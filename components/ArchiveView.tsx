@@ -4,15 +4,16 @@ import React, { useState } from 'react';
 import {
   Database,
   ArrowLeft,
-  Play,
   Lock,
   Zap,
   Link as LinkIcon,
 } from 'lucide-react';
 import glossaryData from '@/data/glossary.json';
 import spiderWebData from '@/data/spider_web.json';
+import ChronologyTab from '@/components/ChronologyTab';
 
 type ArchiveViewProps = {
+  currentSeason?: number; // 追加: 現在の到達シーズン（親から受け取る）
   unlockedTerms: string[];
   readTerms: string[];
   insightPoints: number;
@@ -28,6 +29,7 @@ type ArchiveViewProps = {
 };
 
 export default function ArchiveView({
+  currentSeason = 1, // デフォルトはSeason 1
   unlockedTerms,
   readTerms,
   insightPoints,
@@ -45,7 +47,6 @@ export default function ArchiveView({
   );
   const [activeTerm, setActiveTerm] = useState<any | null>(null);
 
-  // ▼ 新規追加(復元): A-Zフィルタリング用のステート
   const [activeLetter, setActiveLetter] = useState<string>('ALL');
   const alphabet = ['ALL', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')];
 
@@ -55,8 +56,6 @@ export default function ArchiveView({
     msg: string;
     type: 'success' | 'fail';
   } | null>(null);
-
-  const availableEpisodes = ['#01', '#02', '#03', '#06'];
 
   const unsolvedPins = spiderWebData.pins.filter(
     (pin) => clearedData[pin.source_episode] && !unlockedTruths[pin.id]
@@ -93,7 +92,6 @@ export default function ArchiveView({
     setTimeout(() => setLinkFeedback(null), 3000);
   };
 
-  // ▼ 新規追加(復元): 選択中のA-Zタブに合わせて単語をフィルタリング
   const filteredTerms = glossaryData.terms.filter((term) => {
     if (activeLetter === 'ALL') return true;
     return term.en.toUpperCase().startsWith(activeLetter);
@@ -158,58 +156,14 @@ export default function ArchiveView({
       </div>
 
       <div className="flex-1 overflow-hidden relative">
+        {/* ▼ 変更: ChronologyTab コンポーネントに置き換え */}
         {activeTab === 'case' && (
-          <div className="p-4 overflow-y-auto h-full space-y-3 custom-scrollbar">
-            {availableEpisodes.map((epId) => {
-              const data = clearedData[epId];
-              return (
-                <div
-                  key={epId}
-                  className="border-2 border-slate-800 bg-white p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
-                >
-                  <div>
-                    <h3 className="font-bold font-serif text-lg uppercase">
-                      CASE : {epId}
-                    </h3>
-                    {data ? (
-                      <div className="text-sm font-mono mt-1 space-x-3">
-                        <span className="text-slate-500">
-                          TETHER:{' '}
-                          <span className="text-slate-800 font-bold">
-                            {data.tether}%
-                          </span>
-                        </span>
-                        <span className="text-slate-500">
-                          RANK:{' '}
-                          <span
-                            className={`font-bold ${
-                              data.rank === 'LUCID'
-                                ? 'text-green-700'
-                                : data.rank === 'SYMPATHETIC'
-                                ? 'text-blue-700'
-                                : 'text-red-700'
-                            }`}
-                          >
-                            {data.rank}
-                          </span>
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="text-sm font-mono mt-1 text-slate-400">
-                        UNRESOLVED
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => onPlayEpisode(epId)}
-                    className="flex items-center gap-1 bg-slate-800 text-white px-4 py-2 font-bold text-sm hover:bg-slate-700 active:scale-95 transition-all w-full sm:w-auto justify-center"
-                  >
-                    <Play className="w-4 h-4" />{' '}
-                    {data ? 'REINVESTIGATE' : 'INVESTIGATE'}
-                  </button>
-                </div>
-              );
-            })}
+          <div className="p-4 overflow-y-auto h-full custom-scrollbar">
+            <ChronologyTab
+              currentSeason={currentSeason}
+              clearedData={clearedData}
+              onPlayEpisode={onPlayEpisode}
+            />
           </div>
         )}
 
@@ -228,7 +182,6 @@ export default function ArchiveView({
               </button>
             </div>
 
-            {/* ▼ 復元部分: A-Z フィルタリングバー */}
             <div className="flex overflow-x-auto bg-slate-800 p-2 shrink-0 custom-scrollbar gap-1">
               {alphabet.map((letter) => (
                 <button
