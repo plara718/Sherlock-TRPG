@@ -22,8 +22,10 @@ export default function GamePage() {
   const [insightPoints, setInsightPoints] = useState<number>(0);
   const [clearedData, setClearedData] = useState<ClearedData>({});
 
-  // ▼ 新規追加: 蜘蛛の巣ボードの解放済み「真実ノード」の保存
   const [unlockedTruths, setUnlockedTruths] = useState<Record<string, any>>({});
+  
+  // ▼ 新規追加: シーズン進行度の管理
+  const [currentSeason, setCurrentSeason] = useState<number>(1);
 
   useEffect(() => {
     const save = localStorage.getItem('tether_save_data');
@@ -41,9 +43,12 @@ export default function GamePage() {
     const cleared = localStorage.getItem('tether_cleared_data');
     if (cleared) setClearedData(JSON.parse(cleared));
 
-    // ▼ 新規追加: 真実ノードの読み込み
     const truths = localStorage.getItem('tether_unlocked_truths');
     if (truths) setUnlockedTruths(JSON.parse(truths));
+
+    // ▼ 新規追加: シーズン情報の読み込み
+    const season = localStorage.getItem('tether_current_season');
+    if (season) setCurrentSeason(parseInt(season, 10));
 
     setIsInitialized(true);
   }, []);
@@ -54,8 +59,10 @@ export default function GamePage() {
     } else {
       localStorage.setItem('tether_save_data', 'true');
       localStorage.setItem('tether_insight_points', '5');
+      localStorage.setItem('tether_current_season', '1');
       setHasSaveData(true);
       setInsightPoints(5);
+      setCurrentSeason(1);
       setCurrentEpisodeId('#01');
       setView('game');
     }
@@ -70,13 +77,16 @@ export default function GamePage() {
       localStorage.removeItem('tether_read_terms');
       localStorage.removeItem('tether_insight_points');
       localStorage.removeItem('tether_cleared_data');
-      localStorage.removeItem('tether_unlocked_truths'); // 追加
+      localStorage.removeItem('tether_unlocked_truths');
+      localStorage.removeItem('tether_current_season'); // 追加
+      
       setHasSaveData(false);
       setUnlockedTerms([]);
       setReadTerms([]);
       setInsightPoints(0);
       setClearedData({});
-      setUnlockedTruths({}); // 追加
+      setUnlockedTruths({});
+      setCurrentSeason(1); // 追加
       setCurrentEpisodeId('#01');
     }
   };
@@ -97,6 +107,30 @@ export default function GamePage() {
       const newPoints = insightPoints + points;
       setInsightPoints(newPoints);
       localStorage.setItem('tether_insight_points', newPoints.toString());
+    }
+
+    // ▼ 新規追加: シーズン1終了時の特別ルーティング
+    if (epId === '#13' && !isAlreadyCleared) {
+      // #13を初めてクリアした直後は、アーカイブに戻らずそのまま幕間へ遷移
+      setCurrentEpisodeId('interlude_s1');
+      setView('game');
+      return; 
+    }
+
+    if (epId === 'interlude_s1' && !isAlreadyCleared) {
+      // 幕間を読み終わった時、中央のモリアーティノードを強制解禁する
+      const masterTruth = {
+        node_title: "ジェームズ・モリアーティ教授",
+        hidden_note: "【犯罪界のナポレオン】ロンドンの地下を支配する巨大な蜘蛛の巣の中心。彼は自らの手を汚さず、冷徹な計算によって完全な犯罪システムを構築している。Season 2へ続く――。",
+        reward_points: 0
+      };
+      const newTruths = { ...unlockedTruths, "pin_s1_master": masterTruth };
+      setUnlockedTruths(newTruths);
+      localStorage.setItem('tether_unlocked_truths', JSON.stringify(newTruths));
+
+      // シーズン2進行フラグを立てる
+      setCurrentSeason(2);
+      localStorage.setItem('tether_current_season', '2');
     }
 
     setView('archive');
@@ -138,7 +172,6 @@ export default function GamePage() {
     }
   };
 
-  // ▼ 新規追加: 蜘蛛の巣ボードでLINKに成功した時の処理
   const handleUnlockTruth = (
     pinId: string,
     truthData: any,
@@ -148,13 +181,11 @@ export default function GamePage() {
     setUnlockedTruths(newTruths);
     localStorage.setItem('tether_unlocked_truths', JSON.stringify(newTruths));
 
-    // コスト消費と報酬の加算
     const newPoints = insightPoints - linkCost + (truthData.reward_points || 0);
     setInsightPoints(newPoints);
     localStorage.setItem('tether_insight_points', newPoints.toString());
   };
 
-  // ▼ 新規追加: LINKに失敗した時（コストのみ消費）
   const handleLinkFail = (linkCost: number) => {
     const newPoints = Math.max(0, insightPoints - linkCost);
     setInsightPoints(newPoints);
@@ -196,7 +227,7 @@ export default function GamePage() {
           readTerms={readTerms}
           insightPoints={insightPoints}
           clearedData={clearedData}
-          unlockedTruths={unlockedTruths} // 追加
+          unlockedTruths={unlockedTruths}
           onReturnTitle={() => setView('title')}
           onReturnGame={() => setView('game')}
           onPlayEpisode={(epId) => {
@@ -205,8 +236,8 @@ export default function GamePage() {
           }}
           onResearch={handleResearch}
           onReadTerm={handleReadTerm}
-          onUnlockTruth={handleUnlockTruth} // 追加
-          onLinkFail={handleLinkFail} // 追加
+          onUnlockTruth={handleUnlockTruth}
+          onLinkFail={handleLinkFail}
         />
       )}
     </div>

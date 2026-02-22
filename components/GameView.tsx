@@ -4,18 +4,41 @@ import React, { useRef, useEffect, useState } from 'react';
 import TetherBar from '@/components/TetherBar';
 import Controls from '@/components/Controls';
 import GlossaryToast from '@/components/GlossaryToast';
-import InterruptPanel from '@/components/InterruptPanel'; // ← 新規追加
+import InterruptPanel from '@/components/InterruptPanel';
 import { useGameLogic, ScenarioData } from '@/lib/useGameLogic';
-import { FileText } from 'lucide-react';
+import { FileText, ArrowRight } from 'lucide-react';
 
 import episode01 from '@/data/episode_01.json';
 import episode02 from '@/data/episode_02.json';
-// ※テストプレイ用に episode_06 等も必要に応じてimportしてください
+import episode03 from '@/data/episode_03.json';
+import episode04 from '@/data/episode_04.json';
+import episode05 from '@/data/episode_05.json';
+import episode06 from '@/data/episode_06.json';
+import episode07 from '@/data/episode_07.json';
+import episode08 from '@/data/episode_08.json';
+import episode09 from '@/data/episode_09.json';
+import episode10 from '@/data/episode_10.json';
+import episode11 from '@/data/episode_11.json';
+import episode12 from '@/data/episode_12.json';
+import episode13 from '@/data/episode_13.json';
+import interludeS1 from '@/data/interlude_s1.json'; // ← 追加: 幕間データ
 import glossaryData from '@/data/glossary.json';
 
 const SCENARIOS: Record<string, any> = {
   '#01': episode01,
   '#02': episode02,
+  '#03': episode03,
+  '#04': episode04,
+  '#05': episode05,
+  '#06': episode06,
+  '#07': episode07,
+  '#08': episode08,
+  '#09': episode09,
+  '#10': episode10,
+  '#11': episode11,
+  '#12': episode12,
+  '#13': episode13,
+  'interlude_s1': interludeS1, // ← 追加
 };
 
 type GameViewProps = {
@@ -44,7 +67,6 @@ export default function GameView({
     desc: string;
   } | null>(null);
 
-  // ▼ 新規追加: Interrupt（繋ぎ止め）モードの判定フラグ
   const [isInterruptMode, setIsInterruptMode] = useState(false);
 
   const {
@@ -69,14 +91,11 @@ export default function GameView({
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // 誤操作対策用のRef
   const isScrollingRef = useRef(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const lastActionTimeRef = useRef<number>(0);
 
-  // ▼ 新規追加: ホームズの暴走（[<NOISE>]）を検知してパネルを切り替える
   useEffect(() => {
-    // 現在のテキストに [<NOISE>] が含まれており、かつ文字送りが完了したらモード切替
     if (currentBeat?.text.includes('[<NOISE>]') && !isStreaming) {
       setIsInterruptMode(true);
     } else {
@@ -103,7 +122,6 @@ export default function GameView({
     parts.forEach((part, i) => {
       if (part.startsWith('{') && part.endsWith('}')) {
         const word = part.slice(1, -1);
-        // 手帳にストック済みの場合はグレーアウト等のスタイルに変更するロジック
         const isCollected = collectedEvidence.includes(word);
         elements.push(
           <span
@@ -253,7 +271,6 @@ export default function GameView({
         </div>
       </div>
 
-      {/* ▼ 修正: パネル表示時は通常の証拠バーを隠す */}
       {!isInterruptMode && collectedEvidence.length > 0 && (
         <div className="p-2 sm:p-3 bg-slate-800 flex flex-wrap gap-2 border-t-2 border-slate-600 shrink-0 shadow-inner overflow-x-auto custom-scrollbar">
           <span className="text-[10px] font-mono text-slate-400 flex items-center mr-2 tracking-widest">
@@ -279,22 +296,18 @@ export default function GameView({
         </div>
       )}
 
-      {/* ▼ 修正: Controls部分を分岐（InterruptPanel / Controls） */}
       <div onClick={(e) => e.stopPropagation()}>
         {isInterruptMode ? (
           <InterruptPanel
             collectedEvidences={collectedEvidence}
             onSubmit={(skill, evidence) => {
-              // まず選択された証拠をセット
               handleSelectEvidence(evidence);
-              // 少し遅延させてからInterruptを実行（Stateの反映待ち）
               setTimeout(() => {
                 handleInterrupt(skill);
               }, 10);
               setIsInterruptMode(false);
             }}
             onTimeUp={() => {
-              // 時間切れペナルティとして、強制的に失敗判定を発生させる
               handleInterrupt('TIMEOUT');
               setIsInterruptMode(false);
             }}
@@ -317,7 +330,7 @@ export default function GameView({
         />
       )}
 
-      {/* リザルト画面 */}
+      {/* ▼ 修正: 通常エピソードクリア時（リザルト画面） */}
       {isCompleted && endResult && (
         <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-4 animate-in fade-in duration-500">
           <div
@@ -407,6 +420,24 @@ export default function GameView({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ▼ 修正: カットシーン完了時（リザルトを出さずに次へ進むUI） */}
+      {isCompleted && !endResult && (
+        <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 animate-in fade-in duration-1000">
+          <p className="text-white text-lg font-serif tracking-widest mb-8 animate-pulse text-center">
+            ―― そして、点と点が繋がる。
+          </p>
+          <button
+            onClick={() => {
+              // カットシーンなので、便宜上のランクやポイントを渡して完了処理へ
+              onEpisodeComplete(episodeId, "INTERLUDE", tether, 0);
+            }}
+            className="bg-transparent border border-white text-white hover:bg-white hover:text-black font-bold py-3 px-8 rounded tracking-widest transition-all duration-300 flex items-center gap-2"
+          >
+            次へ進む <ArrowRight size={20} />
+          </button>
         </div>
       )}
     </div>
