@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Network, Lock, HelpCircle, X } from 'lucide-react';
+// ▼ここを spider_web.json に修正しています
 import spiderData from '@/data/spider_web.json';
 import glossaryData from '@/data/glossary.json';
 
@@ -21,13 +22,11 @@ export default function SpiderWebTab({
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   
-  // チュートリアル用のステート管理
   const [tutorialStep, setTutorialStep] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<any[]>([]);
 
-  // クリア状況からチュートリアルの発火を判定
   useEffect(() => {
     const hasClearedEp6 = Object.keys(clearedData).includes('#06');
     const hasSeenTutorial = localStorage.getItem('tether_spider_tutorial_done');
@@ -37,7 +36,6 @@ export default function SpiderWebTab({
     }
   }, [clearedData]);
 
-  // 初期ノードの配置計算
   useEffect(() => {
     if (!containerRef.current) return;
     const { clientWidth, clientHeight } = containerRef.current;
@@ -80,7 +78,6 @@ export default function SpiderWebTab({
   return (
     <div className="relative w-full h-full flex flex-col animate-in fade-in duration-300">
       
-      {/* ヘッダー領域 */}
       <div className="flex items-end justify-between mb-4 border-b border-slate-300 pb-2 shrink-0">
         <div className="flex items-center gap-3">
           <div>
@@ -110,7 +107,6 @@ export default function SpiderWebTab({
         </div>
       </div>
 
-      {/* ヘルプモーダル */}
       {showHelp && (
         <div className="absolute inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-[#f4ecd8] border-2 border-amber-700 p-6 rounded shadow-2xl max-w-md w-full relative">
@@ -139,7 +135,6 @@ export default function SpiderWebTab({
         </div>
       )}
 
-      {/* チュートリアルオーバーレイ */}
       {tutorialStep > 0 && (
         <div className="absolute inset-0 z-[60] bg-black/70 flex items-center justify-center pointer-events-none animate-in fade-in">
           <div className="bg-slate-900 border-2 border-amber-500 p-6 rounded-lg shadow-[0_0_30px_rgba(245,158,11,0.3)] max-w-sm pointer-events-auto text-center transform -translate-y-12">
@@ -160,7 +155,6 @@ export default function SpiderWebTab({
         </div>
       )}
 
-      {/* ネットワーク描画エリア */}
       <div
         ref={containerRef}
         className={`flex-1 bg-slate-900 rounded-lg border-2 border-slate-700 relative overflow-hidden shadow-inner ${tutorialStep === 1 ? 'ring-4 ring-amber-500/50 animate-pulse' : ''}`}
@@ -168,14 +162,12 @@ export default function SpiderWebTab({
       >
         <div className="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-500/20 via-slate-900 to-black" />
         
-        {/* 背景の同心円グリッド */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
           <div className="w-[80%] h-[80%] border border-amber-500 rounded-full absolute" />
           <div className="w-[50%] h-[50%] border border-amber-500 rounded-full absolute" />
           <div className="w-[20%] h-[20%] border border-amber-500 rounded-full absolute bg-amber-900/20" />
         </div>
 
-        {/* 接続線の描画 */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
           {nodes.map((node) => {
             if (!node.isCleared) return null;
@@ -201,7 +193,6 @@ export default function SpiderWebTab({
           })}
         </svg>
 
-        {/* 中央のコアノード */}
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center pointer-events-none">
           <div className="w-12 h-12 bg-black border-2 border-amber-700 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(180,83,9,0.5)]">
             <span className="text-amber-500 font-serif font-bold text-lg">
@@ -213,7 +204,6 @@ export default function SpiderWebTab({
           </span>
         </div>
 
-        {/* 各事件ノードの配置 */}
         {nodes.map((node) => {
           if (!node.isCleared) return null;
           const isSelected = selectedPinId === node.id;
@@ -246,7 +236,6 @@ export default function SpiderWebTab({
           );
         })}
 
-        {/* ノード詳細パネル */}
         {selectedNode && (
           <div
             className="absolute bottom-4 left-4 right-4 bg-slate-800/95 border-l-4 border-amber-600 p-4 rounded shadow-2xl z-30 backdrop-blur-sm animate-in slide-in-from-bottom-4"
