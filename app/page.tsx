@@ -24,7 +24,6 @@ export default function GamePage() {
 
   const [unlockedTruths, setUnlockedTruths] = useState<Record<string, any>>({});
   
-  // ▼ 新規追加: シーズン進行度の管理
   const [currentSeason, setCurrentSeason] = useState<number>(1);
 
   useEffect(() => {
@@ -46,7 +45,6 @@ export default function GamePage() {
     const truths = localStorage.getItem('tether_unlocked_truths');
     if (truths) setUnlockedTruths(JSON.parse(truths));
 
-    // ▼ 新規追加: シーズン情報の読み込み
     const season = localStorage.getItem('tether_current_season');
     if (season) setCurrentSeason(parseInt(season, 10));
 
@@ -78,7 +76,7 @@ export default function GamePage() {
       localStorage.removeItem('tether_insight_points');
       localStorage.removeItem('tether_cleared_data');
       localStorage.removeItem('tether_unlocked_truths');
-      localStorage.removeItem('tether_current_season'); // 追加
+      localStorage.removeItem('tether_current_season');
       
       setHasSaveData(false);
       setUnlockedTerms([]);
@@ -86,7 +84,7 @@ export default function GamePage() {
       setInsightPoints(0);
       setClearedData({});
       setUnlockedTruths({});
-      setCurrentSeason(1); // 追加
+      setCurrentSeason(1);
       setCurrentEpisodeId('#01');
     }
   };
@@ -109,16 +107,13 @@ export default function GamePage() {
       localStorage.setItem('tether_insight_points', newPoints.toString());
     }
 
-    // ▼ 新規追加: シーズン1終了時の特別ルーティング
     if (epId === '#13' && !isAlreadyCleared) {
-      // #13を初めてクリアした直後は、アーカイブに戻らずそのまま幕間へ遷移
       setCurrentEpisodeId('interlude_s1');
       setView('game');
       return; 
     }
 
     if (epId === 'interlude_s1' && !isAlreadyCleared) {
-      // 幕間を読み終わった時、中央のモリアーティノードを強制解禁する
       const masterTruth = {
         node_title: "ジェームズ・モリアーティ教授",
         hidden_note: "【犯罪界のナポレオン】ロンドンの地下を支配する巨大な蜘蛛の巣の中心。彼は自らの手を汚さず、冷徹な計算によって完全な犯罪システムを構築している。Season 2へ続く――。",
@@ -128,7 +123,6 @@ export default function GamePage() {
       setUnlockedTruths(newTruths);
       localStorage.setItem('tether_unlocked_truths', JSON.stringify(newTruths));
 
-      // シーズン2進行フラグを立てる
       setCurrentSeason(2);
       localStorage.setItem('tether_current_season', '2');
     }
@@ -137,7 +131,8 @@ export default function GamePage() {
   };
 
   const handleResearch = () => {
-    const clearedEpIds = Object.keys(clearedData).map((id) => `S1-${id}`);
+    // ▼ 修正: S1- という強制プレフィックスを廃止し、そのままのIDで判定
+    const clearedEpIds = Object.keys(clearedData); 
     const availableTerms = glossaryData.terms.filter(
       (t) =>
         !unlockedTerms.includes(t.id) &&
@@ -223,6 +218,7 @@ export default function GamePage() {
 
       {view === 'archive' && (
         <ArchiveView
+          currentSeason={currentSeason}
           unlockedTerms={unlockedTerms}
           readTerms={readTerms}
           insightPoints={insightPoints}
