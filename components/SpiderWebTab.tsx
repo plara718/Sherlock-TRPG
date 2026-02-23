@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Network, Lock, HelpCircle, X } from 'lucide-react';
-// ▼ここを spider_web.json に修正しています
+import { Network, Lock, HelpCircle, X, AlertCircle } from 'lucide-react';
 import spiderData from '@/data/spider_web.json';
 import glossaryData from '@/data/glossary.json';
 
@@ -22,11 +21,16 @@ export default function SpiderWebTab({
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   
+  // チュートリアルステート
   const [tutorialStep, setTutorialStep] = useState(0);
+  
+  // エラー演出用のステート（シェイクするノードのIDを保持）
+  const [errorNodeId, setErrorNodeId] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<any[]>([]);
 
+  // チュートリアルの発火判定
   useEffect(() => {
     const hasClearedEp6 = Object.keys(clearedData).includes('#06');
     const hasSeenTutorial = localStorage.getItem('tether_spider_tutorial_done');
@@ -36,6 +40,7 @@ export default function SpiderWebTab({
     }
   }, [clearedData]);
 
+  // ノードの配置計算
   useEffect(() => {
     if (!containerRef.current) return;
     const { clientWidth, clientHeight } = containerRef.current;
@@ -46,6 +51,7 @@ export default function SpiderWebTab({
       const isCleared = Object.keys(clearedData).includes(pin.source_episode);
       const isTruthUnlocked = unlockedTerms.includes(pin.required_index_id);
 
+      // 解放済みは内側、未解放は外側に配置
       const angle = (index / spiderData.pins.length) * Math.PI * 2;
       const radius = isTruthUnlocked ? clientWidth * 0.15 : clientWidth * 0.35;
 
@@ -78,6 +84,7 @@ export default function SpiderWebTab({
   return (
     <div className="relative w-full h-full flex flex-col animate-in fade-in duration-300">
       
+      {/* ヘッダー領域 */}
       <div className="flex items-end justify-between mb-4 border-b border-slate-300 pb-2 shrink-0">
         <div className="flex items-center gap-3">
           <div>
@@ -107,6 +114,7 @@ export default function SpiderWebTab({
         </div>
       </div>
 
+      {/* ヘルプモーダル */}
       {showHelp && (
         <div className="absolute inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-[#f4ecd8] border-2 border-amber-700 p-6 rounded shadow-2xl max-w-md w-full relative">
@@ -135,9 +143,13 @@ export default function SpiderWebTab({
         </div>
       )}
 
+      {/* チュートリアルオーバーレイ（誤操作防止のため pointer-events-auto を全面に付与） */}
       {tutorialStep > 0 && (
-        <div className="absolute inset-0 z-[60] bg-black/70 flex items-center justify-center pointer-events-none animate-in fade-in">
-          <div className="bg-slate-900 border-2 border-amber-500 p-6 rounded-lg shadow-[0_0_30px_rgba(245,158,11,0.3)] max-w-sm pointer-events-auto text-center transform -translate-y-12">
+        <div 
+          className="absolute inset-0 z-[60] bg-black/70 flex items-center justify-center pointer-events-auto animate-in fade-in"
+          onClick={(e) => e.stopPropagation()} // 背後へのクリック貫通を防止
+        >
+          <div className="bg-slate-900 border-2 border-amber-500 p-6 rounded-lg shadow-[0_0_30px_rgba(245,158,11,0.3)] max-w-sm text-center transform -translate-y-12">
             <h3 className="text-amber-500 font-bold font-mono text-sm tracking-widest mb-3 border-b border-amber-500/30 pb-2">
               SYSTEM INTERCEPT
             </h3>
@@ -155,19 +167,24 @@ export default function SpiderWebTab({
         </div>
       )}
 
+      {/* ネットワーク描画エリア */}
       <div
         ref={containerRef}
         className={`flex-1 bg-slate-900 rounded-lg border-2 border-slate-700 relative overflow-hidden shadow-inner ${tutorialStep === 1 ? 'ring-4 ring-amber-500/50 animate-pulse' : ''}`}
-        onClick={() => setSelectedPinId(null)}
+        onClick={() => {
+          if (tutorialStep === 0) setSelectedPinId(null);
+        }}
       >
         <div className="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-500/20 via-slate-900 to-black" />
         
+        {/* 背景の同心円グリッド */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
           <div className="w-[80%] h-[80%] border border-amber-500 rounded-full absolute" />
           <div className="w-[50%] h-[50%] border border-amber-500 rounded-full absolute" />
           <div className="w-[20%] h-[20%] border border-amber-500 rounded-full absolute bg-amber-900/20" />
         </div>
 
+        {/* 接続線の描画 */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
           {nodes.map((node) => {
             if (!node.isCleared) return null;
@@ -193,6 +210,7 @@ export default function SpiderWebTab({
           })}
         </svg>
 
+        {/* 中央のコアノード */}
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center pointer-events-none">
           <div className="w-12 h-12 bg-black border-2 border-amber-700 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(180,83,9,0.5)]">
             <span className="text-amber-500 font-serif font-bold text-lg">
@@ -204,31 +222,47 @@ export default function SpiderWebTab({
           </span>
         </div>
 
+        {/* 各事件ノードの配置（タップ判定エリア拡大＆エラー演出付き） */}
         {nodes.map((node) => {
           if (!node.isCleared) return null;
           const isSelected = selectedPinId === node.id;
+          const isErrorShake = errorNodeId === node.id;
 
           return (
             <div
               key={node.id}
-              className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer z-20 transition-all duration-500 ease-out"
+              className={`absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer z-20 transition-all duration-500 ease-out p-4 ${
+                isErrorShake ? 'animate-[shake_0.4s_ease-in-out]' : ''
+              }`} // p-4 を追加して透明なタップ判定エリアを大幅に拡大
               style={{ left: node.x, top: node.y }}
               onClick={(e) => {
                 e.stopPropagation();
+                if (tutorialStep > 0) return; // チュートリアル中は操作無効
+                
                 setSelectedPinId(node.id);
+                
+                // 未解放ノードをタップした場合はエラー演出（シェイク）を発動
+                if (!node.isTruthUnlocked) {
+                  setErrorNodeId(node.id);
+                  setTimeout(() => setErrorNodeId(null), 400); // 400msで解除
+                }
               }}
             >
               <div
-                className={`w-4 h-4 rounded-full border-2 transition-all duration-300 ${
+                className={`w-4 h-4 rounded-full border-2 transition-all duration-300 mx-auto ${
                   isSelected
                     ? 'bg-amber-400 border-white scale-150 shadow-[0_0_15px_rgba(251,191,36,0.8)]'
+                    : isErrorShake
+                    ? 'bg-red-600 border-red-300 scale-125 shadow-[0_0_15px_rgba(220,38,38,0.8)]'
                     : node.isTruthUnlocked
                     ? 'bg-amber-700 border-amber-400 hover:scale-125'
                     : 'bg-slate-700 border-slate-500 hover:scale-125 hover:bg-slate-600'
                 }`}
               />
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-max text-center pointer-events-none">
-                <p className="text-[9px] font-mono text-slate-400 bg-black/60 px-1 rounded">
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 w-max text-center pointer-events-none">
+                <p className={`text-[9px] font-mono px-1 rounded transition-colors ${
+                  isErrorShake ? 'text-red-300 bg-red-900/80' : 'text-slate-400 bg-black/60'
+                }`}>
                   {node.source_episode}
                 </p>
               </div>
@@ -236,14 +270,19 @@ export default function SpiderWebTab({
           );
         })}
 
+        {/* ノード詳細パネル */}
         {selectedNode && (
           <div
-            className="absolute bottom-4 left-4 right-4 bg-slate-800/95 border-l-4 border-amber-600 p-4 rounded shadow-2xl z-30 backdrop-blur-sm animate-in slide-in-from-bottom-4"
+            className={`absolute bottom-4 left-4 right-4 bg-slate-800/95 border-l-4 p-4 rounded shadow-2xl z-30 backdrop-blur-sm animate-in slide-in-from-bottom-4 ${
+              selectedNode.isTruthUnlocked ? 'border-amber-600' : 'border-slate-500'
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-start mb-2 border-b border-slate-600 pb-2">
               <div>
-                <span className="text-[10px] font-mono text-amber-500 bg-amber-900/30 px-2 py-0.5 rounded mr-2">
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded mr-2 ${
+                  selectedNode.isTruthUnlocked ? 'text-amber-500 bg-amber-900/30' : 'text-slate-400 bg-slate-700'
+                }`}>
                   {selectedNode.source_episode}
                 </span>
                 <span className="text-xs font-bold text-slate-300 font-mono">
@@ -263,18 +302,20 @@ export default function SpiderWebTab({
             </h3>
 
             {!selectedNode.isTruthUnlocked ? (
-              <div className="bg-slate-900/50 p-3 rounded border border-slate-700">
+              <div className="bg-slate-900/50 p-3 rounded border border-slate-700 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-[repeating-linear-gradient(45deg,transparent,transparent_5px,rgba(255,0,0,0.1)_5px,rgba(255,0,0,0.1)_10px)] pointer-events-none" />
                 <div className="flex items-center gap-2 text-slate-400 mb-2">
-                  <Lock size={14} />
-                  <span className="text-[10px] font-mono uppercase tracking-widest">
+                  <Lock size={14} className="text-red-400/80" />
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-red-400/80">
                     Encrypted Query
                   </span>
                 </div>
-                <p className="text-sm text-slate-300 italic">
+                <p className="text-sm text-slate-300 italic mb-3">
                   {selectedNode.question}
                 </p>
-                <div className="mt-3 text-[10px] text-amber-700 font-mono text-right">
-                  * 大索引で関連データ [{selectedNode.required_index_id}] を解読せよ
+                <div className="flex items-center justify-end gap-1 text-[10px] text-amber-600 font-mono bg-amber-900/20 py-1 px-2 rounded w-fit ml-auto border border-amber-900/50">
+                  <AlertCircle size={12} />
+                  大索引で [{selectedNode.required_index_id}] を解読せよ
                 </div>
               </div>
             ) : (
