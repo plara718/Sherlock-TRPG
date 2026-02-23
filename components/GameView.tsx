@@ -48,6 +48,7 @@ type GameViewProps = {
   onBack: () => void;
   unlockedTerms: string[];
   setUnlockedTerms: (terms: string[]) => void;
+  clearedData: { [epId: string]: { rank: string; tether: number } }; // ▼ 追加：クリア状況を受け取る
   onEpisodeComplete: (
     epId: string,
     rank: string,
@@ -61,6 +62,7 @@ export default function GameView({
   onBack,
   unlockedTerms,
   setUnlockedTerms,
+  clearedData,
   onEpisodeComplete,
 }: GameViewProps) {
   const scenarioData = SCENARIOS[episodeId] || SCENARIOS['#00'];
@@ -71,6 +73,9 @@ export default function GameView({
 
   const [isInterruptMode, setIsInterruptMode] = useState(false);
   const [screenEffect, setScreenEffect] = useState<'none' | 'flash' | 'shake'>('none');
+
+  // ▼ 追加：現在のエピソードがすでにクリア済みかどうかを判定
+  const isReplay = Boolean(clearedData[episodeId]);
 
   const {
     currentBeat,
@@ -90,7 +95,7 @@ export default function GameView({
     selectedSkill,
     isCompleted,
     endResult,
-  } = useGameLogic(scenarioData as ScenarioData);
+  } = useGameLogic(scenarioData as ScenarioData, isReplay); // ▼ 修正：isReplay を渡す
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -436,6 +441,12 @@ export default function GameView({
                 <p className="text-3xl font-bold text-amber-700 font-mono">
                   +{endResult.points} pt
                 </p>
+                {/* ▼ 追加：再プレイ時は注意書きを表示 */}
+                {isReplay && (
+                  <p className="text-[10px] text-amber-800 mt-1 font-mono tracking-tighter">
+                    *再プレイのため報酬は制限されています
+                  </p>
+                )}
               </div>
 
               <button

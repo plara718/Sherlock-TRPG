@@ -9,10 +9,10 @@ type ClearedData = {
 };
 
 type ChronologyTabProps = {
-  currentSeason: number; // 追加: 現在の到達シーズン
+  currentSeason: number;
   clearedData: ClearedData;
   onPlayEpisode: (epId: string) => void;
-  onShowReport?: (epId: string, epTitle: string) => void; // 今回は使用しない場合もあるが予約
+  onShowReport?: (epId: string, epTitle: string) => void;
 };
 
 export default function ChronologyTab({
@@ -28,6 +28,9 @@ export default function ChronologyTab({
     archiveData.seasons.find((s) => s.season_id === activeTab) ||
     archiveData.seasons[0];
 
+  // 全エピソードのフラットなリスト（順次解放の判定用）
+  const allEpisodes = archiveData.seasons.flatMap(s => s.episodes);
+
   return (
     <div className="animate-in fade-in duration-300">
       <p className="text-slate-600 mb-6 text-xs sm:text-sm mt-2 font-mono">
@@ -37,8 +40,6 @@ export default function ChronologyTab({
       {/* シーズン切り替えタブ */}
       <div className="flex overflow-x-auto gap-2 mb-8 pb-2 border-b border-slate-300 custom-scrollbar">
         {archiveData.seasons.map((s) => {
-          // currentSeasonより先、かつSPステージ（99）ではない場合はロック
-          // ※SPステージは別途各エピソードの解放条件で制御
           const isLocked = s.season_id > currentSeason && s.season_id !== 99;
 
           return (
@@ -58,7 +59,7 @@ export default function ChronologyTab({
                   : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
               }`}
             >
-              {s.title.split(':')[0]} {/* "Season 1" などの部分だけ表示 */}
+              {s.title.split(':')[0]}
               {isLocked && <Lock size={14} />}
             </button>
           );
@@ -75,12 +76,21 @@ export default function ChronologyTab({
         </p>
 
         <div className="grid gap-4">
-          {displaySeason.episodes.map((ep) => {
+          {displaySeason.episodes.map((ep, index) => {
             const isExpanded = expandedEp === ep.id;
             const cData = clearedData[ep.id];
             
-            // 未解放判定（summaryに未解放という文字が含まれていればプレイ不可）
-            const isPlayable = !ep.summary.includes('未解放') && !ep.summary.includes('到達すると解放');
+            // 全体でのインデックスを取得
+            const globalIndex = allEpisodes.findIndex(e => e.id === ep.id);
+            const prevEp = globalIndex > 0 ? allEpisodes[globalIndex - 1] : null;
+
+            // プレイ可能条件：
+            // 1. summaryに「未解放」が含まれていない（未実装データではない）
+            // 2. すでにクリア済みである
+            // 3. または、一つ前のエピソードがクリア済みである（一番最初の #00 は無条件解放）
+            const isImplemented = !ep.summary.includes('未解放') && !ep.summary.includes('到達すると解放');
+            const isNextPlayable = globalIndex === 0 || (prevEp && clearedData[prevEp.id]);
+            const isPlayable = isImplemented && (cData || isNextPlayable);
 
             return (
               <div
@@ -110,7 +120,7 @@ export default function ChronologyTab({
                       <span>YEAR: {ep.year}</span>
                     </div>
                     <div className="font-bold text-slate-800 text-base sm:text-lg">
-                      {ep.title}
+                      {isPlayable ? ep.title : '??? (ENCRYPTED FILE)'}
                     </div>
                   </div>
 
@@ -147,7 +157,7 @@ export default function ChronologyTab({
                           e.stopPropagation();
                           onPlayEpisode(ep.id);
                         }}
-                        className="text-[10px] sm:text-xs bg-amber-600 text-white px-3 py-1 rounded uppercase font-bold tracking-widest shadow hover:bg-amber-500 flex items-center gap-1"
+                        className="text-[10px] sm:text-xs bg-amber-600 text-white px-3 py-1 rounded uppercase font-bold tracking-widest shadow hover:bg-amber-500 flex items-center gap-1 animate-pulse"
                       >
                         <Play size={12} /> PLAY
                       </button>
@@ -182,12 +192,15 @@ export default function ChronologyTab({
                     )}
 
                     {cData && (
-                      <button
-                        onClick={() => onPlayEpisode(ep.id)}
-                        className="text-xs bg-slate-800 text-white px-4 py-2 rounded shadow hover:bg-slate-700 font-bold tracking-widest uppercase transition-transform active:scale-95"
-                      >
-                        Replay Investigation
-                      </button>
+                      <div className="flex justify-between items-center mt-4">
+                        <button
+                          onClick={() => onPlayEpisode(ep.id)}
+                          className="text-xs bg-slate-800 text-white px-4 py-2 rounded shadow hover:bg-slate-700 font-bold tracking-widest uppercase transition-transform active:scale-95"
+                        >
+                          Replay Investigation
+                        </button>
+                        <span className="text-[10px] text-slate-500 font-mono">* 再プレイ時のクリア報酬(Insight)は1ptに減少します</span>
+                      </div>
                     )}
                   </div>
                 )}

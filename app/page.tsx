@@ -15,7 +15,7 @@ export default function GamePage() {
   const [view, setView] = useState<'title' | 'game' | 'archive'>('title');
   const [hasSaveData, setHasSaveData] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [currentEpisodeId, setCurrentEpisodeId] = useState<string>('#01');
+  const [currentEpisodeId, setCurrentEpisodeId] = useState<string>('#00'); // 開始エピソードを #00（チュートリアル）に変更
 
   const [unlockedTerms, setUnlockedTerms] = useState<string[]>([]);
   const [readTerms, setReadTerms] = useState<string[]>([]);
@@ -56,12 +56,12 @@ export default function GamePage() {
       setView('archive');
     } else {
       localStorage.setItem('tether_save_data', 'true');
-      localStorage.setItem('tether_insight_points', '5');
+      localStorage.setItem('tether_insight_points', '0'); // 初期ポイントは0に変更（チュートリアルで稼ぐため）
       localStorage.setItem('tether_current_season', '1');
       setHasSaveData(true);
-      setInsightPoints(5);
+      setInsightPoints(0);
       setCurrentSeason(1);
-      setCurrentEpisodeId('#01');
+      setCurrentEpisodeId('#00');
       setView('game');
     }
   };
@@ -77,6 +77,7 @@ export default function GamePage() {
       localStorage.removeItem('tether_cleared_data');
       localStorage.removeItem('tether_unlocked_truths');
       localStorage.removeItem('tether_current_season');
+      localStorage.removeItem('tether_spider_tutorial_done'); // スパイダーウェブのチュートリアル完了フラグも削除
       
       setHasSaveData(false);
       setUnlockedTerms([]);
@@ -85,7 +86,7 @@ export default function GamePage() {
       setClearedData({});
       setUnlockedTruths({});
       setCurrentSeason(1);
-      setCurrentEpisodeId('#01');
+      setCurrentEpisodeId('#00');
     }
   };
 
@@ -96,23 +97,25 @@ export default function GamePage() {
     points: number
   ) => {
     const isAlreadyCleared = !!clearedData[epId];
+    
+    // ▼クリア状況の更新（再プレイ時は最新のランクとtetherで上書きされる）
     const newData = { ...clearedData, [epId]: { rank, tether } };
-
     setClearedData(newData);
     localStorage.setItem('tether_cleared_data', JSON.stringify(newData));
 
-    if (!isAlreadyCleared) {
-      const newPoints = insightPoints + points;
-      setInsightPoints(newPoints);
-      localStorage.setItem('tether_insight_points', newPoints.toString());
-    }
+    // ▼ポイントの加算処理（GameView側の useGameLogic で再プレイ時のポイントはすでに 1 に制限されている）
+    const newPoints = insightPoints + points;
+    setInsightPoints(newPoints);
+    localStorage.setItem('tether_insight_points', newPoints.toString());
 
+    // ▼Season 1 のエンディング演出（#13クリア後）
     if (epId === '#13' && !isAlreadyCleared) {
       setCurrentEpisodeId('interlude_s1');
       setView('game');
       return; 
     }
 
+    // ▼Interludeクリア時（Season 2への移行）
     if (epId === 'interlude_s1' && !isAlreadyCleared) {
       const masterTruth = {
         node_title: "ジェームズ・モリアーティ教授",
@@ -131,12 +134,11 @@ export default function GamePage() {
   };
 
   const handleResearch = () => {
-    // ▼ 修正: S1- という強制プレフィックスを廃止し、そのままのIDで判定
     const clearedEpIds = Object.keys(clearedData); 
     const availableTerms = glossaryData.terms.filter(
       (t) =>
         !unlockedTerms.includes(t.id) &&
-        (t.appearance === 'general' || clearedEpIds.includes(t.appearance))
+        (t.appearance === 'general' || clearedEpIds.includes(t.appearance) || t.appearance === 'SP-01')
     );
 
     if (insightPoints > 0 && availableTerms.length > 0) {
@@ -212,6 +214,7 @@ export default function GamePage() {
               JSON.stringify(terms)
             );
           }}
+          clearedData={clearedData} // ▼追加：再プレイ判定用
           onEpisodeComplete={handleEpisodeComplete}
         />
       )}
@@ -223,7 +226,6 @@ export default function GamePage() {
           readTerms={readTerms}
           insightPoints={insightPoints}
           clearedData={clearedData}
-          unlockedTruths={unlockedTruths}
           onReturnTitle={() => setView('title')}
           onReturnGame={() => setView('game')}
           onPlayEpisode={(epId) => {
@@ -232,8 +234,6 @@ export default function GamePage() {
           }}
           onResearch={handleResearch}
           onReadTerm={handleReadTerm}
-          onUnlockTruth={handleUnlockTruth}
-          onLinkFail={handleLinkFail}
         />
       )}
     </div>

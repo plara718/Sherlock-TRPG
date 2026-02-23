@@ -12,7 +12,7 @@ export type ScenarioBeat = {
     success_msg: string;
     fail_msg: string;
     correction_text?: string;
-    hint?: string; // ←【新規追加】ヒントテキスト
+    hint?: string;
   };
 };
 
@@ -41,7 +41,8 @@ const TETHER_PENALTY_FAIL = -15;
 const TETHER_PENALTY_MISS = -15;
 const TETHER_PENALTY_WASTE = -5;
 
-export function useGameLogic(scenarioData: ScenarioData) {
+// ▼ 変更点：第2引数に isReplay を追加（デフォルトは false）
+export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = false) {
   const initialTether = scenarioData.meta.tether_start || 50;
   const beats = scenarioData.beats;
 
@@ -344,27 +345,29 @@ export function useGameLogic(scenarioData: ScenarioData) {
       }
 
       let rank = 'ABYSS';
-      let watson_journal =
-        scenarioData.consequence?.watson_journal?.abyss || '';
-      let points = 1;
+      let watson_journal = scenarioData.consequence?.watson_journal?.abyss || '';
+      let basePoints = 1;
 
+      // ▼ 変更点：初回クリアの基礎報酬を調整
       if (tether >= 80) {
         rank = 'SYMPATHETIC';
-        watson_journal =
-          scenarioData.consequence?.watson_journal?.sympathetic || '';
-        points = 1;
+        watson_journal = scenarioData.consequence?.watson_journal?.sympathetic || '';
+        basePoints = 5; 
       } else if (tether >= 40) {
         rank = 'LUCID';
         watson_journal = scenarioData.consequence?.watson_journal?.lucid || '';
-        points = 3;
+        basePoints = 3;
       }
+
+      // ▼ 変更点：再プレイ時は 1pt に制限
+      const finalPoints = isReplay ? 1 : basePoints;
 
       setEndResult({
         rank,
         official_record: scenarioData.consequence?.official_record || '',
         watson_journal,
         holmes_note: scenarioData.consequence?.holmes_note || '',
-        points,
+        points: finalPoints,
       });
       setIsCompleted(true);
     }
