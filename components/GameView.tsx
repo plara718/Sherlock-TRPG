@@ -6,7 +6,7 @@ import Controls from '@/components/Controls';
 import GlossaryToast from '@/components/GlossaryToast';
 import InterruptPanel from '@/components/InterruptPanel';
 import { useGameLogic, ScenarioData } from '@/lib/useGameLogic';
-import { FileText, ArrowRight } from 'lucide-react';
+import { FileText, ArrowRight, Eye } from 'lucide-react';
 
 import episode00 from '@/data/episode_00.json';
 import episode01 from '@/data/episode_01.json';
@@ -22,7 +22,7 @@ import episode10 from '@/data/episode_10.json';
 import episode11 from '@/data/episode_11.json';
 import episode12 from '@/data/episode_12.json';
 import episode13 from '@/data/episode_13.json';
-import interludeS1 from '@/data/interlude_s1.json';
+// ※14話以降のJSONは未作成のため、現在はエラー回避用に#00をフォールバックとしています
 import glossaryData from '@/data/glossary.json';
 
 const SCENARIOS: Record<string, any> = {
@@ -40,7 +40,6 @@ const SCENARIOS: Record<string, any> = {
   '#11': episode11,
   '#12': episode12,
   '#13': episode13,
-  'interlude_s1': interludeS1,
 };
 
 type GameViewProps = {
@@ -48,7 +47,9 @@ type GameViewProps = {
   onBack: () => void;
   unlockedTerms: string[];
   setUnlockedTerms: (terms: string[]) => void;
-  clearedData: { [epId: string]: { rank: string; tether: number } }; // ▼ 追加：クリア状況を受け取る
+  clearedData: { [epId: string]: { rank: string; tether: number } };
+  insightPoints: number;
+  onSpendPoint: (amount: number) => boolean;
   onEpisodeComplete: (
     epId: string,
     rank: string,
@@ -63,6 +64,8 @@ export default function GameView({
   unlockedTerms,
   setUnlockedTerms,
   clearedData,
+  insightPoints,
+  onSpendPoint,
   onEpisodeComplete,
 }: GameViewProps) {
   const scenarioData = SCENARIOS[episodeId] || SCENARIOS['#00'];
@@ -73,9 +76,13 @@ export default function GameView({
 
   const [isInterruptMode, setIsInterruptMode] = useState(false);
   const [screenEffect, setScreenEffect] = useState<'none' | 'flash' | 'shake'>('none');
+  
+  // ▼ 新機能の状態管理
+  const [isWigginsActive, setIsWigginsActive] = useState(false);
+  const [ireneUsed, setIreneUsed] = useState(false);
 
-  // ▼ 追加：現在のエピソードがすでにクリア済みかどうかを判定
   const isReplay = Boolean(clearedData[episodeId]);
+  const canUseIrene = unlockedTerms.includes('I007'); // I007: アイリーンの囁き
 
   const {
     currentBeat,
@@ -95,7 +102,7 @@ export default function GameView({
     selectedSkill,
     isCompleted,
     endResult,
-  } = useGameLogic(scenarioData as ScenarioData, isReplay); // ▼ 修正：isReplay を渡す
+  } = useGameLogic(scenarioData as ScenarioData, isReplay);
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -121,6 +128,8 @@ export default function GameView({
     } else {
       setIsInterruptMode(false);
     }
+    // ビートが変わったらウィギンズの眼をオフにする
+    setIsWigginsActive(false);
   }, [currentBeat, isStreaming]);
 
   useEffect(() => {
@@ -144,6 +153,15 @@ export default function GameView({
     }
   };
 
+  const handleWigginsEye = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (insightPoints >= 1 && !isWigginsActive) {
+      if (onSpendPoint(1)) {
+        setIsWigginsActive(true);
+      }
+    }
+  };
+
   const renderText = (text: string) => {
     let elements: (string | React.JSX.Element)[] = [];
     const parts = text.split(/(\{.*?\})/g);
@@ -151,6 +169,12 @@ export default function GameView({
       if (part.startsWith('{') && part.endsWith('}')) {
         const word = part.slice(1, -1);
         const isCollected = collectedEvidence.includes(word);
+        
+        // ▼ ウィギンズの眼がアクティブで、かつ未収集の場合のスタイル
+        const wigginsStyle = (isWigginsActive && !isCollected) 
+          ? 'ring-2 ring-amber-400 ring-offset-1 bg-amber-100 animate-pulse' 
+          : '';
+
         elements.push(
           <span
             key={`ev-${i}`}
@@ -158,7 +182,7 @@ export default function GameView({
               e.stopPropagation();
               collectEvidence(word);
             }}
-            className={`font-bold cursor-pointer px-1 mx-0.5 rounded border transition-colors shadow-sm inline-flex items-center z-10 relative ${
+            className={`font-bold cursor-pointer px-1 mx-0.5 rounded border transition-colors shadow-sm inline-flex items-center z-10 relative ${wigginsStyle} ${
               isCollected
                 ? 'bg-slate-300 text-slate-500 border-slate-400 cursor-default'
                 : 'text-blue-700 bg-blue-50 hover:bg-blue-100 border-blue-300 active:scale-95'
@@ -241,6 +265,11 @@ export default function GameView({
     }
   };
 
+  // ウィギンズの眼ボタンを表示するかどうかの判定（現在のテキストに未収集の証拠があるか）
+  const hasUncollectedEvidence = currentBeat?.text.match(/\{.*?\}/g)?.some(
+    match => !collectedEvidence.includes(match.slice(1, -1))
+  );
+
   return (
     <div className={`w-full max-w-2xl border-0 sm:border-4 border-slate-800 sm:p-1 relative shadow-2xl bg-white flex flex-col h-[100dvh] sm:h-[85vh] touch-manipulation overscroll-none transition-transform duration-75 ${
       screenEffect === 'shake' ? '-translate-x-2 border-red-500' : ''
@@ -272,7 +301,7 @@ export default function GameView({
           </div>
         )}
 
-        <div className="flex-1 p-4 sm:p-6 overflow-y-auto flex flex-col gap-6 custom-scrollbar">
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto flex flex-col gap-6 custom-scrollbar relative">
           {chatHistory.map((beat: any) => {
             const isCurrent = beat.id === currentBeat.id;
             const textToShow = isCurrent ? displayedText : beat.text;
@@ -307,6 +336,19 @@ export default function GameView({
           })}
           <div ref={bottomRef} className="h-4" />
         </div>
+
+        {/* ▼ ウィギンズの眼 ボタン（未収集の証拠がある場合のみ表示） */}
+        {!isStreaming && hasUncollectedEvidence && !isInterruptMode && !isWigginsActive && unlockedTerms.includes('W040') && (
+          <div className="absolute bottom-4 right-4 z-20 animate-in fade-in zoom-in duration-300">
+             <button
+                onClick={handleWigginsEye}
+                disabled={insightPoints < 1}
+                className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white text-[10px] sm:text-xs font-bold px-3 py-2 rounded-full shadow-lg flex items-center gap-1 border-2 border-amber-800 transition-transform active:scale-95"
+             >
+                <Eye size={14} /> WIGGINS (1pt)
+             </button>
+          </div>
+        )}
       </div>
 
       {!isInterruptMode && collectedEvidence.length > 0 && (
@@ -339,8 +381,13 @@ export default function GameView({
           <InterruptPanel
             collectedEvidences={collectedEvidence}
             hintText={currentBeat?.interrupt?.hint}
+            canUseIrene={canUseIrene} // ▼ アイリーン判定
+            ireneUsed={ireneUsed}
+            onUseIrene={() => setIreneUsed(true)}
             onSubmit={(skill, evidence) => {
-              handleSelectEvidence(evidence);
+              if (evidence) {
+                handleSelectEvidence(evidence);
+              }
               setTimeout(() => {
                 handleInterrupt(skill);
               }, 10);
@@ -371,6 +418,7 @@ export default function GameView({
 
       {isCompleted && endResult && (
         <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-4 animate-in fade-in duration-500">
+          {/* ...（結果表示部分は変更なしのため省略せずにそのまま維持）... */}
           <div
             className="bg-[#f4ecd8] max-w-md w-full rounded shadow-[0_0_30px_rgba(0,0,0,0.8)] border-4 border-[#c2b280] relative overflow-hidden"
             onClick={(e) => e.stopPropagation()}
@@ -441,7 +489,6 @@ export default function GameView({
                 <p className="text-3xl font-bold text-amber-700 font-mono">
                   +{endResult.points} pt
                 </p>
-                {/* ▼ 追加：再プレイ時は注意書きを表示 */}
                 {isReplay && (
                   <p className="text-[10px] text-amber-800 mt-1 font-mono tracking-tighter">
                     *再プレイのため報酬は制限されています
@@ -470,7 +517,7 @@ export default function GameView({
       {isCompleted && !endResult && (
         <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 animate-in fade-in duration-1000">
           <p className="text-white text-lg font-serif tracking-widest mb-8 animate-pulse text-center">
-            ―― そして、点と点が繋がる。
+            ―― そして、記録は次へ繋がる。
           </p>
           <button
             onClick={() => {

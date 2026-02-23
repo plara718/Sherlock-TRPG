@@ -15,7 +15,7 @@ export default function GamePage() {
   const [view, setView] = useState<'title' | 'game' | 'archive'>('title');
   const [hasSaveData, setHasSaveData] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [currentEpisodeId, setCurrentEpisodeId] = useState<string>('#00'); // 開始エピソードを #00（チュートリアル）に変更
+  const [currentEpisodeId, setCurrentEpisodeId] = useState<string>('#00');
 
   const [unlockedTerms, setUnlockedTerms] = useState<string[]>([]);
   const [readTerms, setReadTerms] = useState<string[]>([]);
@@ -23,8 +23,8 @@ export default function GamePage() {
   const [clearedData, setClearedData] = useState<ClearedData>({});
 
   const [unlockedTruths, setUnlockedTruths] = useState<Record<string, any>>({});
-  
   const [currentSeason, setCurrentSeason] = useState<number>(1);
+  const [mycroftIntel, setMycroftIntel] = useState<string[]>([]);
 
   useEffect(() => {
     const save = localStorage.getItem('tether_save_data');
@@ -48,6 +48,9 @@ export default function GamePage() {
     const season = localStorage.getItem('tether_current_season');
     if (season) setCurrentSeason(parseInt(season, 10));
 
+    const intel = localStorage.getItem('tether_mycroft_intel');
+    if (intel) setMycroftIntel(JSON.parse(intel));
+
     setIsInitialized(true);
   }, []);
 
@@ -56,7 +59,7 @@ export default function GamePage() {
       setView('archive');
     } else {
       localStorage.setItem('tether_save_data', 'true');
-      localStorage.setItem('tether_insight_points', '0'); // 初期ポイントは0に変更（チュートリアルで稼ぐため）
+      localStorage.setItem('tether_insight_points', '0');
       localStorage.setItem('tether_current_season', '1');
       setHasSaveData(true);
       setInsightPoints(0);
@@ -77,7 +80,8 @@ export default function GamePage() {
       localStorage.removeItem('tether_cleared_data');
       localStorage.removeItem('tether_unlocked_truths');
       localStorage.removeItem('tether_current_season');
-      localStorage.removeItem('tether_spider_tutorial_done'); // スパイダーウェブのチュートリアル完了フラグも削除
+      localStorage.removeItem('tether_mycroft_intel');
+      localStorage.removeItem('tether_spider_tutorial_done');
       
       setHasSaveData(false);
       setUnlockedTerms([]);
@@ -86,8 +90,52 @@ export default function GamePage() {
       setClearedData({});
       setUnlockedTruths({});
       setCurrentSeason(1);
+      setMycroftIntel([]);
       setCurrentEpisodeId('#00');
     }
+  };
+
+  // ▼ 新機能：特定の国家的事件開始時にマイクロフトがデータを解放する
+  const triggerMycroftIntel = (epId: string) => {
+    const mycroftEps = ['#04', '#16', '#24', '#39', '#46', '#58'];
+    if (mycroftEps.includes(epId) && !mycroftIntel.includes(epId)) {
+      const availableTerms = glossaryData.terms.filter(t => !unlockedTerms.includes(t.id));
+      const toUnlock: string[] = [];
+      
+      // 最大3つの未解放データを一気にアンロック
+      for(let i=0; i<3 && availableTerms.length > 0; i++) {
+        const idx = Math.floor(Math.random() * availableTerms.length);
+        toUnlock.push(availableTerms[idx].id);
+        availableTerms.splice(idx, 1);
+      }
+      
+      if (toUnlock.length > 0) {
+        const newTerms = [...unlockedTerms, ...toUnlock];
+        setUnlockedTerms(newTerms);
+        localStorage.setItem('tether_unlocked_terms', JSON.stringify(newTerms));
+        alert(`【Mycroft's Authority】\n兄マイクロフトの権限により、政府データベースへのアクセスが許可されました。\n大索引（Great Index）に ${toUnlock.length} 件の極秘データが新規登録されました。`);
+      }
+      
+      const newIntel = [...mycroftIntel, epId];
+      setMycroftIntel(newIntel);
+      localStorage.setItem('tether_mycroft_intel', JSON.stringify(newIntel));
+    }
+  };
+
+  const handlePlayEpisode = (epId: string) => {
+    triggerMycroftIntel(epId);
+    setCurrentEpisodeId(epId);
+    setView('game');
+  };
+
+  const handleSpendPoint = (amount: number) => {
+    if (insightPoints >= amount) {
+      const newPoints = insightPoints - amount;
+      setInsightPoints(newPoints);
+      localStorage.setItem('tether_insight_points', newPoints.toString());
+      return true;
+    }
+    return false;
   };
 
   const handleEpisodeComplete = (
@@ -98,36 +146,29 @@ export default function GamePage() {
   ) => {
     const isAlreadyCleared = !!clearedData[epId];
     
-    // ▼クリア状況の更新（再プレイ時は最新のランクとtetherで上書きされる）
+    // クリア状況の更新
     const newData = { ...clearedData, [epId]: { rank, tether } };
     setClearedData(newData);
     localStorage.setItem('tether_cleared_data', JSON.stringify(newData));
 
-    // ▼ポイントの加算処理（GameView側の useGameLogic で再プレイ時のポイントはすでに 1 に制限されている）
+    // ポイント加算
     const newPoints = insightPoints + points;
     setInsightPoints(newPoints);
     localStorage.setItem('tether_insight_points', newPoints.toString());
 
-    // ▼Season 1 のエンディング演出（#13クリア後）
-    if (epId === '#13' && !isAlreadyCleared) {
-      setCurrentEpisodeId('interlude_s1');
-      setView('game');
-      return; 
-    }
-
-    // ▼Interludeクリア時（Season 2への移行）
-    if (epId === 'interlude_s1' && !isAlreadyCleared) {
-      const masterTruth = {
-        node_title: "ジェームズ・モリアーティ教授",
-        hidden_note: "【犯罪界のナポレオン】ロンドンの地下を支配する巨大な蜘蛛の巣の中心。彼は自らの手を汚さず、冷徹な計算によって完全な犯罪システムを構築している。Season 2へ続く――。",
-        reward_points: 0
-      };
-      const newTruths = { ...unlockedTruths, "pin_s1_master": masterTruth };
-      setUnlockedTruths(newTruths);
-      localStorage.setItem('tether_unlocked_truths', JSON.stringify(newTruths));
-
+    // ▼ 新ロジック：シーズン進行チェック
+    if (epId === '#13' && !isAlreadyCleared && currentSeason < 2) {
       setCurrentSeason(2);
       localStorage.setItem('tether_current_season', '2');
+      alert("【Season 1: 黎明 - CLEAR】\n犯罪界のナポレオンの名前が浮上しました。\n次なる戦い（Season 2: 暗躍）のロックが解除されました。");
+    } else if (epId === '#29' && !isAlreadyCleared && currentSeason < 3) {
+      setCurrentSeason(3);
+      localStorage.setItem('tether_current_season', '3');
+      alert("【Season 2: 暗躍 - CLEAR】\nモリアーティとの全面対決が始まります。\n（Season 3: 決戦）のロックが解除されました。");
+    } else if (epId === '#40' && !isAlreadyCleared && currentSeason < 4) {
+      setCurrentSeason(4);
+      localStorage.setItem('tether_current_season', '4');
+      alert("【Season 3: 決戦 - CLEAR】\nライヘンバッハの滝での死闘を越え、伝説が帰還します。\n（Season 4: 帰還）のロックが解除されました。");
     }
 
     setView('archive');
@@ -138,7 +179,7 @@ export default function GamePage() {
     const availableTerms = glossaryData.terms.filter(
       (t) =>
         !unlockedTerms.includes(t.id) &&
-        (t.appearance === 'general' || clearedEpIds.includes(t.appearance) || t.appearance === 'SP-01')
+        (t.appearance === 'general' || clearedEpIds.includes(t.appearance) || t.appearance.startsWith('SP-'))
     );
 
     if (insightPoints > 0 && availableTerms.length > 0) {
@@ -146,18 +187,13 @@ export default function GamePage() {
         availableTerms[Math.floor(Math.random() * availableTerms.length)];
       const newUnlocked = [...unlockedTerms, randomTerm.id];
       setUnlockedTerms(newUnlocked);
-      localStorage.setItem(
-        'tether_unlocked_terms',
-        JSON.stringify(newUnlocked)
-      );
+      localStorage.setItem('tether_unlocked_terms', JSON.stringify(newUnlocked));
 
       const newPoints = insightPoints - 1;
       setInsightPoints(newPoints);
       localStorage.setItem('tether_insight_points', newPoints.toString());
     } else if (availableTerms.length === 0) {
-      alert(
-        '現時点で解読可能なデータはすべて復元済みです。新たな事件を解決してください。'
-      );
+      alert('現時点で解読可能なデータはすべて復元済みです。新たな事件を解決してください。');
     }
   };
 
@@ -209,12 +245,11 @@ export default function GamePage() {
           unlockedTerms={unlockedTerms}
           setUnlockedTerms={(terms) => {
             setUnlockedTerms(terms);
-            localStorage.setItem(
-              'tether_unlocked_terms',
-              JSON.stringify(terms)
-            );
+            localStorage.setItem('tether_unlocked_terms', JSON.stringify(terms));
           }}
-          clearedData={clearedData} // ▼追加：再プレイ判定用
+          clearedData={clearedData}
+          insightPoints={insightPoints}
+          onSpendPoint={handleSpendPoint}
           onEpisodeComplete={handleEpisodeComplete}
         />
       )}
@@ -226,14 +261,14 @@ export default function GamePage() {
           readTerms={readTerms}
           insightPoints={insightPoints}
           clearedData={clearedData}
+          unlockedTruths={unlockedTruths}
           onReturnTitle={() => setView('title')}
           onReturnGame={() => setView('game')}
-          onPlayEpisode={(epId) => {
-            setCurrentEpisodeId(epId);
-            setView('game');
-          }}
+          onPlayEpisode={handlePlayEpisode}
           onResearch={handleResearch}
           onReadTerm={handleReadTerm}
+          onUnlockTruth={handleUnlockTruth}
+          onLinkFail={handleLinkFail}
         />
       )}
     </div>
