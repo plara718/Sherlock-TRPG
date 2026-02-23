@@ -12,6 +12,7 @@ export type ScenarioBeat = {
     success_msg: string;
     fail_msg: string;
     correction_text?: string;
+    hint?: string; // ←【新規追加】ヒントテキスト
   };
 };
 
@@ -21,9 +22,9 @@ export type ScenarioData = {
     title: string;
     tether_start: number;
     world_state: any;
-    type?: string; // ←【追加】シナリオタイプ（cutscene等）
+    type?: string; 
   };
-  consequence?: { // ←【変更】カットシーンでは存在しないためオプショナルに
+  consequence?: { 
     official_record: string;
     watson_journal: {
       sympathetic: string;
@@ -41,7 +42,7 @@ const TETHER_PENALTY_MISS = -15;
 const TETHER_PENALTY_WASTE = -5;
 
 export function useGameLogic(scenarioData: ScenarioData) {
-  const initialTether = scenarioData.meta.tether_start || 50; // デフォルト値を一応設定
+  const initialTether = scenarioData.meta.tether_start || 50;
   const beats = scenarioData.beats;
 
   const [beatIndex, setBeatIndex] = useState(0);
@@ -271,7 +272,6 @@ export function useGameLogic(scenarioData: ScenarioData) {
 
     if (!isResolved) {
       if (currentBeat.interrupt) {
-        // ... (既存の未解決時処理そのまま) ...
         setIsResolved(true);
         const isSkillMatch =
           selectedSkill === currentBeat.interrupt.required_skill;
@@ -337,15 +337,12 @@ export function useGameLogic(scenarioData: ScenarioData) {
     if (beatIndex < beats.length - 1) {
       setBeatIndex((prev) => prev + 1);
     } else {
-      // ▼▼▼【ここが変更点】カットシーンの場合の終了処理 ▼▼▼
       if (scenarioData.meta.type === 'cutscene') {
-        // カットシーンは評価リザルトを出さずに即座に完了
         setEndResult(null); 
         setIsCompleted(true);
         return;
       }
 
-      // 通常エピソードの完了・評価処理
       let rank = 'ABYSS';
       let watson_journal =
         scenarioData.consequence?.watson_journal?.abyss || '';

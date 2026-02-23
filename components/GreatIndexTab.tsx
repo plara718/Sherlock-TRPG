@@ -62,11 +62,13 @@ export default function GreatIndexTab({
   const totalCount = glossaryData.terms.length;
   const unlockPercentage = Math.round((unlockedCount / totalCount) * 100) || 0;
 
-  const clearedEpIds = Object.keys(clearedData).map((id) => `S1-${id}`);
+  // ▼修正：プレフィックス S1- を削除し、そのままのエピソードIDを使用する
+  const clearedEpIds = Object.keys(clearedData); 
+  
   const unlockableTermsCount = glossaryData.terms.filter(
     (t) =>
       !unlockedTerms.includes(t.id) &&
-      (t.appearance === 'general' || clearedEpIds.includes(t.appearance))
+      (t.appearance === 'general' || clearedEpIds.includes(t.appearance) || t.appearance === 'SP-01') // SP-01などの特殊タグも許容できる形に
   ).length;
 
   // タブのフィルタリング処理
@@ -126,7 +128,7 @@ export default function GreatIndexTab({
         </div>
       </div>
 
-      {/* A-Z タブナビゲーション（ラップ形式で一覧性を向上） */}
+      {/* A-Z タブナビゲーション */}
       <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-6 border-b border-slate-300 pb-4">
         {ALPHABETS.map((letter) => {
           const showNewBadge = hasNewInLetter(letter);

@@ -8,6 +8,7 @@ import InterruptPanel from '@/components/InterruptPanel';
 import { useGameLogic, ScenarioData } from '@/lib/useGameLogic';
 import { FileText, ArrowRight } from 'lucide-react';
 
+import episode00 from '@/data/episode_00.json';
 import episode01 from '@/data/episode_01.json';
 import episode02 from '@/data/episode_02.json';
 import episode03 from '@/data/episode_03.json';
@@ -21,10 +22,11 @@ import episode10 from '@/data/episode_10.json';
 import episode11 from '@/data/episode_11.json';
 import episode12 from '@/data/episode_12.json';
 import episode13 from '@/data/episode_13.json';
-import interludeS1 from '@/data/interlude_s1.json'; // ← 追加: 幕間データ
+import interludeS1 from '@/data/interlude_s1.json';
 import glossaryData from '@/data/glossary.json';
 
 const SCENARIOS: Record<string, any> = {
+  '#00': episode00,
   '#01': episode01,
   '#02': episode02,
   '#03': episode03,
@@ -38,7 +40,7 @@ const SCENARIOS: Record<string, any> = {
   '#11': episode11,
   '#12': episode12,
   '#13': episode13,
-  'interlude_s1': interludeS1, // ← 追加
+  'interlude_s1': interludeS1,
 };
 
 type GameViewProps = {
@@ -61,13 +63,14 @@ export default function GameView({
   setUnlockedTerms,
   onEpisodeComplete,
 }: GameViewProps) {
-  const scenarioData = SCENARIOS[episodeId] || SCENARIOS['#01'];
+  const scenarioData = SCENARIOS[episodeId] || SCENARIOS['#00'];
   const [activeGlossary, setActiveGlossary] = useState<{
     word: string;
     desc: string;
   } | null>(null);
 
   const [isInterruptMode, setIsInterruptMode] = useState(false);
+  const [screenEffect, setScreenEffect] = useState<'none' | 'flash' | 'shake'>('none');
 
   const {
     currentBeat,
@@ -96,6 +99,18 @@ export default function GameView({
   const lastActionTimeRef = useRef<number>(0);
 
   useEffect(() => {
+    if (feedback) {
+      if (feedback.type === 'success') {
+        setScreenEffect('flash');
+      } else {
+        setScreenEffect('shake');
+      }
+      const timer = setTimeout(() => setScreenEffect('none'), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [feedback]);
+
+  useEffect(() => {
     if (currentBeat?.text.includes('[<NOISE>]') && !isStreaming) {
       setIsInterruptMode(true);
     } else {
@@ -108,11 +123,19 @@ export default function GameView({
   }, [displayedText, beatIndex, collectedEvidence, isInterruptMode]);
 
   const handleGlossaryClick = (term: any) => {
-    setActiveGlossary({ word: term.ja, desc: term.details });
-    if (!unlockedTerms.includes(term.id)) {
+    if (unlockedTerms.includes(term.id)) {
+      setActiveGlossary({ 
+        word: term.ja, 
+        desc: "このデータは既に大索引に登録されています。詳細はアーカイブで確認してください。" 
+      });
+    } else {
       const newTerms = [...unlockedTerms, term.id];
       setUnlockedTerms(newTerms);
       localStorage.setItem('tether_unlocked_terms', JSON.stringify(newTerms));
+      setActiveGlossary({ 
+        word: term.ja, 
+        desc: "【NEW】大索引に新規データが登録されました！ 事件解決後、アーカイブから詳細を解読できます。" 
+      });
     }
   };
 
@@ -214,7 +237,17 @@ export default function GameView({
   };
 
   return (
-    <div className="w-full max-w-2xl border-0 sm:border-4 border-slate-800 sm:p-1 relative shadow-2xl bg-white flex flex-col h-[100dvh] sm:h-[85vh] touch-manipulation overscroll-none">
+    <div className={`w-full max-w-2xl border-0 sm:border-4 border-slate-800 sm:p-1 relative shadow-2xl bg-white flex flex-col h-[100dvh] sm:h-[85vh] touch-manipulation overscroll-none transition-transform duration-75 ${
+      screenEffect === 'shake' ? '-translate-x-2 border-red-500' : ''
+    }`}>
+
+      {screenEffect === 'flash' && (
+        <div className="absolute inset-0 bg-white z-[60] animate-out fade-out duration-500 pointer-events-none mix-blend-overlay" />
+      )}
+      {screenEffect === 'shake' && (
+        <div className="absolute inset-0 bg-red-900/20 z-[60] animate-out fade-out duration-500 pointer-events-none" />
+      )}
+
       <TetherBar tether={tether} onArchiveClick={onBack} />
 
       <div
@@ -300,6 +333,7 @@ export default function GameView({
         {isInterruptMode ? (
           <InterruptPanel
             collectedEvidences={collectedEvidence}
+            hintText={currentBeat?.interrupt?.hint}
             onSubmit={(skill, evidence) => {
               handleSelectEvidence(evidence);
               setTimeout(() => {
@@ -330,7 +364,6 @@ export default function GameView({
         />
       )}
 
-      {/* ▼ 修正: 通常エピソードクリア時（リザルト画面） */}
       {isCompleted && endResult && (
         <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-4 animate-in fade-in duration-500">
           <div
@@ -423,7 +456,6 @@ export default function GameView({
         </div>
       )}
 
-      {/* ▼ 修正: カットシーン完了時（リザルトを出さずに次へ進むUI） */}
       {isCompleted && !endResult && (
         <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 animate-in fade-in duration-1000">
           <p className="text-white text-lg font-serif tracking-widest mb-8 animate-pulse text-center">
@@ -431,7 +463,6 @@ export default function GameView({
           </p>
           <button
             onClick={() => {
-              // カットシーンなので、便宜上のランクやポイントを渡して完了処理へ
               onEpisodeComplete(episodeId, "INTERLUDE", tether, 0);
             }}
             className="bg-transparent border border-white text-white hover:bg-white hover:text-black font-bold py-3 px-8 rounded tracking-widest transition-all duration-300 flex items-center gap-2"
