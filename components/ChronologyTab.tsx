@@ -31,6 +31,14 @@ export default function ChronologyTab({
   // 全エピソードのフラットなリスト（順次解放の判定用）
   const allEpisodes = archiveData.seasons.flatMap(s => s.episodes);
 
+  // ▼ 新機能：SPステージの特殊解放条件を判定する関数
+  const checkSpPlayable = (epId: string) => {
+    if (epId === 'SP-01') return !!clearedData['#14']; // ボヘミアの醜聞クリア後
+    if (epId === 'SP-02') return !!clearedData['#40']; // 最後の事件クリア後
+    if (epId === 'SP-03') return !!clearedData['#57']; // 白面の兵士クリア後
+    return false;
+  };
+
   return (
     <div className="animate-in fade-in duration-300">
       <p className="text-slate-600 mb-6 text-xs sm:text-sm mt-2 font-mono">
@@ -40,6 +48,7 @@ export default function ChronologyTab({
       {/* シーズン切り替えタブ */}
       <div className="flex overflow-x-auto gap-2 mb-8 pb-2 border-b border-slate-300 custom-scrollbar">
         {archiveData.seasons.map((s) => {
+          // ▼ SPステージ(99)は常時タブ自体は押せるようにする
           const isLocked = s.season_id > currentSeason && s.season_id !== 99;
 
           return (
@@ -76,21 +85,23 @@ export default function ChronologyTab({
         </p>
 
         <div className="grid gap-4">
-          {displaySeason.episodes.map((ep, index) => {
+          {displaySeason.episodes.map((ep) => {
             const isExpanded = expandedEp === ep.id;
             const cData = clearedData[ep.id];
             
-            // 全体でのインデックスを取得
             const globalIndex = allEpisodes.findIndex(e => e.id === ep.id);
             const prevEp = globalIndex > 0 ? allEpisodes[globalIndex - 1] : null;
 
-            // プレイ可能条件：
-            // 1. summaryに「未解放」が含まれていない（未実装データではない）
-            // 2. すでにクリア済みである
-            // 3. または、一つ前のエピソードがクリア済みである（一番最初の #00 は無条件解放）
             const isImplemented = !ep.summary.includes('未解放') && !ep.summary.includes('到達すると解放');
-            const isNextPlayable = globalIndex === 0 || (prevEp && clearedData[prevEp.id]);
-            const isPlayable = isImplemented && (cData || isNextPlayable);
+            
+            // ▼ 修正：SPステージか通常ステージかで解放ロジックを分岐
+            let isPlayable = false;
+            if (ep.id.startsWith('SP-')) {
+              isPlayable = isImplemented && checkSpPlayable(ep.id);
+            } else {
+              const isNextPlayable = globalIndex === 0 || (prevEp && clearedData[prevEp.id]);
+              isPlayable = isImplemented && (!!cData || isNextPlayable);
+            }
 
             return (
               <div
@@ -114,7 +125,7 @@ export default function ChronologyTab({
                 >
                   <div>
                     <div className="text-xs font-mono font-bold text-slate-500 mb-1 flex items-center gap-2">
-                      <span className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-700">
+                      <span className={`px-1.5 py-0.5 rounded text-slate-700 ${ep.id.startsWith('SP') ? 'bg-fuchsia-200' : 'bg-slate-200'}`}>
                         {ep.id}
                       </span>
                       <span>YEAR: {ep.year}</span>
@@ -157,7 +168,9 @@ export default function ChronologyTab({
                           e.stopPropagation();
                           onPlayEpisode(ep.id);
                         }}
-                        className="text-[10px] sm:text-xs bg-amber-600 text-white px-3 py-1 rounded uppercase font-bold tracking-widest shadow hover:bg-amber-500 flex items-center gap-1 animate-pulse"
+                        className={`text-[10px] sm:text-xs text-white px-3 py-1 rounded uppercase font-bold tracking-widest shadow flex items-center gap-1 animate-pulse ${
+                          ep.id.startsWith('SP') ? 'bg-fuchsia-700 hover:bg-fuchsia-600' : 'bg-amber-600 hover:bg-amber-500'
+                        }`}
                       >
                         <Play size={12} /> PLAY
                       </button>
@@ -183,7 +196,9 @@ export default function ChronologyTab({
                         {ep.keywords.map((kw, i) => (
                           <span
                             key={i}
-                            className="text-[10px] sm:text-xs bg-slate-300 text-slate-700 px-2 py-0.5 rounded border border-slate-400 font-bold"
+                            className={`text-[10px] sm:text-xs px-2 py-0.5 rounded border font-bold ${
+                              ep.id.startsWith('SP') ? 'bg-fuchsia-100 border-fuchsia-300 text-fuchsia-800' : 'bg-slate-300 border-slate-400 text-slate-700'
+                            }`}
                           >
                             #{kw}
                           </span>
@@ -199,7 +214,7 @@ export default function ChronologyTab({
                         >
                           Replay Investigation
                         </button>
-                        <span className="text-[10px] text-slate-500 font-mono">* 再プレイ時のクリア報酬(Insight)は1ptに減少します</span>
+                        <span className="text-[10px] text-slate-500 font-mono">* 再プレイ時の報酬(Insight)は1ptに減少します</span>
                       </div>
                     )}
                   </div>
