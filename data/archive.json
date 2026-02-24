@@ -6,6 +6,7 @@
       "years": "1881 - 1888",
       "description": "奇妙な出会いと、語られざる『ブリキ箱の記憶』。点在する不可解な事件の背後に潜む、見えない影の正体とは。",
       "episodes": [
+        { "id": "#00", "title": "チュートリアル：思考の接続", "status": "cleared" },
         { "id": "#01", "title": "緋色の研究", "status": "cleared" },
         { "id": "#02", "title": "まだらの紐", "status": "cleared" },
         { "id": "#03", "title": "独身の貴族", "status": "cleared" },
