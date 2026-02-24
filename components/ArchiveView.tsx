@@ -26,8 +26,23 @@ const data: ArchiveData = archiveData as ArchiveData;
 
 // clearedEpisodes（クリア済みエピソードの配列）をPropsで受け取る
 interface ArchiveViewProps {
-  onSelectEpisode?: (episodeId: string) => void;
+  currentSeason?: number;
+  unlockedTerms?: string[];
+  readTerms?: string[];
+  insightPoints?: number;
+  clearedData?: Record<string, any>;
+  unlockedTruths?: Record<string, any>;
+  onReturnTitle?: () => void;
+  onReturnGame?: () => void;
+  onPlayEpisode?: (epId: string) => void;
+  onResearch?: () => void;
+  onReadTerm?: (termId: string) => void;
+  onUnlockTruth?: (pinId: string, truthData: any, cost: number) => void;
+  onLinkFail?: (cost: number) => void;
+  
+  // スペシャルシナリオ動的解放用の追加プロパティ
   clearedEpisodes?: string[]; 
+  onSelectEpisode?: (episodeId: string) => void;
 }
 
 // --- コンポーネント本体 ---

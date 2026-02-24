@@ -265,6 +265,10 @@ export default function GamePage() {
           onReturnTitle={() => setView('title')}
           onReturnGame={() => setView('game')}
           onPlayEpisode={handlePlayEpisode}
+          // ▼ 追加: スペシャルシナリオの動的解放用データと選択イベント
+          clearedEpisodes={Object.keys(clearedData)}
+          onSelectEpisode={handlePlayEpisode}
+          // ▲ 追加ここまで
           onResearch={handleResearch}
           onReadTerm={handleReadTerm}
           onUnlockTruth={handleUnlockTruth}
