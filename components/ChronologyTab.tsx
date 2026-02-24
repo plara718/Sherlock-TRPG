@@ -1,18 +1,28 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Lock, FileText, Play } from 'lucide-react';
-import archiveData from '@/data/archive.json';
+import { Lock, FileText, Play, FolderOpen } from 'lucide-react';
 
-type ClearedData = {
-  [epId: string]: { rank: string; tether: number };
-};
+// @ts-ignore
+import rawArchiveData from '@/data/archive.json';
+const archiveData = rawArchiveData as any;
 
 type ChronologyTabProps = {
   currentSeason: number;
-  clearedData: ClearedData;
+  clearedData: Record<string, any>;
   onPlayEpisode: (epId: string) => void;
   onShowReport?: (epId: string, epTitle: string) => void;
+  clearedEpisodes: string[]; 
+};
+
+type Episode = {
+  id: string;
+  year?: string;
+  title: string;
+  summary?: string;
+  keywords?: string[];
+  status?: string;
+  category?: string;
 };
 
 export default function ChronologyTab({
@@ -20,52 +30,55 @@ export default function ChronologyTab({
   clearedData,
   onPlayEpisode,
   onShowReport,
+  clearedEpisodes,
 }: ChronologyTabProps) {
-  const [activeTab, setActiveTab] = useState<number>(1);
+  const [activeTab, setActiveTab] = useState<number | string>(1);
   const [expandedEp, setExpandedEp] = useState<string | null>(null);
 
-  const displaySeason =
-    archiveData.seasons.find((s) => s.season_id === activeTab) ||
-    archiveData.seasons[0];
+  const displaySeason = archiveData.seasons.find((s: any) => s.season_id === activeTab) || archiveData.seasons[0];
+  const allEpisodes = archiveData.seasons.flatMap((s: any) => s.episodes);
 
-  // 全エピソードのフラットなリスト（順次解放の判定用）
-  const allEpisodes = archiveData.seasons.flatMap(s => s.episodes);
-
-  // ▼ 新機能：SPステージの特殊解放条件を判定する関数
+  // SPステージ特殊解放条件判定
   const checkSpPlayable = (epId: string) => {
-    if (epId === 'SP-01') return !!clearedData['#14']; // ボヘミアの醜聞クリア後
-    if (epId === 'SP-02') return !!clearedData['#40']; // 最後の事件クリア後
-    if (epId === 'SP-03') return !!clearedData['#57']; // 白面の兵士クリア後
-    return false;
+    switch (epId) {
+      case 'SP-01': return clearedEpisodes.includes('#14');
+      case 'SP-02': return clearedEpisodes.includes('#40');
+      case 'SP-03': return clearedEpisodes.includes('#58');
+      case 'SP-04': return clearedEpisodes.includes('#15');
+      case 'SP-05': return clearedEpisodes.includes('#29');
+      case 'SP-06': return clearedEpisodes.includes('SP-05');
+      default: return false;
+    }
+  };
+
+  const groupEpisodesByCategory = (episodes: Episode[]) => {
+    return episodes.reduce((acc, ep) => {
+      const cat = ep.category || 'default';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(ep);
+      return acc;
+    }, {} as Record<string, Episode[]>);
   };
 
   return (
     <div className="animate-in fade-in duration-300">
-      <p className="text-slate-600 mb-6 text-xs sm:text-sm mt-2 font-mono">
-        シャーロック・ホームズ完全年代記：全58話 + SP
-      </p>
-
-      {/* シーズン切り替えタブ */}
-      <div className="flex overflow-x-auto gap-2 mb-8 pb-2 border-b border-slate-300 custom-scrollbar">
-        {archiveData.seasons.map((s) => {
-          // ▼ SPステージ(99)は常時タブ自体は押せるようにする
-          const isLocked = s.season_id > currentSeason && s.season_id !== 99;
-
+      
+      {/* スマホ最適化：横スクロールのシーズン選択ピル */}
+      <div className="flex overflow-x-auto gap-3 mb-6 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 custom-scrollbar snap-x">
+        {archiveData.seasons.map((s: any) => {
+          const isLocked = typeof s.season_id === 'number' && s.season_id > currentSeason;
           return (
             <button
               key={s.season_id}
               onClick={() => {
-                if (!isLocked) {
-                  setActiveTab(s.season_id);
-                  setExpandedEp(null);
-                }
+                if (!isLocked) { setActiveTab(s.season_id); setExpandedEp(null); }
               }}
-              className={`whitespace-nowrap px-4 py-2 font-bold text-sm sm:text-base rounded-t-lg transition-colors flex items-center gap-2 ${
+              className={`snap-start whitespace-nowrap px-5 py-2.5 font-bold text-sm rounded-full transition-colors flex-shrink-0 flex items-center gap-2 border shadow-sm ${
                 activeTab === s.season_id
-                  ? 'bg-slate-800 text-white'
+                  ? 'bg-[#5c4d43] text-[#f4ebd8] border-[#5c4d43]'
                   : isLocked
-                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                  : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                  ? 'bg-[#d8c8b8]/30 text-[#8c7a6b] border-transparent cursor-not-allowed opacity-60'
+                  : 'bg-[#e6d5c3] text-[#5c4d43] border-[#8c7a6b]/30 hover:bg-[#d8c8b8]'
               }`}
             >
               {s.title.split(':')[0]}
@@ -75,153 +88,119 @@ export default function ChronologyTab({
         })}
       </div>
 
-      {/* シーズン詳細とエピソードリスト */}
-      <div className="mb-12">
-        <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">
-          {displaySeason.title}
-        </h2>
-        <p className="text-sm text-slate-600 mb-6 font-serif leading-relaxed bg-[#FDF6E3] p-3 border-l-4 border-slate-400 shadow-inner">
+      <div className="mb-6">
+        <h2 className="text-xl sm:text-2xl font-bold text-[#3a2f29] mb-3">{displaySeason.title}</h2>
+        <p className="text-sm text-[#5c4d43] mb-6 font-serif leading-relaxed bg-[#e6d5c3]/50 p-4 rounded-lg border border-[#8c7a6b]/20 shadow-inner">
           {displaySeason.description}
         </p>
 
         <div className="grid gap-4">
-          {displaySeason.episodes.map((ep) => {
-            const isExpanded = expandedEp === ep.id;
-            const cData = clearedData[ep.id];
-            
-            const globalIndex = allEpisodes.findIndex(e => e.id === ep.id);
-            const prevEp = globalIndex > 0 ? allEpisodes[globalIndex - 1] : null;
+          {(() => {
+            const groupedEpisodes = groupEpisodesByCategory(displaySeason.episodes);
 
-            const isImplemented = !ep.summary.includes('未解放') && !ep.summary.includes('到達すると解放');
-            
-            // ▼ 修正：SPステージか通常ステージかで解放ロジックを分岐
-            let isPlayable = false;
-            if (ep.id.startsWith('SP-')) {
-              isPlayable = isImplemented && checkSpPlayable(ep.id);
-            } else {
-              const isNextPlayable = globalIndex === 0 || (prevEp && clearedData[prevEp.id]);
-              isPlayable = isImplemented && (!!cData || isNextPlayable);
-            }
-
-            return (
-              <div
-                key={ep.id}
-                className={`rounded-lg border-2 ${
-                  isPlayable
-                    ? 'bg-white border-slate-800 shadow-md'
-                    : 'bg-slate-200 border-slate-300 opacity-60'
-                } overflow-hidden transition-all duration-300`}
-              >
-                {/* エピソードヘッダー（クリックで展開） */}
-                <div
-                  onClick={() =>
-                    isPlayable && setExpandedEp(isExpanded ? null : ep.id)
-                  }
-                  className={`p-4 flex items-center justify-between ${
-                    isPlayable
-                      ? 'cursor-pointer hover:bg-slate-50'
-                      : 'cursor-not-allowed'
-                  }`}
-                >
-                  <div>
-                    <div className="text-xs font-mono font-bold text-slate-500 mb-1 flex items-center gap-2">
-                      <span className={`px-1.5 py-0.5 rounded text-slate-700 ${ep.id.startsWith('SP') ? 'bg-fuchsia-200' : 'bg-slate-200'}`}>
-                        {ep.id}
-                      </span>
-                      <span>YEAR: {ep.year}</span>
-                    </div>
-                    <div className="font-bold text-slate-800 text-base sm:text-lg">
-                      {isPlayable ? ep.title : '??? (ENCRYPTED FILE)'}
-                    </div>
-                  </div>
-
-                  {/* ステータス＆アクションボタン */}
-                  <div className="flex items-center gap-2">
-                    {cData ? (
-                      <>
-                        <span
-                          className={`text-[10px] sm:text-xs text-white px-2 py-1 rounded font-bold tracking-widest shadow ${
-                            cData.rank === 'LUCID'
-                              ? 'bg-green-700'
-                              : cData.rank === 'SYMPATHETIC'
-                              ? 'bg-blue-700'
-                              : 'bg-red-800'
-                          }`}
-                        >
-                          {cData.rank}
-                        </span>
-                        {onShowReport && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onShowReport(ep.id, ep.title);
-                            }}
-                            className="text-[10px] sm:text-xs bg-slate-200 text-slate-700 border border-slate-400 px-2 py-1 rounded font-bold hover:bg-slate-300 flex items-center gap-1"
-                          >
-                            <FileText size={12} /> REPORT
-                          </button>
-                        )}
-                      </>
-                    ) : isPlayable ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onPlayEpisode(ep.id);
-                        }}
-                        className={`text-[10px] sm:text-xs text-white px-3 py-1 rounded uppercase font-bold tracking-widest shadow flex items-center gap-1 animate-pulse ${
-                          ep.id.startsWith('SP') ? 'bg-fuchsia-700 hover:bg-fuchsia-600' : 'bg-amber-600 hover:bg-amber-500'
-                        }`}
-                      >
-                        <Play size={12} /> PLAY
-                      </button>
-                    ) : (
-                      <Lock size={18} className="text-slate-400" />
-                    )}
-                  </div>
-                </div>
-
-                {/* エピソード詳細（展開時） */}
-                {isExpanded && isPlayable && (
-                  <div className="p-4 border-t border-slate-200 bg-[#f4ecd8] animate-in slide-in-from-top-2">
-                    <p className="text-sm text-slate-800 leading-relaxed font-serif mb-4">
-                      {ep.summary}
-                    </p>
-                    
-                    {/* キーワードタグ */}
-                    {ep.keywords && ep.keywords.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        <span className="text-[10px] font-mono text-slate-500 flex items-center mr-1">
-                          KEYWORDS:
-                        </span>
-                        {ep.keywords.map((kw, i) => (
-                          <span
-                            key={i}
-                            className={`text-[10px] sm:text-xs px-2 py-0.5 rounded border font-bold ${
-                              ep.id.startsWith('SP') ? 'bg-fuchsia-100 border-fuchsia-300 text-fuchsia-800' : 'bg-slate-300 border-slate-400 text-slate-700'
-                            }`}
-                          >
-                            #{kw}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {cData && (
-                      <div className="flex justify-between items-center mt-4">
-                        <button
-                          onClick={() => onPlayEpisode(ep.id)}
-                          className="text-xs bg-slate-800 text-white px-4 py-2 rounded shadow hover:bg-slate-700 font-bold tracking-widest uppercase transition-transform active:scale-95"
-                        >
-                          Replay Investigation
-                        </button>
-                        <span className="text-[10px] text-slate-500 font-mono">* 再プレイ時の報酬(Insight)は1ptに減少します</span>
-                      </div>
-                    )}
+            return Object.entries(groupedEpisodes).map(([category, episodes]) => (
+              <div key={category} className="mb-6">
+                
+                {category !== 'default' && (
+                  <div className="flex items-center gap-2 mb-4 mt-2 text-[#5c4d43]">
+                    <FolderOpen className="w-5 h-5 text-[#8c7a6b]" />
+                    <h4 className="text-base font-bold border-b border-[#8c7a6b]/30 pb-1 flex-1 font-serif">
+                      {category}
+                    </h4>
                   </div>
                 )}
+
+                <div className="grid gap-3">
+                  {episodes.map((ep: Episode) => {
+                    const isExpanded = expandedEp === ep.id;
+                    const cData = clearedData[ep.id];
+                    const globalIndex = allEpisodes.findIndex((e: any) => e.id === ep.id);
+                    const prevEp = globalIndex > 0 ? allEpisodes[globalIndex - 1] : null;
+
+                    const summaryText = ep.summary || '';
+                    const isImplemented = !summaryText.includes('未解放') && !summaryText.includes('到達すると解放') && ep.status !== 'locked';
+                    
+                    let isPlayable = false;
+                    if (ep.id.startsWith('SP-')) {
+                      isPlayable = checkSpPlayable(ep.id);
+                    } else {
+                      const isNextPlayable = globalIndex === 0 || (prevEp && clearedData[prevEp.id]);
+                      isPlayable = isImplemented && (!!cData || isNextPlayable);
+                    }
+
+                    return (
+                      <div
+                        key={ep.id}
+                        className={`rounded-xl border ${
+                          isPlayable
+                            ? 'bg-[#fffcf7] border-[#8c7a6b]/40 shadow-sm'
+                            : 'bg-[#e6d5c3]/40 border-transparent opacity-60'
+                        } overflow-hidden transition-all duration-300`}
+                      >
+                        {/* タップエリア（大きめ） */}
+                        <div
+                          onClick={() => isPlayable && setExpandedEp(isExpanded ? null : ep.id)}
+                          className={`p-4 sm:p-5 flex items-center justify-between ${isPlayable ? 'cursor-pointer active:bg-[#f4ebd8]' : 'cursor-not-allowed'}`}
+                        >
+                          <div className="flex-1 pr-4">
+                            <div className="text-xs font-mono font-bold text-[#8c7a6b] mb-1 flex items-center gap-2">
+                              <span className={`px-1.5 py-0.5 rounded ${ep.id.startsWith('SP') ? 'bg-fuchsia-100 text-fuchsia-800' : 'bg-[#e6d5c3] text-[#5c4d43]'}`}>
+                                {ep.id}
+                              </span>
+                            </div>
+                            <div className={`font-bold text-base leading-tight ${isPlayable ? 'text-[#3a2f29]' : 'text-[#8c7a6b]'}`}>
+                              {isPlayable ? ep.title : '??? (LOCKED)'}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {cData ? (
+                              <span className={`text-[10px] text-white px-2 py-1 rounded font-bold tracking-widest shadow-sm ${
+                                  cData.rank === 'LUCID' ? 'bg-emerald-700' : cData.rank === 'SYMPATHETIC' ? 'bg-blue-700' : 'bg-rose-800'
+                                }`}>
+                                {cData.rank}
+                              </span>
+                            ) : isPlayable ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onPlayEpisode(ep.id); }}
+                                className={`text-[10px] text-white px-3 py-1.5 rounded-full font-bold tracking-widest shadow-md flex items-center gap-1 active:scale-95 transition-transform ${
+                                  ep.id.startsWith('SP') ? 'bg-fuchsia-700' : 'bg-amber-600'
+                                }`}
+                              >
+                                <Play size={12} className="fill-current" /> PLAY
+                              </button>
+                            ) : (
+                              <Lock size={18} className="text-[#8c7a6b]" />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 展開時詳細エリア */}
+                        {isExpanded && isPlayable && (
+                          <div className="p-4 sm:p-5 border-t border-[#8c7a6b]/20 bg-[#f4ebd8]/50 animate-in slide-in-from-top-2">
+                            <p className="text-sm text-[#3a2f29] leading-relaxed font-serif mb-4">
+                              {ep.summary || '詳細データがありません。'}
+                            </p>
+                            {cData && (
+                              <div className="flex justify-between items-center mt-4">
+                                <button
+                                  onClick={() => onPlayEpisode(ep.id)}
+                                  className="text-[10px] sm:text-xs bg-[#5c4d43] text-white px-4 py-2 rounded-full shadow hover:bg-[#3a2f29] font-bold tracking-widest uppercase active:scale-95 transition-transform"
+                                >
+                                  REPLAY
+                                </button>
+                                <span className="text-[9px] text-[#8c7a6b] font-mono">* 再プレイ報酬 1pt</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            );
-          })}
+            ));
+          })()}
         </div>
       </div>
     </div>

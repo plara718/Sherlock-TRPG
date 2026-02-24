@@ -19,20 +19,22 @@ export default function GlossaryToast({
 
   return (
     <div className="fixed bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-50 animate-in slide-in-from-bottom-5 fade-in duration-300">
-      <div className="bg-slate-900 text-white p-4 rounded-lg shadow-2xl border border-slate-700 relative">
+      <div className="bg-[#1a1512]/95 backdrop-blur-sm p-4 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] border border-amber-900/50 relative">
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 text-slate-400 hover:text-white transition-colors"
+          className="absolute top-3 right-3 text-[#8c7a6b] hover:text-[#f4ebd8] transition-colors p-1"
         >
           <X size={16} />
         </button>
         <div className="flex items-start gap-3">
-          <Info className="text-amber-500 shrink-0 mt-1" size={18} />
-          <div>
-            <h4 className="font-bold text-amber-500 text-sm mb-1 tracking-wider">
+          <Info className="text-amber-600 shrink-0 mt-0.5" size={18} />
+          <div className="pr-4">
+            <h4 className="font-bold font-serif text-amber-500 text-sm mb-1.5 tracking-wider">
               {term}
             </h4>
-            <p className="text-xs text-slate-300 leading-relaxed">{desc}</p>
+            <p className="text-xs font-serif text-[#d8c8b8] leading-relaxed">
+              {desc}
+            </p>
           </div>
         </div>
       </div>

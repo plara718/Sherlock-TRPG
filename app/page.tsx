@@ -4,12 +4,9 @@ import React, { useEffect, useState } from 'react';
 import TitleView from '@/components/TitleView';
 import GameView from '@/components/GameView';
 import ArchiveView from '@/components/ArchiveView';
-
 import glossaryData from '@/data/glossary.json';
 
-type ClearedData = {
-  [epId: string]: { rank: string; tether: number };
-};
+type ClearedData = { [epId: string]: { rank: string; tether: number } };
 
 export default function GamePage() {
   const [view, setView] = useState<'title' | 'game' | 'archive'>('title');
@@ -21,7 +18,6 @@ export default function GamePage() {
   const [readTerms, setReadTerms] = useState<string[]>([]);
   const [insightPoints, setInsightPoints] = useState<number>(0);
   const [clearedData, setClearedData] = useState<ClearedData>({});
-
   const [unlockedTruths, setUnlockedTruths] = useState<Record<string, any>>({});
   const [currentSeason, setCurrentSeason] = useState<number>(1);
   const [mycroftIntel, setMycroftIntel] = useState<string[]>([]);
@@ -29,25 +25,18 @@ export default function GamePage() {
   useEffect(() => {
     const save = localStorage.getItem('tether_save_data');
     if (save) setHasSaveData(true);
-
     const terms = localStorage.getItem('tether_unlocked_terms');
     if (terms) setUnlockedTerms(JSON.parse(terms));
-
     const read = localStorage.getItem('tether_read_terms');
     if (read) setReadTerms(JSON.parse(read));
-
     const points = localStorage.getItem('tether_insight_points');
     if (points) setInsightPoints(parseInt(points, 10));
-
     const cleared = localStorage.getItem('tether_cleared_data');
     if (cleared) setClearedData(JSON.parse(cleared));
-
     const truths = localStorage.getItem('tether_unlocked_truths');
     if (truths) setUnlockedTruths(JSON.parse(truths));
-
     const season = localStorage.getItem('tether_current_season');
     if (season) setCurrentSeason(parseInt(season, 10));
-
     const intel = localStorage.getItem('tether_mycroft_intel');
     if (intel) setMycroftIntel(JSON.parse(intel));
 
@@ -70,19 +59,8 @@ export default function GamePage() {
   };
 
   const handleResetData = () => {
-    if (
-      window.confirm('すべての進捗データと大索引の記録をリセットしますか？')
-    ) {
-      localStorage.removeItem('tether_save_data');
-      localStorage.removeItem('tether_unlocked_terms');
-      localStorage.removeItem('tether_read_terms');
-      localStorage.removeItem('tether_insight_points');
-      localStorage.removeItem('tether_cleared_data');
-      localStorage.removeItem('tether_unlocked_truths');
-      localStorage.removeItem('tether_current_season');
-      localStorage.removeItem('tether_mycroft_intel');
-      localStorage.removeItem('tether_spider_tutorial_done');
-      
+    if (window.confirm('すべての進捗データと大索引の記録をリセットしますか？')) {
+      localStorage.clear();
       setHasSaveData(false);
       setUnlockedTerms([]);
       setReadTerms([]);
@@ -95,27 +73,22 @@ export default function GamePage() {
     }
   };
 
-  // ▼ 新機能：特定の国家的事件開始時にマイクロフトがデータを解放する
   const triggerMycroftIntel = (epId: string) => {
     const mycroftEps = ['#04', '#16', '#24', '#39', '#46', '#58'];
     if (mycroftEps.includes(epId) && !mycroftIntel.includes(epId)) {
       const availableTerms = glossaryData.terms.filter(t => !unlockedTerms.includes(t.id));
       const toUnlock: string[] = [];
-      
-      // 最大3つの未解放データを一気にアンロック
       for(let i=0; i<3 && availableTerms.length > 0; i++) {
         const idx = Math.floor(Math.random() * availableTerms.length);
         toUnlock.push(availableTerms[idx].id);
         availableTerms.splice(idx, 1);
       }
-      
       if (toUnlock.length > 0) {
         const newTerms = [...unlockedTerms, ...toUnlock];
         setUnlockedTerms(newTerms);
         localStorage.setItem('tether_unlocked_terms', JSON.stringify(newTerms));
-        alert(`【Mycroft's Authority】\n兄マイクロフトの権限により、政府データベースへのアクセスが許可されました。\n大索引（Great Index）に ${toUnlock.length} 件の極秘データが新規登録されました。`);
+        alert(`【Mycroft's Authority】\n兄マイクロフトの権限により、大索引に ${toUnlock.length} 件の極秘データが追加されました。`);
       }
-      
       const newIntel = [...mycroftIntel, epId];
       setMycroftIntel(newIntel);
       localStorage.setItem('tether_mycroft_intel', JSON.stringify(newIntel));
@@ -138,25 +111,16 @@ export default function GamePage() {
     return false;
   };
 
-  const handleEpisodeComplete = (
-    epId: string,
-    rank: string,
-    tether: number,
-    points: number
-  ) => {
+  const handleEpisodeComplete = (epId: string, rank: string, tether: number, points: number) => {
     const isAlreadyCleared = !!clearedData[epId];
-    
-    // クリア状況の更新
     const newData = { ...clearedData, [epId]: { rank, tether } };
     setClearedData(newData);
     localStorage.setItem('tether_cleared_data', JSON.stringify(newData));
 
-    // ポイント加算
     const newPoints = insightPoints + points;
     setInsightPoints(newPoints);
     localStorage.setItem('tether_insight_points', newPoints.toString());
 
-    // ▼ 新ロジック：シーズン進行チェック
     if (epId === '#13' && !isAlreadyCleared && currentSeason < 2) {
       setCurrentSeason(2);
       localStorage.setItem('tether_current_season', '2');
@@ -170,25 +134,17 @@ export default function GamePage() {
       localStorage.setItem('tether_current_season', '4');
       alert("【Season 3: 決戦 - CLEAR】\nライヘンバッハの滝での死闘を越え、伝説が帰還します。\n（Season 4: 帰還）のロックが解除されました。");
     }
-
     setView('archive');
   };
 
   const handleResearch = () => {
     const clearedEpIds = Object.keys(clearedData); 
-    const availableTerms = glossaryData.terms.filter(
-      (t) =>
-        !unlockedTerms.includes(t.id) &&
-        (t.appearance === 'general' || clearedEpIds.includes(t.appearance) || t.appearance.startsWith('SP-'))
-    );
-
+    const availableTerms = glossaryData.terms.filter(t => !unlockedTerms.includes(t.id) && (t.appearance === 'general' || clearedEpIds.includes(t.appearance) || t.appearance.startsWith('SP-')));
     if (insightPoints > 0 && availableTerms.length > 0) {
-      const randomTerm =
-        availableTerms[Math.floor(Math.random() * availableTerms.length)];
+      const randomTerm = availableTerms[Math.floor(Math.random() * availableTerms.length)];
       const newUnlocked = [...unlockedTerms, randomTerm.id];
       setUnlockedTerms(newUnlocked);
       localStorage.setItem('tether_unlocked_terms', JSON.stringify(newUnlocked));
-
       const newPoints = insightPoints - 1;
       setInsightPoints(newPoints);
       localStorage.setItem('tether_insight_points', newPoints.toString());
@@ -205,15 +161,10 @@ export default function GamePage() {
     }
   };
 
-  const handleUnlockTruth = (
-    pinId: string,
-    truthData: any,
-    linkCost: number
-  ) => {
+  const handleUnlockTruth = (pinId: string, truthData: any, linkCost: number) => {
     const newTruths = { ...unlockedTruths, [pinId]: truthData };
     setUnlockedTruths(newTruths);
     localStorage.setItem('tether_unlocked_truths', JSON.stringify(newTruths));
-
     const newPoints = insightPoints - linkCost + (truthData.reward_points || 0);
     setInsightPoints(newPoints);
     localStorage.setItem('tether_insight_points', newPoints.toString());
@@ -225,55 +176,56 @@ export default function GamePage() {
     localStorage.setItem('tether_insight_points', newPoints.toString());
   };
 
-  if (!isInitialized) return <div className="min-h-screen bg-slate-900" />;
+  if (!isInitialized) return <div className="h-[100dvh] bg-slate-900" />;
 
+  // スマホ極限最適化：h-[100dvh] と overscroll-none でネイティブアプリ化
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-800 font-sans flex flex-col items-center justify-center sm:p-4 overflow-hidden">
+    <div className="h-[100dvh] w-full bg-slate-900 text-slate-800 font-sans overflow-hidden overscroll-none relative">
+      
+      {/* タイトル画面（フェードイン） */}
       {view === 'title' && (
-        <TitleView
-          hasSaveData={hasSaveData}
-          onStart={handleStartConnection}
-          onReset={handleResetData}
-        />
+        <div className="absolute inset-0 z-10 animate-in fade-in duration-500">
+          <TitleView hasSaveData={hasSaveData} onStart={handleStartConnection} onReset={handleResetData} />
+        </div>
       )}
 
+      {/* ゲーム画面（右からスライドイン） */}
       {view === 'game' && (
-        <GameView
-          key={currentEpisodeId}
-          episodeId={currentEpisodeId}
-          onBack={() => setView('archive')}
-          unlockedTerms={unlockedTerms}
-          setUnlockedTerms={(terms) => {
-            setUnlockedTerms(terms);
-            localStorage.setItem('tether_unlocked_terms', JSON.stringify(terms));
-          }}
-          clearedData={clearedData}
-          insightPoints={insightPoints}
-          onSpendPoint={handleSpendPoint}
-          onEpisodeComplete={handleEpisodeComplete}
-        />
+        <div className="absolute inset-0 z-20 bg-slate-900 animate-in slide-in-from-right-8 fade-in duration-300 shadow-2xl">
+          <GameView
+            key={currentEpisodeId}
+            episodeId={currentEpisodeId}
+            onBack={() => setView('archive')}
+            unlockedTerms={unlockedTerms}
+            setUnlockedTerms={(terms) => { setUnlockedTerms(terms); localStorage.setItem('tether_unlocked_terms', JSON.stringify(terms)); }}
+            clearedData={clearedData}
+            insightPoints={insightPoints}
+            onSpendPoint={handleSpendPoint}
+            onEpisodeComplete={handleEpisodeComplete}
+          />
+        </div>
       )}
 
+      {/* アーカイブ画面（下からスライドインして重なるモーダル風） */}
       {view === 'archive' && (
-        <ArchiveView
-          currentSeason={currentSeason}
-          unlockedTerms={unlockedTerms}
-          readTerms={readTerms}
-          insightPoints={insightPoints}
-          clearedData={clearedData}
-          unlockedTruths={unlockedTruths}
-          onReturnTitle={() => setView('title')}
-          onReturnGame={() => setView('game')}
-          onPlayEpisode={handlePlayEpisode}
-          // ▼ 追加: スペシャルシナリオの動的解放用データと選択イベント
-          clearedEpisodes={Object.keys(clearedData)}
-          onSelectEpisode={handlePlayEpisode}
-          // ▲ 追加ここまで
-          onResearch={handleResearch}
-          onReadTerm={handleReadTerm}
-          onUnlockTruth={handleUnlockTruth}
-          onLinkFail={handleLinkFail}
-        />
+        <div className="absolute inset-0 z-30 bg-[#f4ebd8] animate-in slide-in-from-bottom-8 fade-in duration-300">
+          <ArchiveView
+            currentSeason={currentSeason}
+            unlockedTerms={unlockedTerms}
+            readTerms={readTerms}
+            insightPoints={insightPoints}
+            clearedData={clearedData}
+            unlockedTruths={unlockedTruths}
+            clearedEpisodes={Object.keys(clearedData)}
+            onReturnTitle={() => setView('title')}
+            onReturnGame={() => setView('game')}
+            onPlayEpisode={handlePlayEpisode}
+            onResearch={handleResearch}
+            onReadTerm={handleReadTerm}
+            onUnlockTruth={handleUnlockTruth}
+            onLinkFail={handleLinkFail}
+          />
+        </div>
       )}
     </div>
   );

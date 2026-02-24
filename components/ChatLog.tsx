@@ -13,46 +13,51 @@ export default function ChatLog({ speaker, text, feedback }: ChatLogProps) {
   const isSystem = speaker === 'System';
 
   return (
-    <div className="mb-4 flex flex-col gap-2">
+    <div className="mb-4 sm:mb-6 flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
       {/* 枠のデザインを分岐 */}
       <div
-        className={`p-4 border rounded shadow-sm ${
+        className={`p-4 sm:p-5 rounded-xl border transition-all ${
           isSystem
-            ? 'bg-slate-200 border-slate-300'
-            : 'bg-white border-slate-300'
+            ? 'bg-[#e6d5c3]/40 border-[#8c7a6b]/30 shadow-inner'
+            : 'bg-[#fffcf7] border-[#8c7a6b]/40 shadow-sm'
         }`}
       >
         {/* キャラクター発言の時のみ名前を表示 */}
         {!isSystem && (
-          <div className="font-bold text-sm text-slate-500 mb-1">{speaker}</div>
+          <div className="font-bold text-xs font-mono text-[#8c7a6b] mb-1.5 uppercase tracking-widest">
+            {speaker}
+          </div>
         )}
 
         {/* テキストのスタイルを分岐 */}
         <div
-          className={`text-lg leading-relaxed whitespace-pre-wrap ${
-            isSystem ? 'text-slate-700 italic font-serif' : 'text-slate-800'
+          className={`text-base sm:text-lg leading-relaxed whitespace-pre-wrap font-serif ${
+            isSystem ? 'text-[#5c4d43] italic' : 'text-[#3a2f29]'
           }`}
         >
           {cleanText}
         </div>
       </div>
 
+      {/* フィードバック表示エリア */}
       {feedback && (
         <div
-          className={`p-3 border-l-4 ${
+          className={`p-3 sm:p-4 rounded-lg border-l-4 shadow-sm animate-in zoom-in-95 duration-300 ${
             feedback.type === 'success'
-              ? 'border-green-600 bg-green-50 text-green-800'
-              : 'border-red-600 bg-red-50 text-red-800'
+              ? 'border-emerald-600 bg-emerald-50 text-emerald-900 border-y-emerald-200 border-r-emerald-200'
+              : 'border-rose-600 bg-rose-50 text-rose-900 border-y-rose-200 border-r-rose-200'
           }`}
         >
-          <p className="font-bold">
+          <p className="font-bold font-mono text-xs sm:text-sm tracking-widest mb-1">
             {feedback.type === 'success'
               ? 'INTERRUPT SUCCESS'
               : feedback.type === 'penalty'
               ? 'INVALID INTERRUPT'
               : 'INTERRUPT MISSED'}
           </p>
-          <p className="text-sm italic mt-1">{feedback.msg}</p>
+          <p className="text-sm sm:text-base italic font-serif leading-relaxed">
+            {feedback.msg}
+          </p>
         </div>
       )}
     </div>

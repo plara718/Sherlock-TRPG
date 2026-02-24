@@ -5,6 +5,7 @@ import TetherBar from '@/components/TetherBar';
 import Controls from '@/components/Controls';
 import GlossaryToast from '@/components/GlossaryToast';
 import InterruptPanel from '@/components/InterruptPanel';
+import ChatLog from '@/components/ChatLog'; // 追加：ChatLogの呼び出し用
 import { useGameLogic, ScenarioData } from '@/lib/useGameLogic';
 import { FileText, ArrowRight, Eye } from 'lucide-react';
 
@@ -22,24 +23,30 @@ import episode10 from '@/data/episode_10.json';
 import episode11 from '@/data/episode_11.json';
 import episode12 from '@/data/episode_12.json';
 import episode13 from '@/data/episode_13.json';
-// ※14話以降のJSONは未作成のため、現在はエラー回避用に#00をフォールバックとしています
+import episode14 from '@/data/episode_14.json';
+import episode15 from '@/data/episode_15.json';
+import episode16 from '@/data/episode_16.json';
+import episode17 from '@/data/episode_17.json';
+import episode18 from '@/data/episode_18.json';
+import episode19 from '@/data/episode_19.json';
 import glossaryData from '@/data/glossary.json';
 
+// SPエピソードのインポート（適宜追加してください）
+//import episodeSp01 from '@/data/episode_sp01.json';
+//import episodeSp02 from '@/data/episode_sp02.json';
+//import episodeSp03 from '@/data/episode_sp03.json';
+import episodeSp04 from '@/data/episode_sp04.json';
+import episodeSp05 from '@/data/episode_sp05.json';
+import episodeSp06 from '@/data/episode_sp06.json';
+
 const SCENARIOS: Record<string, any> = {
-  '#00': episode00,
-  '#01': episode01,
-  '#02': episode02,
-  '#03': episode03,
-  '#04': episode04,
-  '#05': episode05,
-  '#06': episode06,
-  '#07': episode07,
-  '#08': episode08,
-  '#09': episode09,
-  '#10': episode10,
-  '#11': episode11,
-  '#12': episode12,
-  '#13': episode13,
+  '#00': episode00, '#01': episode01, '#02': episode02, '#03': episode03,
+  '#04': episode04, '#05': episode05, '#06': episode06, '#07': episode07,
+  '#08': episode08, '#09': episode09, '#10': episode10, '#11': episode11,
+  '#12': episode12, '#13': episode13, '#14': episode14, '#15': episode15,
+  '#16': episode16, '#17': episode17, '#18': episode18, '#19': episode19,
+  //'SP-01': episodeSp01, 'SP-02': episodeSp02, 'SP-03': episodeSp03,
+  'SP-04': episodeSp04, 'SP-05': episodeSp05, 'SP-06': episodeSp06,
 };
 
 type GameViewProps = {
@@ -50,85 +57,47 @@ type GameViewProps = {
   clearedData: { [epId: string]: { rank: string; tether: number } };
   insightPoints: number;
   onSpendPoint: (amount: number) => boolean;
-  onEpisodeComplete: (
-    epId: string,
-    rank: string,
-    tether: number,
-    points: number
-  ) => void;
+  onEpisodeComplete: (epId: string, rank: string, tether: number, points: number) => void;
 };
 
 export default function GameView({
-  episodeId,
-  onBack,
-  unlockedTerms,
-  setUnlockedTerms,
-  clearedData,
-  insightPoints,
-  onSpendPoint,
-  onEpisodeComplete,
+  episodeId, onBack, unlockedTerms, setUnlockedTerms, clearedData, insightPoints, onSpendPoint, onEpisodeComplete,
 }: GameViewProps) {
   const scenarioData = SCENARIOS[episodeId] || SCENARIOS['#00'];
-  const [activeGlossary, setActiveGlossary] = useState<{
-    word: string;
-    desc: string;
-  } | null>(null);
+  const [activeGlossary, setActiveGlossary] = useState<{ word: string; desc: string; } | null>(null);
 
   const [isInterruptMode, setIsInterruptMode] = useState(false);
   const [screenEffect, setScreenEffect] = useState<'none' | 'flash' | 'shake'>('none');
   
-  // ▼ 新機能の状態管理
   const [isWigginsActive, setIsWigginsActive] = useState(false);
   const [ireneUsed, setIreneUsed] = useState(false);
 
   const isReplay = Boolean(clearedData[episodeId]);
-  const canUseIrene = unlockedTerms.includes('I007'); // I007: アイリーンの囁き
+  const canUseIrene = unlockedTerms.includes('I007'); 
 
   const {
-    currentBeat,
-    displayedText,
-    isStreaming,
-    tether,
-    feedback,
-    handleInterrupt,
-    nextBeat,
-    skipStream,
-    beatIndex,
-    beats,
-    collectedEvidence,
-    selectedEvidence,
-    collectEvidence,
-    handleSelectEvidence,
-    selectedSkill,
-    isCompleted,
-    endResult,
+    currentBeat, displayedText, isStreaming, tether, feedback, handleInterrupt,
+    nextBeat, skipStream, beatIndex, beats, collectedEvidence, selectedEvidence,
+    collectEvidence, handleSelectEvidence, selectedSkill, isCompleted, endResult,
   } = useGameLogic(scenarioData as ScenarioData, isReplay);
 
   const bottomRef = useRef<HTMLDivElement>(null);
-
   const isScrollingRef = useRef(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const lastActionTimeRef = useRef<number>(0);
 
   useEffect(() => {
     if (feedback) {
-      if (feedback.type === 'success') {
-        setScreenEffect('flash');
-      } else {
-        setScreenEffect('shake');
-      }
+      if (feedback.type === 'success') setScreenEffect('flash');
+      else setScreenEffect('shake');
       const timer = setTimeout(() => setScreenEffect('none'), 500);
       return () => clearTimeout(timer);
     }
   }, [feedback]);
 
   useEffect(() => {
-    if (currentBeat?.text.includes('[<NOISE>]') && !isStreaming) {
-      setIsInterruptMode(true);
-    } else {
-      setIsInterruptMode(false);
-    }
-    // ビートが変わったらウィギンズの眼をオフにする
+    if (currentBeat?.text.includes('[<NOISE>]') && !isStreaming) setIsInterruptMode(true);
+    else setIsInterruptMode(false);
     setIsWigginsActive(false);
   }, [currentBeat, isStreaming]);
 
@@ -138,27 +107,18 @@ export default function GameView({
 
   const handleGlossaryClick = (term: any) => {
     if (unlockedTerms.includes(term.id)) {
-      setActiveGlossary({ 
-        word: term.ja, 
-        desc: "このデータは既に大索引に登録されています。詳細はアーカイブで確認してください。" 
-      });
+      setActiveGlossary({ word: term.ja, desc: "このデータは既に大索引に登録されています。詳細はアーカイブで確認してください。" });
     } else {
       const newTerms = [...unlockedTerms, term.id];
       setUnlockedTerms(newTerms);
-      localStorage.setItem('tether_unlocked_terms', JSON.stringify(newTerms));
-      setActiveGlossary({ 
-        word: term.ja, 
-        desc: "【NEW】大索引に新規データが登録されました！ 事件解決後、アーカイブから詳細を解読できます。" 
-      });
+      setActiveGlossary({ word: term.ja, desc: "【NEW】大索引に新規データが登録されました！ 事件解決後、アーカイブから詳細を解読できます。" });
     }
   };
 
   const handleWigginsEye = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (insightPoints >= 1 && !isWigginsActive) {
-      if (onSpendPoint(1)) {
-        setIsWigginsActive(true);
-      }
+      if (onSpendPoint(1)) setIsWigginsActive(true);
     }
   };
 
@@ -169,23 +129,16 @@ export default function GameView({
       if (part.startsWith('{') && part.endsWith('}')) {
         const word = part.slice(1, -1);
         const isCollected = collectedEvidence.includes(word);
-        
-        // ▼ ウィギンズの眼がアクティブで、かつ未収集の場合のスタイル
-        const wigginsStyle = (isWigginsActive && !isCollected) 
-          ? 'ring-2 ring-amber-400 ring-offset-1 bg-amber-100 animate-pulse' 
-          : '';
+        const wigginsStyle = (isWigginsActive && !isCollected) ? 'ring-2 ring-amber-500 ring-offset-1 bg-amber-200 animate-pulse' : '';
 
         elements.push(
           <span
             key={`ev-${i}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              collectEvidence(word);
-            }}
-            className={`font-bold cursor-pointer px-1 mx-0.5 rounded border transition-colors shadow-sm inline-flex items-center z-10 relative ${wigginsStyle} ${
+            onClick={(e) => { e.stopPropagation(); collectEvidence(word); }}
+            className={`font-bold cursor-pointer px-1.5 mx-0.5 rounded transition-all shadow-sm inline-flex items-center z-10 relative ${wigginsStyle} ${
               isCollected
-                ? 'bg-slate-300 text-slate-500 border-slate-400 cursor-default'
-                : 'text-blue-700 bg-blue-50 hover:bg-blue-100 border-blue-300 active:scale-95'
+                ? 'bg-[#d8c8b8] text-[#8c7a6b] cursor-default'
+                : 'text-[#3a2f29] bg-amber-500/20 hover:bg-amber-500/40 border border-amber-600/30 active:scale-95'
             }`}
           >
             {word}
@@ -199,10 +152,7 @@ export default function GameView({
     glossaryData.terms.forEach((term) => {
       const newElements: (string | React.JSX.Element)[] = [];
       elements.forEach((el) => {
-        if (typeof el !== 'string') {
-          newElements.push(el);
-          return;
-        }
+        if (typeof el !== 'string') { newElements.push(el); return; }
         const gParts = el.split(term.trigger_word);
         gParts.forEach((gPart, j) => {
           newElements.push(gPart);
@@ -210,10 +160,7 @@ export default function GameView({
             newElements.push(
               <span
                 key={`g-${term.id}-${j}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleGlossaryClick(term);
-                }}
+                onClick={(e) => { e.stopPropagation(); handleGlossaryClick(term); }}
                 className="text-amber-700 underline decoration-dotted cursor-help hover:text-amber-600 transition-colors font-bold z-10 relative"
               >
                 {term.trigger_word}
@@ -227,29 +174,19 @@ export default function GameView({
     return elements;
   };
 
-  const latestSystemBeat = beats
-    .slice(0, beatIndex + 1)
-    .reverse()
-    .find((b: any) => b.speaker === 'System');
-  const chatHistory = beats
-    .slice(0, beatIndex + 1)
-    .filter((b: any) => b.speaker !== 'System');
+  const latestSystemBeat = beats.slice(0, beatIndex + 1).reverse().find((b: any) => b.speaker === 'System');
+  const chatHistory = beats.slice(0, beatIndex + 1).filter((b: any) => b.speaker !== 'System');
 
   const handleTouchStart = (e: React.TouchEvent) => {
     isScrollingRef.current = false;
-    touchStartRef.current = {
-      x: e.touches[0].clientX,
-      y: e.touches[0].clientY,
-    };
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!touchStartRef.current) return;
     const dx = Math.abs(e.touches[0].clientX - touchStartRef.current.x);
     const dy = Math.abs(e.touches[0].clientY - touchStartRef.current.y);
-    if (dx > 10 || dy > 10) {
-      isScrollingRef.current = true;
-    }
+    if (dx > 10 || dy > 10) isScrollingRef.current = true;
   };
 
   const handleAreaClick = () => {
@@ -257,117 +194,99 @@ export default function GameView({
     const now = Date.now();
     if (now - lastActionTimeRef.current < 300) return;
     lastActionTimeRef.current = now;
-
-    if (isStreaming) {
-      skipStream();
-    } else {
-      nextBeat();
-    }
+    if (isStreaming) skipStream();
+    else nextBeat();
   };
 
-  // ウィギンズの眼ボタンを表示するかどうかの判定（現在のテキストに未収集の証拠があるか）
-  const hasUncollectedEvidence = currentBeat?.text.match(/\{.*?\}/g)?.some(
-    match => !collectedEvidence.includes(match.slice(1, -1))
-  );
+  const hasUncollectedEvidence = currentBeat?.text.match(/\{.*?\}/g)?.some(match => !collectedEvidence.includes(match.slice(1, -1)));
 
   return (
-    <div className={`w-full max-w-2xl border-0 sm:border-4 border-slate-800 sm:p-1 relative shadow-2xl bg-white flex flex-col h-[100dvh] sm:h-[85vh] touch-manipulation overscroll-none transition-transform duration-75 ${
-      screenEffect === 'shake' ? '-translate-x-2 border-red-500' : ''
+    <div className={`w-full max-w-2xl mx-auto relative bg-[#f4ebd8] flex flex-col h-[100dvh] touch-manipulation overscroll-none transition-transform duration-75 ${
+      screenEffect === 'shake' ? '-translate-x-2' : ''
     }`}>
 
-      {screenEffect === 'flash' && (
-        <div className="absolute inset-0 bg-white z-[60] animate-out fade-out duration-500 pointer-events-none mix-blend-overlay" />
-      )}
-      {screenEffect === 'shake' && (
-        <div className="absolute inset-0 bg-red-900/20 z-[60] animate-out fade-out duration-500 pointer-events-none" />
-      )}
+      {screenEffect === 'flash' && <div className="absolute inset-0 bg-white z-[60] animate-out fade-out duration-500 pointer-events-none mix-blend-overlay" />}
+      {screenEffect === 'shake' && <div className="absolute inset-0 bg-rose-900/20 z-[60] animate-out fade-out duration-500 pointer-events-none" />}
 
+      {/* 画面上部固定のテザーゲージ（コンポーネント側で色は合わせる前提） */}
       <TetherBar tether={tether} onArchiveClick={onBack} />
 
+      {/* メインテキストエリア（スクロール可能） */}
       <div
-        className="flex-1 flex flex-col bg-[#FDF6E3] relative overflow-hidden cursor-pointer"
+        className="flex-1 flex flex-col bg-[#f4ebd8] relative overflow-hidden cursor-pointer"
         onClick={handleAreaClick}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
       >
+        {/* 背景の薄いテクスチャ/透かし（オプション） */}
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-[#3a2f29] to-transparent" />
+
+        {/* System（地の文）の固定ヘッダー */}
         {latestSystemBeat && (
-          <div className="p-4 bg-slate-200 border-b-2 border-slate-400 shadow-inner flex-shrink-0 z-10">
-            <h2 className="text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest font-mono">
+          <div className="p-4 sm:p-5 bg-[#e6d5c3] border-b border-[#8c7a6b]/30 shadow-sm flex-shrink-0 z-10 animate-in fade-in slide-in-from-top-2">
+            <h2 className="text-[10px] font-bold text-[#8c7a6b] mb-1.5 uppercase tracking-widest font-mono">
               Scene Context : {episodeId}
             </h2>
-            <p className="text-sm text-slate-800 italic font-serif leading-relaxed">
+            <p className="text-sm sm:text-base text-[#5c4d43] italic font-serif leading-relaxed">
               {renderText(latestSystemBeat.text)}
             </p>
           </div>
         )}
 
-        <div className="flex-1 p-4 sm:p-6 overflow-y-auto flex flex-col gap-6 custom-scrollbar relative">
+        {/* 会話ログのリスト */}
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar relative">
           {chatHistory.map((beat: any) => {
             const isCurrent = beat.id === currentBeat.id;
             const textToShow = isCurrent ? displayedText : beat.text;
-            const cleanText = textToShow.replace(/\[<NOISE>\]/g, '');
+            
+            // ▼ 先ほど修正した ChatLog コンポーネントを使用
             return (
-              <div
-                key={beat.id}
-                className="relative p-4 bg-white border-2 border-slate-800 rounded shadow-sm"
-              >
-                <div className="absolute -top-3 left-4 bg-slate-800 text-white px-3 py-0.5 text-[10px] font-bold rounded uppercase tracking-widest font-mono">
-                  {beat.speaker}
-                </div>
-                <div className="mt-2 text-base sm:text-lg text-slate-800 leading-relaxed font-medium">
-                  {renderText(cleanText)}
-                  {isCurrent && isStreaming && (
-                    <span className="inline-block w-2 h-5 bg-slate-800 ml-1 animate-pulse align-middle" />
-                  )}
-                </div>
-                {isCurrent && feedback && (
-                  <div
-                    className={`mt-4 p-3 border-l-4 text-xs font-bold italic shadow-sm animate-in slide-in-from-left-2 ${
-                      feedback.type === 'success'
-                        ? 'border-green-700 bg-green-50 text-green-900'
-                        : 'border-red-700 bg-red-50 text-red-900'
-                    }`}
-                  >
-                    {feedback.msg}
-                  </div>
-                )}
-              </div>
+              <ChatLog 
+                key={beat.id} 
+                speaker={beat.speaker} 
+                text={renderText(textToShow) as unknown as string} // renderTextを通した結果を渡す（ReactNode許容のため要調整）
+                feedback={isCurrent ? feedback : null} 
+              />
             );
           })}
-          <div ref={bottomRef} className="h-4" />
+          
+          {/* 現在ストリーミング中のカーソル */}
+          {isStreaming && currentBeat.speaker !== 'System' && (
+            <div className="inline-block w-2.5 h-5 bg-[#3a2f29] ml-1 animate-pulse align-middle" />
+          )}
+
+          <div ref={bottomRef} className="h-20" /> {/* 最下部の余白 */}
         </div>
 
-        {/* ▼ ウィギンズの眼 ボタン（未収集の証拠がある場合のみ表示） */}
+        {/* ウィギンズの眼 ボタン */}
         {!isStreaming && hasUncollectedEvidence && !isInterruptMode && !isWigginsActive && unlockedTerms.includes('W040') && (
-          <div className="absolute bottom-4 right-4 z-20 animate-in fade-in zoom-in duration-300">
+          <div className="absolute bottom-6 right-6 z-20 animate-in fade-in zoom-in duration-300">
              <button
                 onClick={handleWigginsEye}
                 disabled={insightPoints < 1}
-                className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white text-[10px] sm:text-xs font-bold px-3 py-2 rounded-full shadow-lg flex items-center gap-1 border-2 border-amber-800 transition-transform active:scale-95"
+                className="bg-amber-700 hover:bg-amber-600 disabled:bg-[#d8c8b8] disabled:text-[#8c7a6b] disabled:cursor-not-allowed text-white text-[10px] sm:text-xs font-bold px-4 py-3 rounded-full shadow-lg flex items-center gap-1.5 transition-transform active:scale-95"
              >
-                <Eye size={14} /> WIGGINS (1pt)
+                <Eye size={16} /> WIGGINS (1pt)
              </button>
           </div>
         )}
       </div>
 
+      {/* 収集した証拠品リスト（画面下部に固定） */}
       {!isInterruptMode && collectedEvidence.length > 0 && (
-        <div className="p-2 sm:p-3 bg-slate-800 flex flex-wrap gap-2 border-t-2 border-slate-600 shrink-0 shadow-inner overflow-x-auto custom-scrollbar">
-          <span className="text-[10px] font-mono text-slate-400 flex items-center mr-2 tracking-widest">
+        <div className="p-3 bg-[#2a2420] flex flex-wrap gap-2 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.1)] overflow-x-auto custom-scrollbar border-t border-[#3a2f29]">
+          <span className="text-[10px] font-mono text-[#8c7a6b] flex items-center mr-1 tracking-widest uppercase">
             EVIDENCE:
           </span>
           {collectedEvidence.map((ev) => (
             <button
               key={ev}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleSelectEvidence(ev);
-              }}
+              onClick={(e) => { e.stopPropagation(); handleSelectEvidence(ev); }}
               disabled={isStreaming}
-              className={`whitespace-nowrap text-[10px] sm:text-xs px-2 py-1.5 rounded border font-bold transition-all active:scale-95 z-20 relative ${
+              className={`whitespace-nowrap text-[10px] sm:text-xs px-2.5 py-1.5 rounded-full font-bold transition-all active:scale-95 z-20 relative ${
                 selectedEvidence === ev
-                  ? 'bg-amber-500 border-amber-400 text-slate-900 shadow-[0_0_8px_rgba(217,119,6,0.6)]'
-                  : 'bg-slate-700 border-slate-500 text-slate-200 hover:bg-slate-600'
+                  ? 'bg-amber-500 text-[#3a2f29] shadow-[0_0_10px_rgba(245,158,11,0.4)]'
+                  : 'bg-[#5c4d43] text-[#f4ebd8] hover:bg-[#8c7a6b]'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {ev}
@@ -376,21 +295,18 @@ export default function GameView({
         </div>
       )}
 
-      <div onClick={(e) => e.stopPropagation()}>
+      {/* 操作パネル（Controls / InterruptPanel） */}
+      <div onClick={(e) => e.stopPropagation()} className="shrink-0 bg-[#f4ebd8]">
         {isInterruptMode ? (
           <InterruptPanel
             collectedEvidences={collectedEvidence}
             hintText={currentBeat?.interrupt?.hint}
-            canUseIrene={canUseIrene} // ▼ アイリーン判定
+            canUseIrene={canUseIrene}
             ireneUsed={ireneUsed}
             onUseIrene={() => setIreneUsed(true)}
             onSubmit={(skill, evidence) => {
-              if (evidence) {
-                handleSelectEvidence(evidence);
-              }
-              setTimeout(() => {
-                handleInterrupt(skill);
-              }, 10);
+              if (evidence) handleSelectEvidence(evidence);
+              setTimeout(() => handleInterrupt(skill), 10);
               setIsInterruptMode(false);
             }}
             onTimeUp={() => {
@@ -408,104 +324,65 @@ export default function GameView({
         )}
       </div>
 
+      {/* 用語解説トースト */}
       {activeGlossary && (
-        <GlossaryToast
-          term={activeGlossary.word}
-          desc={activeGlossary.desc}
-          onClose={() => setActiveGlossary(null)}
-        />
+        <GlossaryToast term={activeGlossary.word} desc={activeGlossary.desc} onClose={() => setActiveGlossary(null)} />
       )}
 
+      {/* クリアリザルト画面 */}
       {isCompleted && endResult && (
-        <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-4 animate-in fade-in duration-500">
-          {/* ...（結果表示部分は変更なしのため省略せずにそのまま維持）... */}
-          <div
-            className="bg-[#f4ecd8] max-w-md w-full rounded shadow-[0_0_30px_rgba(0,0,0,0.8)] border-4 border-[#c2b280] relative overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-20 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent to-amber-900" />
-            <div className="p-6 relative z-10 font-serif text-slate-800">
-              <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-widest border-b-2 border-slate-800 pb-2 mb-4 flex items-center gap-2">
-                <FileText /> Investigation Report
+        <div className="absolute inset-0 z-50 bg-[#1a1512]/90 flex items-center justify-center p-4 animate-in fade-in duration-500 backdrop-blur-sm">
+          <div className="bg-[#f4ebd8] max-w-md w-full rounded-xl shadow-2xl border-2 border-[#8c7a6b] relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent to-[#3a2f29]" />
+            <div className="p-6 sm:p-8 relative z-10 font-serif text-[#3a2f29]">
+              
+              <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-widest border-b border-[#8c7a6b]/30 pb-3 mb-5 flex items-center gap-2">
+                <FileText className="text-[#8c7a6b]" /> Investigation Report
               </h2>
 
-              <div className="flex justify-between items-end border-b border-slate-400 border-dotted pb-2 mb-4 font-mono text-sm">
+              <div className="flex justify-between items-end border-b border-[#8c7a6b]/30 border-dotted pb-3 mb-5 font-mono text-sm">
                 <div>
-                  <span className="text-slate-500">CASE ID:</span>{' '}
-                  <span className="font-bold">{episodeId}</span>
-                  <br />
-                  <span className="text-slate-500">FINAL TETHER:</span>{' '}
-                  <span className="text-lg font-bold">{tether}%</span>
+                  <span className="text-[#8c7a6b]">CASE ID:</span> <span className="font-bold">{episodeId}</span><br />
+                  <span className="text-[#8c7a6b]">FINAL TETHER:</span> <span className="text-lg font-bold text-amber-700">{tether}%</span>
                 </div>
-                <div
-                  className={`border-4 px-2 py-1 font-bold text-xl uppercase tracking-widest rotate-6 opacity-80 bg-[#f4ecd8] ${
-                    endResult.rank === 'LUCID'
-                      ? 'border-green-700 text-green-700'
-                      : endResult.rank === 'SYMPATHETIC'
-                      ? 'border-blue-700 text-blue-700'
-                      : 'border-red-800 text-red-800'
-                  }`}
-                >
+                <div className={`border-2 px-3 py-1 font-bold text-lg uppercase tracking-widest rotate-6 opacity-90 rounded-sm bg-[#f4ebd8] shadow-sm ${
+                    endResult.rank === 'LUCID' ? 'border-emerald-700 text-emerald-800' : endResult.rank === 'SYMPATHETIC' ? 'border-blue-700 text-blue-800' : 'border-rose-800 text-rose-800'
+                  }`}>
                   {endResult.rank}
                 </div>
               </div>
 
-              <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-2 custom-scrollbar">
                 {endResult.official_record && (
-                  <div className="bg-slate-200 p-3 border-l-4 border-slate-500 font-mono text-xs shadow-inner">
-                    <p className="text-slate-700">
-                      {endResult.official_record}
-                    </p>
+                  <div className="bg-[#e6d5c3]/50 p-3 sm:p-4 rounded-lg border border-[#8c7a6b]/20 font-mono text-xs shadow-inner">
+                    <p className="text-[#5c4d43] leading-relaxed">{endResult.official_record}</p>
                   </div>
                 )}
-
                 {endResult.watson_journal && (
-                  <div className="p-3 border border-slate-400 bg-[#e8dec5] shadow-sm">
-                    <h3 className="font-bold text-slate-800 mb-2 border-b border-slate-400 pb-1 text-sm uppercase tracking-widest">
+                  <div className="p-4 rounded-lg border border-[#8c7a6b]/30 bg-[#fffcf7] shadow-sm">
+                    <h3 className="font-bold text-[#3a2f29] mb-2 border-b border-[#8c7a6b]/20 pb-1 text-xs uppercase tracking-widest">
                       Watson's Journal
                     </h3>
-                    <p className="text-sm leading-relaxed text-slate-800">
-                      {endResult.watson_journal}
-                    </p>
+                    <p className="text-sm leading-relaxed text-[#5c4d43]">{endResult.watson_journal}</p>
                   </div>
                 )}
-
                 {endResult.holmes_note && (
-                  <div className="p-3 bg-[#FDF6E3] border border-amber-200 shadow-sm">
-                    <h3 className="font-bold text-amber-900 mb-1 italic text-xs">
-                      Holmes's Note :
-                    </h3>
-                    <p className="text-sm leading-relaxed italic text-amber-800">
-                      {endResult.holmes_note}
-                    </p>
+                  <div className="p-4 rounded-lg bg-amber-600/5 border border-amber-700/20 shadow-sm">
+                    <h3 className="font-bold text-amber-900 mb-1.5 italic text-xs">Holmes's Note :</h3>
+                    <p className="text-sm leading-relaxed italic text-amber-800/90">{endResult.holmes_note}</p>
                   </div>
                 )}
               </div>
 
-              <div className="mt-6 text-center border-t border-slate-300 pt-4">
-                <p className="text-xs text-slate-500 tracking-widest uppercase mb-1">
-                  Insight Points Acquired
-                </p>
-                <p className="text-3xl font-bold text-amber-700 font-mono">
-                  +{endResult.points} pt
-                </p>
-                {isReplay && (
-                  <p className="text-[10px] text-amber-800 mt-1 font-mono tracking-tighter">
-                    *再プレイのため報酬は制限されています
-                  </p>
-                )}
+              <div className="mt-6 text-center pt-4">
+                <p className="text-[10px] text-[#8c7a6b] tracking-widest uppercase mb-1 font-mono">Insight Points Acquired</p>
+                <p className="text-4xl font-bold text-amber-600 font-mono drop-shadow-sm">+{endResult.points} pt</p>
+                {isReplay && <p className="text-[9px] text-amber-800/70 mt-1 font-mono tracking-tighter">*再プレイ報酬適用</p>}
               </div>
 
               <button
-                onClick={() =>
-                  onEpisodeComplete(
-                    episodeId,
-                    endResult.rank,
-                    tether,
-                    endResult.points
-                  )
-                }
-                className="w-full mt-4 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded tracking-widest transition-colors shadow-lg active:scale-95"
+                onClick={() => onEpisodeComplete(episodeId, endResult.rank, tether, endResult.points)}
+                className="w-full mt-6 bg-[#3a2f29] hover:bg-[#1a1512] text-[#f4ebd8] font-bold py-3.5 rounded-full tracking-widest transition-transform active:scale-95 shadow-md text-sm"
               >
                 FILE ARCHIVE (記録完了)
               </button>
@@ -514,16 +391,15 @@ export default function GameView({
         </div>
       )}
 
+      {/* （SPエピソード等の特殊クリア時の演出用） */}
       {isCompleted && !endResult && (
-        <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 animate-in fade-in duration-1000">
-          <p className="text-white text-lg font-serif tracking-widest mb-8 animate-pulse text-center">
+        <div className="absolute inset-0 z-50 bg-[#1a1512]/95 flex flex-col items-center justify-center p-4 animate-in fade-in duration-1000 backdrop-blur-md">
+          <p className="text-[#f4ebd8] text-lg font-serif tracking-widest mb-10 animate-pulse text-center">
             ―― そして、記録は次へ繋がる。
           </p>
           <button
-            onClick={() => {
-              onEpisodeComplete(episodeId, "INTERLUDE", tether, 0);
-            }}
-            className="bg-transparent border border-white text-white hover:bg-white hover:text-black font-bold py-3 px-8 rounded tracking-widest transition-all duration-300 flex items-center gap-2"
+            onClick={() => onEpisodeComplete(episodeId, "INTERLUDE", tether, 0)}
+            className="bg-transparent border border-[#8c7a6b] text-[#f4ebd8] hover:bg-[#f4ebd8] hover:text-[#1a1512] font-bold py-3 px-8 rounded-full tracking-widest transition-all duration-300 flex items-center gap-2 active:scale-95"
           >
             次へ進む <ArrowRight size={20} />
           </button>
