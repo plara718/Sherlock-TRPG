@@ -63,8 +63,8 @@ export default function ChronologyTab({
   return (
     <div className="animate-in fade-in duration-300">
       
-      {/* スマホ最適化：横スクロールのシーズン選択ピル */}
-      <div className="flex overflow-x-auto gap-3 mb-6 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 custom-scrollbar snap-x">
+      {/* スマホ最適化：折り返し表示（自動ラップ）のシーズン選択ピル */}
+      <div className="flex flex-wrap gap-2 sm:gap-3 mb-6">
         {archiveData.seasons.map((s: any) => {
           const isLocked = typeof s.season_id === 'number' && s.season_id > currentSeason;
           return (
@@ -73,7 +73,7 @@ export default function ChronologyTab({
               onClick={() => {
                 if (!isLocked) { setActiveTab(s.season_id); setExpandedEp(null); }
               }}
-              className={`snap-start whitespace-nowrap px-5 py-2.5 font-bold text-sm rounded-full transition-colors flex-shrink-0 flex items-center gap-2 border shadow-sm ${
+              className={`px-3 py-1.5 sm:px-5 sm:py-2.5 font-bold text-xs sm:text-sm rounded-full transition-colors flex items-center gap-1.5 border shadow-sm ${
                 activeTab === s.season_id
                   ? 'bg-[#5c4d43] text-[#f4ebd8] border-[#5c4d43]'
                   : isLocked
@@ -82,7 +82,7 @@ export default function ChronologyTab({
               }`}
             >
               {s.title.split(':')[0]}
-              {isLocked && <Lock size={14} />}
+              {isLocked && <Lock size={14} className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
             </button>
           );
         })}
