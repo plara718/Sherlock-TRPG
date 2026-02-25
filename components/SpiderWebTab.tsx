@@ -1,29 +1,39 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Network, Lock, HelpCircle, X, AlertCircle } from 'lucide-react';
-import spiderData from '@/data/spider_web.json';
+import { Network, Lock, HelpCircle, X, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import spiderDataS1 from '@/data/spider_web_s1.json';
+import spiderDataS2 from '@/data/spider_web_s2.json';
 
 // --- 型定義 ---
-// ArchiveView からの渡し方と完全に一致させるため、汎用的な Record 型を使用
 type SpiderWebTabProps = {
   clearedData?: Record<string, any>;
   unlockedTerms?: string[];
-  unlockedTruths?: Record<string, any>; // 追加
-  insightPoints?: number;              // 追加
-  onUnlockTruth?: (pinId: string, truthData: any, cost: number) => void; // 追加
-  onLinkFail?: (cost: number) => void; // 追加
+  unlockedTruths?: Record<string, any>;
+  insightPoints?: number;
+  onUnlockTruth?: (pinId: string, truthData: any, cost: number) => void;
+  onLinkFail?: (cost: number) => void;
 };
 
 export default function SpiderWebTab({
   clearedData = {},
   unlockedTerms = [],
-  // 以下のPropsは現在使われていなくても、親からの警告を防ぐために定義しておく
   unlockedTruths = {},
   insightPoints = 0,
   onUnlockTruth,
   onLinkFail,
 }: SpiderWebTabProps) {
+  // ▼ 進行度に応じて初期表示シーズンを自動判定する
+  const [currentSeason, setCurrentSeason] = useState<1 | 2>(() => {
+    // clearedDataのキー（例: "#01", "#14"）からエピソード番号を抽出し、
+    // 14以上（Season 2のエピソード）が含まれていればSeason 2を初期表示する
+    const hasSeason2 = Object.keys(clearedData).some(id => {
+      const epNum = parseInt(id.replace('#', ''), 10);
+      return !isNaN(epNum) && epNum >= 14;
+    });
+    return hasSeason2 ? 2 : 1;
+  });
+  
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
@@ -31,6 +41,9 @@ export default function SpiderWebTab({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<any[]>([]);
+
+  // ▼ 現在のシーズンに応じたデータを取得する
+  const currentSpiderData = currentSeason === 1 ? spiderDataS1 : spiderDataS2;
 
   // チュートリアルの発火判定
   useEffect(() => {
@@ -49,11 +62,11 @@ export default function SpiderWebTab({
     const centerX = clientWidth / 2;
     const centerY = clientHeight / 2;
 
-    const newNodes = spiderData.pins.map((pin: any, index: number) => {
+    const newNodes = currentSpiderData.pins.map((pin: any, index: number) => {
       const isCleared = Object.keys(clearedData).includes(pin.source_episode);
       const isTruthUnlocked = unlockedTerms.includes(pin.required_index_id);
 
-      const angle = (index / spiderData.pins.length) * Math.PI * 2;
+      const angle = (index / currentSpiderData.pins.length) * Math.PI * 2;
       const radius = isTruthUnlocked ? clientWidth * 0.15 : clientWidth * 0.35;
 
       const x = centerX + Math.cos(angle) * radius;
@@ -69,7 +82,7 @@ export default function SpiderWebTab({
     });
 
     setNodes(newNodes);
-  }, [clearedData, unlockedTerms]);
+  }, [clearedData, unlockedTerms, currentSpiderData]);
 
   const handleTutorialNext = () => {
     if (tutorialStep === 1) {
@@ -89,9 +102,30 @@ export default function SpiderWebTab({
       <div className="flex items-end justify-between mb-4 border-b border-[#8c7a6b]/30 pb-2 shrink-0">
         <div className="flex items-center gap-3">
           <div>
-            <p className="text-[#8c7a6b] text-[10px] sm:text-xs font-mono tracking-widest">
-              相関図 - 暗躍する影のネットワーク
-            </p>
+            <div className="flex items-center gap-2 text-[#8c7a6b] text-[10px] sm:text-xs font-mono tracking-widest">
+              {/* ▼ シーズン切り替えUI */}
+              <button 
+                onClick={() => {
+                  setCurrentSeason(1);
+                  setSelectedPinId(null);
+                }} 
+                disabled={currentSeason === 1}
+                className="hover:text-amber-600 disabled:opacity-30 disabled:hover:text-[#8c7a6b] transition-colors"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <span>SEASON {currentSeason}</span>
+              <button 
+                onClick={() => {
+                  setCurrentSeason(2);
+                  setSelectedPinId(null);
+                }} 
+                disabled={currentSeason === 2}
+                className="hover:text-amber-600 disabled:opacity-30 disabled:hover:text-[#8c7a6b] transition-colors"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
             <h2 className="text-xl sm:text-2xl font-bold text-[#3a2f29] font-serif mt-1 flex items-center gap-2">
               <Network size={24} className="text-amber-700" />
               THE SPIDER WEB
@@ -110,7 +144,7 @@ export default function SpiderWebTab({
             Connections
           </p>
           <p className="text-lg font-bold text-amber-600 font-mono">
-            {nodes.filter((n) => n.isTruthUnlocked).length} / {nodes.length}
+            {nodes.filter((n) => n.isTruthUnlocked).length} / {currentSpiderData.pins.length}
           </p>
         </div>
       </div>
