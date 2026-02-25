@@ -1,16 +1,19 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Archive, BrainCircuit } from 'lucide-react';
+import { Archive, BrainCircuit, Sparkles } from 'lucide-react';
 
 type TetherBarProps = {
   tether: number;
   onArchiveClick: () => void;
+  protagonist?: string; // ← 追加
 };
 
-export default function TetherBar({ tether, onArchiveClick }: TetherBarProps) {
+export default function TetherBar({ tether, onArchiveClick, protagonist = 'watson' }: TetherBarProps) {
   const [flash, setFlash] = useState<'success' | 'damage' | null>(null);
   const prevTether = useRef(tether);
+  
+  const isIrene = protagonist === 'irene';
 
   useEffect(() => {
     if (tether > prevTether.current) {
@@ -27,6 +30,10 @@ export default function TetherBar({ tether, onArchiveClick }: TetherBarProps) {
     return () => clearTimeout(timer);
   }, [tether]);
 
+  const barLabel = isIrene ? 'ELEGANCE' : 'TETHER';
+  const IconComponent = isIrene ? Sparkles : BrainCircuit;
+  const defaultColor = isIrene ? 'text-rose-400' : 'text-amber-600';
+
   return (
     <div
       className={`p-3 sm:p-4 border-b border-[#3a2f29] flex justify-between items-center transition-colors duration-500 z-20 shadow-md shrink-0 ${
@@ -38,25 +45,25 @@ export default function TetherBar({ tether, onArchiveClick }: TetherBarProps) {
       }`}
     >
       <div className="flex items-center gap-3 flex-1">
-        <BrainCircuit
+        <IconComponent
           className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors duration-500 ${
             flash === 'success'
               ? 'text-emerald-500'
               : flash === 'damage'
               ? 'text-rose-500'
-              : 'text-amber-600'
+              : defaultColor
           }`}
         />
         <div className="flex-1 max-w-[200px]">
           <div className="flex justify-between text-[10px] sm:text-xs font-bold mb-1 font-mono tracking-widest">
-            <span className="text-[#8c7a6b]">TETHER</span>
+            <span className="text-[#8c7a6b]">{barLabel}</span>
             <span
               className={`transition-colors duration-500 ${
                 flash === 'success'
                   ? 'text-emerald-400'
                   : flash === 'damage'
                   ? 'text-rose-400'
-                  : 'text-amber-500'
+                  : isIrene ? 'text-rose-400' : 'text-amber-500'
               }`}
             >
               {tether}%
@@ -76,7 +83,7 @@ export default function TetherBar({ tether, onArchiveClick }: TetherBarProps) {
                 tether >= 80
                   ? 'bg-emerald-600'
                   : tether >= 40
-                  ? 'bg-amber-600'
+                  ? (isIrene ? 'bg-rose-500' : 'bg-amber-600')
                   : 'bg-rose-600'
               }`}
               style={{ width: `${tether}%` }}

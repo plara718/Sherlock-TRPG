@@ -11,6 +11,7 @@ type InterruptPanelProps = {
   onUseIrene?: () => void; 
   onSubmit: (skill: string, evidence: string | null) => void;
   onTimeUp: () => void;
+  protagonist?: string; // ← 追加
 };
 
 export default function InterruptPanel({
@@ -21,11 +22,14 @@ export default function InterruptPanel({
   onUseIrene,
   onSubmit,
   onTimeUp,
+  protagonist = 'watson',
 }: InterruptPanelProps) {
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
   const [selectedEvidence, setSelectedEvidence] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState(15);
   const [showHint, setShowHint] = useState(false);
+
+  const isIrene = protagonist === 'irene';
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -42,16 +46,16 @@ export default function InterruptPanel({
   }, [onTimeUp]);
 
   return (
-    <div className="p-4 sm:p-5 bg-[#1a1512] border-t-4 border-rose-800 shadow-[0_-10px_30px_rgba(159,18,57,0.3)] animate-in slide-in-from-bottom-4 relative overflow-hidden">
+    <div className={`p-4 sm:p-5 bg-[#1a1512] border-t-4 shadow-[0_-10px_30px_rgba(159,18,57,0.3)] animate-in slide-in-from-bottom-4 relative overflow-hidden ${isIrene ? 'border-fuchsia-800' : 'border-rose-800'}`}>
       
       {/* 背景の薄い警告ノイズ */}
-      <div className="absolute inset-0 opacity-10 pointer-events-none bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(159,18,57,0.2)_10px,rgba(159,18,57,0.2)_20px)]" />
+      <div className={`absolute inset-0 opacity-10 pointer-events-none bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(159,18,57,0.2)_10px,rgba(159,18,57,0.2)_20px)] ${isIrene ? 'hue-rotate-[280deg]' : ''}`} />
 
       <div className="relative z-10">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-rose-500 font-bold tracking-widest flex items-center gap-2 font-mono uppercase text-sm sm:text-base">
+          <h3 className={`${isIrene ? 'text-fuchsia-400' : 'text-rose-500'} font-bold tracking-widest flex items-center gap-2 font-mono uppercase text-sm sm:text-base`}>
             <ShieldAlert size={18} className="animate-pulse" />
-            Detect Hallucination
+            {isIrene ? 'Detect Flaw' : 'Detect Hallucination'}
           </h3>
           <div className={`font-mono text-xl sm:text-2xl font-bold flex items-center gap-2 bg-black/40 px-3 py-1 rounded-lg border ${timeLeft <= 5 ? 'text-rose-500 animate-pulse border-rose-900/50' : 'text-[#d8c8b8] border-[#5c4d43]'}`}>
             <Clock size={18} /> 00:{timeLeft.toString().padStart(2, '0')}
@@ -59,7 +63,9 @@ export default function InterruptPanel({
         </div>
 
         <p className="text-[10px] sm:text-xs text-[#8c7a6b] mb-5 font-mono leading-relaxed">
-          天才の暴走を繋ぎ止めろ。適切な視点と裏付けとなる証拠を提示せよ。
+          {isIrene 
+            ? '敵の慢心を突け。相手の隙となる視点と、それを証明する証拠を突きつけなさい。' 
+            : '天才の暴走を繋ぎ止めろ。適切な視点と裏付けとなる証拠を提示せよ。'}
         </p>
 
         {/* スキル選択 */}
@@ -101,7 +107,7 @@ export default function InterruptPanel({
           </button>
         </div>
 
-        {/* 証拠選択とヒント（アイリーン機能） */}
+        {/* 証拠選択とヒント */}
         <div className="mb-6">
           <div className="text-[10px] sm:text-xs text-[#8c7a6b] font-mono mb-3 flex justify-between items-center">
             <span className="tracking-widest">SELECT EVIDENCE:</span>
@@ -112,7 +118,8 @@ export default function InterruptPanel({
               </button>
             )}
             
-            {canUseIrene && !ireneUsed && (
+            {/* アイリーン視点の時は、自分自身の囁き機能を使えなくする */}
+            {canUseIrene && !ireneUsed && !isIrene && (
               <button 
                 onClick={() => { setShowHint(true); if (onUseIrene) onUseIrene(); }} 
                 className="text-fuchsia-400 flex items-center gap-1.5 font-bold animate-pulse px-3 py-1 border border-fuchsia-800 rounded-full bg-fuchsia-900/30 hover:bg-fuchsia-900/50 active:scale-95 shadow-[0_0_10px_rgba(192,38,211,0.2)]"
@@ -121,7 +128,7 @@ export default function InterruptPanel({
               </button>
             )}
             
-            {canUseIrene && ireneUsed && (
+            {canUseIrene && ireneUsed && !isIrene && (
               <span className="text-fuchsia-900 flex items-center gap-1 font-bold opacity-60">
                  <Sparkles size={12} /> IRENE (USED)
               </span>
@@ -159,9 +166,11 @@ export default function InterruptPanel({
         <button
           onClick={() => { if (selectedSkill) onSubmit(selectedSkill, selectedEvidence); }}
           disabled={!selectedSkill}
-          className="w-full py-3.5 sm:py-4 bg-rose-800 hover:bg-rose-700 disabled:bg-[#2a2420] disabled:text-[#5c4d43] disabled:border disabled:border-[#3a2f29] disabled:cursor-not-allowed text-white font-bold tracking-widest uppercase rounded-full shadow-lg transition-transform flex items-center justify-center gap-2 active:scale-95 text-sm"
+          className={`w-full py-3.5 sm:py-4 disabled:bg-[#2a2420] disabled:text-[#5c4d43] disabled:border disabled:border-[#3a2f29] disabled:cursor-not-allowed text-white font-bold tracking-widest uppercase rounded-full shadow-lg transition-transform flex items-center justify-center gap-2 active:scale-95 text-sm ${
+            isIrene ? 'bg-fuchsia-800 hover:bg-fuchsia-700' : 'bg-rose-800 hover:bg-rose-700'
+          }`}
         >
-          Tether The Genius
+          {isIrene ? 'Counter The Threat' : 'Tether The Genius'}
         </button>
       </div>
     </div>

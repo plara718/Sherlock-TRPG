@@ -23,6 +23,7 @@ export type ScenarioData = {
     tether_start: number;
     world_state: any;
     type?: string; 
+    protagonist?: string; // ← 追加：主人公フラグ（'watson', 'irene', 'moriarty'など）
   };
   consequence?: { 
     official_record: string;
@@ -41,8 +42,11 @@ const TETHER_PENALTY_FAIL = -15;
 const TETHER_PENALTY_MISS = -15;
 const TETHER_PENALTY_WASTE = -5;
 
-// ▼ 変更点：第2引数に isReplay を追加（デフォルトは false）
 export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = false) {
+  // ▼ 主人公の判定（デフォルトは 'watson'）
+  const protagonist = scenarioData.meta.protagonist || 'watson';
+  const isIrene = protagonist === 'irene';
+
   const initialTether = scenarioData.meta.tether_start || 50;
   const beats = scenarioData.beats;
 
@@ -154,12 +158,16 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
         if (!newEv) {
           setFeedback({
             type: 'penalty',
-            msg: `[${selectedSkill}] 視点を選択中。天才の暴走を繋ぎ止める（TETHER）には、主張を裏付ける【証拠】もセットしろ。`,
+            msg: isIrene
+              ? `[${selectedSkill}] 視点を選択中。相手の慢心を突く（COUNTER）には、それを証明する【証拠】もセットしなさい。`
+              : `[${selectedSkill}] 視点を選択中。天才の暴走を繋ぎ止める（TETHER）には、主張を裏付ける【証拠】もセットしろ。`,
           });
         } else {
           setFeedback({
             type: 'success',
-            msg: `[${selectedSkill}] 視点と証拠 [${newEv}] を提示する準備完了。右下の「TETHER THE GENIUS」を押せ。`,
+            msg: isIrene
+              ? `[${selectedSkill}] 視点と証拠 [${newEv}] を提示する準備完了。右下の「COUNTER」を押してちょうだい。`
+              : `[${selectedSkill}] 視点と証拠 [${newEv}] を提示する準備完了。右下の「TETHER THE GENIUS」を押せ。`,
           });
         }
       } else {
@@ -197,12 +205,16 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
     if (!selectedEvidence) {
       setFeedback({
         type: 'penalty',
-        msg: `[${skillName}] 視点を選択中。しかし、天才の暴走を繋ぎ止める（TETHER）には、確たる【証拠】のセットが必要だ。`,
+        msg: isIrene
+          ? `[${skillName}] 視点を選択中。しかし、反撃（COUNTER）には、確たる【証拠】のセットが必要よ。`
+          : `[${skillName}] 視点を選択中。しかし、天才の暴走を繋ぎ止める（TETHER）には、確たる【証拠】のセットが必要だ。`,
       });
     } else {
       setFeedback({
         type: 'success',
-        msg: `[${skillName}] 視点と証拠 [${selectedEvidence}] を提示する準備完了。右下の「TETHER THE GENIUS」を押せ。`,
+        msg: isIrene
+          ? `[${skillName}] 視点と証拠 [${selectedEvidence}] を提示する準備完了。右下の「COUNTER」を押してちょうだい。`
+          : `[${skillName}] 視点と証拠 [${selectedEvidence}] を提示する準備完了。右下の「TETHER THE GENIUS」を押せ。`,
       });
     }
   };
@@ -257,12 +269,14 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
       } else {
         setFeedback({
           type: 'penalty',
-          msg: `[${skill}] その証拠では天才の暴走を繋ぎ止められないぞ、ワトスン。（TETHER -15）`,
+          msg: isIrene
+            ? `[${skill}] その程度の機転じゃ、この窮地は抜け出せないわ。（TETHER -15）`
+            : `[${skill}] その証拠では天才の暴走を繋ぎ止められないぞ、ワトスン。（TETHER -15）`,
         });
         updateTether(TETHER_PENALTY_FAIL);
       }
     },
-    [currentBeat, isResolved, getTextSpeed, updateTether]
+    [currentBeat, isResolved, getTextSpeed, updateTether, isIrene]
   );
 
   const nextBeat = () => {
@@ -313,7 +327,9 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
         } else if (selectedSkill) {
           setFeedback({
             type: 'penalty',
-            msg: `その証拠では天才の暴走を繋ぎ止められないぞ、ワトスン。（TETHER -15）`,
+            msg: isIrene
+              ? `その程度の機転じゃ、この窮地は抜け出せないわ。（TETHER -15）`
+              : `その証拠では天才の暴走を繋ぎ止められないぞ、ワトスン。（TETHER -15）`,
           });
           updateTether(TETHER_PENALTY_FAIL);
         } else {
@@ -328,7 +344,9 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
         setIsResolved(true);
         setFeedback({
           type: 'penalty',
-          msg: `邪魔をするな、ワトスン。思考の途中だ。（TETHER -5）`,
+          msg: isIrene
+            ? `つまらない手出しは無用よ。（TETHER -5）`
+            : `邪魔をするな、ワトスン。思考の途中だ。（TETHER -5）`,
         });
         updateTether(TETHER_PENALTY_WASTE);
         return;
@@ -348,7 +366,6 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
       let watson_journal = scenarioData.consequence?.watson_journal?.abyss || '';
       let basePoints = 1;
 
-      // ▼ 変更点：初回クリアの基礎報酬を調整
       if (tether >= 80) {
         rank = 'SYMPATHETIC';
         watson_journal = scenarioData.consequence?.watson_journal?.sympathetic || '';
@@ -359,7 +376,6 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
         basePoints = 3;
       }
 
-      // ▼ 変更点：再プレイ時は 1pt に制限
       const finalPoints = isReplay ? 1 : basePoints;
 
       setEndResult({

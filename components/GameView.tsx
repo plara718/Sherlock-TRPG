@@ -5,7 +5,7 @@ import TetherBar from '@/components/TetherBar';
 import Controls from '@/components/Controls';
 import GlossaryToast from '@/components/GlossaryToast';
 import InterruptPanel from '@/components/InterruptPanel';
-import ChatLog from '@/components/ChatLog'; // 追加：ChatLogの呼び出し用
+import ChatLog from '@/components/ChatLog'; 
 import { useGameLogic, ScenarioData } from '@/lib/useGameLogic';
 import { FileText, ArrowRight, Eye } from 'lucide-react';
 
@@ -31,8 +31,8 @@ import episode18 from '@/data/episode_18.json';
 import episode19 from '@/data/episode_19.json';
 import glossaryData from '@/data/glossary.json';
 
-// SPエピソードのインポート（適宜追加してください）
-//import episodeSp01 from '@/data/episode_sp01.json';
+// SPエピソード
+import episodeSp01 from '@/data/episode_sp01.json';
 //import episodeSp02 from '@/data/episode_sp02.json';
 //import episodeSp03 from '@/data/episode_sp03.json';
 import episodeSp04 from '@/data/episode_sp04.json';
@@ -45,7 +45,7 @@ const SCENARIOS: Record<string, any> = {
   '#08': episode08, '#09': episode09, '#10': episode10, '#11': episode11,
   '#12': episode12, '#13': episode13, '#14': episode14, '#15': episode15,
   '#16': episode16, '#17': episode17, '#18': episode18, '#19': episode19,
-  //'SP-01': episodeSp01, 'SP-02': episodeSp02, 'SP-03': episodeSp03,
+  'SP-01': episodeSp01, //'SP-02': episodeSp02, 'SP-03': episodeSp03,
   'SP-04': episodeSp04, 'SP-05': episodeSp05, 'SP-06': episodeSp06,
 };
 
@@ -64,6 +64,10 @@ export default function GameView({
   episodeId, onBack, unlockedTerms, setUnlockedTerms, clearedData, insightPoints, onSpendPoint, onEpisodeComplete,
 }: GameViewProps) {
   const scenarioData = SCENARIOS[episodeId] || SCENARIOS['#00'];
+  // ▼ 主人公の判定
+  const protagonist = scenarioData.meta?.protagonist || 'watson';
+  const isIrene = protagonist === 'irene';
+
   const [activeGlossary, setActiveGlossary] = useState<{ word: string; desc: string; } | null>(null);
 
   const [isInterruptMode, setIsInterruptMode] = useState(false);
@@ -73,7 +77,9 @@ export default function GameView({
   const [ireneUsed, setIreneUsed] = useState(false);
 
   const isReplay = Boolean(clearedData[episodeId]);
-  const canUseIrene = unlockedTerms.includes('I007'); 
+  
+  // アイリーン自身が操作キャラの時は「アイリーンの囁き」を使えないようにする
+  const canUseIrene = unlockedTerms.includes('I007') && !isIrene; 
 
   const {
     currentBeat, displayedText, isStreaming, tether, feedback, handleInterrupt,
@@ -208,20 +214,17 @@ export default function GameView({
       {screenEffect === 'flash' && <div className="absolute inset-0 bg-white z-[60] animate-out fade-out duration-500 pointer-events-none mix-blend-overlay" />}
       {screenEffect === 'shake' && <div className="absolute inset-0 bg-rose-900/20 z-[60] animate-out fade-out duration-500 pointer-events-none" />}
 
-      {/* 画面上部固定のテザーゲージ（コンポーネント側で色は合わせる前提） */}
-      <TetherBar tether={tether} onArchiveClick={onBack} />
+      {/* TetherBarに protagonist を渡す */}
+      <TetherBar tether={tether} onArchiveClick={onBack} protagonist={protagonist} />
 
-      {/* メインテキストエリア（スクロール可能） */}
       <div
         className="flex-1 flex flex-col bg-[#f4ebd8] relative overflow-hidden cursor-pointer"
         onClick={handleAreaClick}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
       >
-        {/* 背景の薄いテクスチャ/透かし（オプション） */}
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-[#3a2f29] to-transparent" />
 
-        {/* System（地の文）の固定ヘッダー */}
         {latestSystemBeat && (
           <div className="p-4 sm:p-5 bg-[#e6d5c3] border-b border-[#8c7a6b]/30 shadow-sm flex-shrink-0 z-10 animate-in fade-in slide-in-from-top-2">
             <h2 className="text-[10px] font-bold text-[#8c7a6b] mb-1.5 uppercase tracking-widest font-mono">
@@ -233,32 +236,28 @@ export default function GameView({
           </div>
         )}
 
-        {/* 会話ログのリスト */}
         <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar relative">
           {chatHistory.map((beat: any) => {
             const isCurrent = beat.id === currentBeat.id;
             const textToShow = isCurrent ? displayedText : beat.text;
             
-            // ▼ 先ほど修正した ChatLog コンポーネントを使用
             return (
               <ChatLog 
                 key={beat.id} 
                 speaker={beat.speaker} 
-                text={renderText(textToShow) as unknown as string} // renderTextを通した結果を渡す（ReactNode許容のため要調整）
+                text={renderText(textToShow) as unknown as string} 
                 feedback={isCurrent ? feedback : null} 
               />
             );
           })}
           
-          {/* 現在ストリーミング中のカーソル */}
           {isStreaming && currentBeat.speaker !== 'System' && (
             <div className="inline-block w-2.5 h-5 bg-[#3a2f29] ml-1 animate-pulse align-middle" />
           )}
 
-          <div ref={bottomRef} className="h-20" /> {/* 最下部の余白 */}
+          <div ref={bottomRef} className="h-20" />
         </div>
 
-        {/* ウィギンズの眼 ボタン */}
         {!isStreaming && hasUncollectedEvidence && !isInterruptMode && !isWigginsActive && unlockedTerms.includes('W040') && (
           <div className="absolute bottom-6 right-6 z-20 animate-in fade-in zoom-in duration-300">
              <button
@@ -272,7 +271,6 @@ export default function GameView({
         )}
       </div>
 
-      {/* 収集した証拠品リスト（画面下部に固定） */}
       {!isInterruptMode && collectedEvidence.length > 0 && (
         <div className="p-3 bg-[#2a2420] flex flex-wrap gap-2 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.1)] overflow-x-auto custom-scrollbar border-t border-[#3a2f29]">
           <span className="text-[10px] font-mono text-[#8c7a6b] flex items-center mr-1 tracking-widest uppercase">
@@ -295,7 +293,6 @@ export default function GameView({
         </div>
       )}
 
-      {/* 操作パネル（Controls / InterruptPanel） */}
       <div onClick={(e) => e.stopPropagation()} className="shrink-0 bg-[#f4ebd8]">
         {isInterruptMode ? (
           <InterruptPanel
@@ -313,6 +310,7 @@ export default function GameView({
               handleInterrupt('TIMEOUT');
               setIsInterruptMode(false);
             }}
+            protagonist={protagonist} // ← 追加
           />
         ) : (
           <Controls
@@ -324,7 +322,6 @@ export default function GameView({
         )}
       </div>
 
-      {/* 用語解説トースト */}
       {activeGlossary && (
         <GlossaryToast term={activeGlossary.word} desc={activeGlossary.desc} onClose={() => setActiveGlossary(null)} />
       )}
@@ -343,7 +340,7 @@ export default function GameView({
               <div className="flex justify-between items-end border-b border-[#8c7a6b]/30 border-dotted pb-3 mb-5 font-mono text-sm">
                 <div>
                   <span className="text-[#8c7a6b]">CASE ID:</span> <span className="font-bold">{episodeId}</span><br />
-                  <span className="text-[#8c7a6b]">FINAL TETHER:</span> <span className="text-lg font-bold text-amber-700">{tether}%</span>
+                  <span className="text-[#8c7a6b]">FINAL {isIrene ? 'ELEGANCE' : 'TETHER'}:</span> <span className={`text-lg font-bold ${isIrene ? 'text-rose-600' : 'text-amber-700'}`}>{tether}%</span>
                 </div>
                 <div className={`border-2 px-3 py-1 font-bold text-lg uppercase tracking-widest rotate-6 opacity-90 rounded-sm bg-[#f4ebd8] shadow-sm ${
                     endResult.rank === 'LUCID' ? 'border-emerald-700 text-emerald-800' : endResult.rank === 'SYMPATHETIC' ? 'border-blue-700 text-blue-800' : 'border-rose-800 text-rose-800'
@@ -360,15 +357,19 @@ export default function GameView({
                 )}
                 {endResult.watson_journal && (
                   <div className="p-4 rounded-lg border border-[#8c7a6b]/30 bg-[#fffcf7] shadow-sm">
+                    {/* ▼ 見出しをアイリーン分岐 */}
                     <h3 className="font-bold text-[#3a2f29] mb-2 border-b border-[#8c7a6b]/20 pb-1 text-xs uppercase tracking-widest">
-                      Watson's Journal
+                      {isIrene ? "Irene's Journal" : "Watson's Journal"}
                     </h3>
                     <p className="text-sm leading-relaxed text-[#5c4d43]">{endResult.watson_journal}</p>
                   </div>
                 )}
                 {endResult.holmes_note && (
                   <div className="p-4 rounded-lg bg-amber-600/5 border border-amber-700/20 shadow-sm">
-                    <h3 className="font-bold text-amber-900 mb-1.5 italic text-xs">Holmes's Note :</h3>
+                    {/* ▼ 見出しをアイリーン分岐 */}
+                    <h3 className="font-bold text-amber-900 mb-1.5 italic text-xs uppercase tracking-widest">
+                      {isIrene ? "M.C. Report :" : "Holmes's Note :"}
+                    </h3>
                     <p className="text-sm leading-relaxed italic text-amber-800/90">{endResult.holmes_note}</p>
                   </div>
                 )}
@@ -391,7 +392,6 @@ export default function GameView({
         </div>
       )}
 
-      {/* （SPエピソード等の特殊クリア時の演出用） */}
       {isCompleted && !endResult && (
         <div className="absolute inset-0 z-50 bg-[#1a1512]/95 flex flex-col items-center justify-center p-4 animate-in fade-in duration-1000 backdrop-blur-md">
           <p className="text-[#f4ebd8] text-lg font-serif tracking-widest mb-10 animate-pulse text-center">
