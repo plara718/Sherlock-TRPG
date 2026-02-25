@@ -2,13 +2,11 @@ import React from 'react';
 
 type ChatLogProps = {
   speaker: string;
-  text: string;
+  text: React.ReactNode; // ReactNodeに変更し、配列や要素を受け入れ可能に
   feedback?: { type: 'success' | 'fail' | 'penalty'; msg: string } | null;
 };
 
 export default function ChatLog({ speaker, text, feedback }: ChatLogProps) {
-  const cleanText = text.replace(/\[<NOISE>\]/g, '');
-
   // システム（地の文）かどうかの判定
   const isSystem = speaker === 'System';
 
@@ -35,7 +33,7 @@ export default function ChatLog({ speaker, text, feedback }: ChatLogProps) {
             isSystem ? 'text-[#5c4d43] italic' : 'text-[#3a2f29]'
           }`}
         >
-          {cleanText}
+          {text}
         </div>
       </div>
 

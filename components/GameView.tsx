@@ -29,6 +29,13 @@ import episode16 from '@/data/episode_16.json';
 import episode17 from '@/data/episode_17.json';
 import episode18 from '@/data/episode_18.json';
 import episode19 from '@/data/episode_19.json';
+// 新規追加エピソード
+import episode22 from '@/data/episode_22.json';
+import episode23 from '@/data/episode_23.json';
+import episode24 from '@/data/episode_24.json';
+// import episode25 from '@/data/episode_25.json';
+import episode26 from '@/data/episode_26.json';
+
 import glossaryData from '@/data/glossary.json';
 
 // SPエピソード
@@ -45,6 +52,7 @@ const SCENARIOS: Record<string, any> = {
   '#08': episode08, '#09': episode09, '#10': episode10, '#11': episode11,
   '#12': episode12, '#13': episode13, '#14': episode14, '#15': episode15,
   '#16': episode16, '#17': episode17, '#18': episode18, '#19': episode19,
+  '#22': episode22, '#23': episode23, '#24': episode24, //'#25': episode25, '#26': episode26,
   'SP-01': episodeSp01, //'SP-02': episodeSp02, 'SP-03': episodeSp03,
   'SP-04': episodeSp04, 'SP-05': episodeSp05, 'SP-06': episodeSp06,
 };
@@ -64,21 +72,16 @@ export default function GameView({
   episodeId, onBack, unlockedTerms, setUnlockedTerms, clearedData, insightPoints, onSpendPoint, onEpisodeComplete,
 }: GameViewProps) {
   const scenarioData = SCENARIOS[episodeId] || SCENARIOS['#00'];
-  // ▼ 主人公の判定
   const protagonist = scenarioData.meta?.protagonist || 'watson';
   const isIrene = protagonist === 'irene';
 
   const [activeGlossary, setActiveGlossary] = useState<{ word: string; desc: string; } | null>(null);
-
   const [isInterruptMode, setIsInterruptMode] = useState(false);
   const [screenEffect, setScreenEffect] = useState<'none' | 'flash' | 'shake'>('none');
-  
   const [isWigginsActive, setIsWigginsActive] = useState(false);
   const [ireneUsed, setIreneUsed] = useState(false);
 
   const isReplay = Boolean(clearedData[episodeId]);
-  
-  // アイリーン自身が操作キャラの時は「アイリーンの囁き」を使えないようにする
   const canUseIrene = unlockedTerms.includes('I007') && !isIrene; 
 
   const {
@@ -129,6 +132,7 @@ export default function GameView({
   };
 
   const renderText = (text: string) => {
+    if (!text) return "";
     let elements: (string | React.JSX.Element)[] = [];
     const parts = text.split(/(\{.*?\})/g);
     parts.forEach((part, i) => {
@@ -214,7 +218,6 @@ export default function GameView({
       {screenEffect === 'flash' && <div className="absolute inset-0 bg-white z-[60] animate-out fade-out duration-500 pointer-events-none mix-blend-overlay" />}
       {screenEffect === 'shake' && <div className="absolute inset-0 bg-rose-900/20 z-[60] animate-out fade-out duration-500 pointer-events-none" />}
 
-      {/* TetherBarに protagonist を渡す */}
       <TetherBar tether={tether} onArchiveClick={onBack} protagonist={protagonist} />
 
       <div
@@ -231,7 +234,8 @@ export default function GameView({
               Scene Context : {episodeId}
             </h2>
             <p className="text-sm sm:text-base text-[#5c4d43] italic font-serif leading-relaxed">
-              {renderText(latestSystemBeat.text)}
+              {/* [<NOISE>] タグを除去してから renderText に渡す */}
+              {renderText((latestSystemBeat.text || "").replace(/\[<NOISE>\]/g, ''))}
             </p>
           </div>
         )}
@@ -241,11 +245,14 @@ export default function GameView({
             const isCurrent = beat.id === currentBeat.id;
             const textToShow = isCurrent ? displayedText : beat.text;
             
+            // [<NOISE>] タグを除去
+            const cleanText = (textToShow || "").replace(/\[<NOISE>\]/g, '');
+
             return (
               <ChatLog 
                 key={beat.id} 
                 speaker={beat.speaker} 
-                text={renderText(textToShow) as unknown as string} 
+                text={renderText(cleanText)} 
                 feedback={isCurrent ? feedback : null} 
               />
             );
@@ -310,7 +317,7 @@ export default function GameView({
               handleInterrupt('TIMEOUT');
               setIsInterruptMode(false);
             }}
-            protagonist={protagonist} // ← 追加
+            protagonist={protagonist}
           />
         ) : (
           <Controls
@@ -326,7 +333,6 @@ export default function GameView({
         <GlossaryToast term={activeGlossary.word} desc={activeGlossary.desc} onClose={() => setActiveGlossary(null)} />
       )}
 
-      {/* クリアリザルト画面 */}
       {isCompleted && endResult && (
         <div className="absolute inset-0 z-50 bg-[#1a1512]/90 flex items-center justify-center p-4 animate-in fade-in duration-500 backdrop-blur-sm">
           <div className="bg-[#f4ebd8] max-w-md w-full rounded-xl shadow-2xl border-2 border-[#8c7a6b] relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -357,7 +363,6 @@ export default function GameView({
                 )}
                 {endResult.watson_journal && (
                   <div className="p-4 rounded-lg border border-[#8c7a6b]/30 bg-[#fffcf7] shadow-sm">
-                    {/* ▼ 見出しをアイリーン分岐 */}
                     <h3 className="font-bold text-[#3a2f29] mb-2 border-b border-[#8c7a6b]/20 pb-1 text-xs uppercase tracking-widest">
                       {isIrene ? "Irene's Journal" : "Watson's Journal"}
                     </h3>
@@ -366,7 +371,6 @@ export default function GameView({
                 )}
                 {endResult.holmes_note && (
                   <div className="p-4 rounded-lg bg-amber-600/5 border border-amber-700/20 shadow-sm">
-                    {/* ▼ 見出しをアイリーン分岐 */}
                     <h3 className="font-bold text-amber-900 mb-1.5 italic text-xs uppercase tracking-widest">
                       {isIrene ? "M.C. Report :" : "Holmes's Note :"}
                     </h3>
