@@ -34,7 +34,7 @@ import episode22 from '@/data/episode_22.json';
 import episode23 from '@/data/episode_23.json';
 import episode24 from '@/data/episode_24.json';
 // import episode25 from '@/data/episode_25.json';
-import episode26 from '@/data/episode_26.json';
+// import episode26 from '@/data/episode_26.json';
 
 import glossaryData from '@/data/glossary.json';
 
