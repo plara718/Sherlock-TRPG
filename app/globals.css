@@ -3,25 +3,39 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  /* Holmes Mode (Default) */
+  --bg-base: #f4ebd8;
+  --bg-panel: #e6d5c3;
+  --bg-dark: #1a1512;
+  --bg-dark-panel: #2a2420;
+  
+  --text-base: #3a2f29;
+  --text-muted: #8c7a6b;
+  --text-light: #f4ebd8;
+  --text-light-muted: #d8c8b8;
+
+  --border-base: #8c7a6b;
+  --border-dark: #3a2f29;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+[data-theme='moriarty'] {
+  /* Moriarty Mode */
+  --bg-base: #0a0a0a;
+  --bg-panel: #141414;
+  --bg-dark: #000000;
+  --bg-dark-panel: #1a1a1a;
+
+  --text-base: #e0e0e0;
+  --text-muted: #888888;
+  --text-light: #ffffff;
+  --text-light-muted: #aaaaaa;
+
+  --border-base: #444444;
+  --border-dark: #222222;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background-color: var(--bg-base);
+  color: var(--text-base);
+  transition: background-color 0.5s ease, color 0.5s ease;
 }

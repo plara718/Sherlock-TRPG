@@ -8,12 +8,23 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      colors: {
+        'theme-bg-base': 'var(--bg-base)',
+        'theme-bg-panel': 'var(--bg-panel)',
+        'theme-bg-dark': 'var(--bg-dark)',
+        'theme-bg-dark-panel': 'var(--bg-dark-panel)',
+        'theme-text-base': 'var(--text-base)',
+        'theme-text-muted': 'var(--text-muted)',
+        'theme-text-light': 'var(--text-light)',
+        'theme-text-light-muted': 'var(--text-light-muted)',
+        'theme-border-base': 'var(--border-base)',
+        'theme-border-dark': 'var(--border-dark)',
+      },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'gradient-conic':
           'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
       },
-      // ▼ ここからシェイクアニメーションの定義を追加 ▼
       keyframes: {
         shake: {
           '0%, 100%': { transform: 'translateX(0)' },
@@ -24,7 +35,6 @@ const config: Config = {
       animation: {
         shake: 'shake 0.4s ease-in-out',
       },
-      // ▲ ここまで追加 ▲
     },
   },
   plugins: [],

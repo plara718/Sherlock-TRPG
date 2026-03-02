@@ -23,14 +23,14 @@ export type ScenarioData = {
     tether_start: number;
     world_state: any;
     type?: string; 
-    protagonist?: string; // ← 追加：主人公フラグ（'watson', 'irene', 'moriarty'など）
+    protagonist?: string; 
   };
   consequence?: { 
     official_record: string;
     watson_journal: {
-      sympathetic: string;
-      lucid: string;
-      abyss: string;
+      sympathetic?: string;
+      lucid?: string;
+      abyss?: string;
     };
     holmes_note: string;
   };
@@ -42,12 +42,17 @@ const TETHER_PENALTY_FAIL = -15;
 const TETHER_PENALTY_MISS = -15;
 const TETHER_PENALTY_WASTE = -5;
 
-export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = false) {
-  // ▼ 主人公の判定（デフォルトは 'watson'）
+// ▼ 引数に playMode を追加
+export function useGameLogic(
+  scenarioData: ScenarioData, 
+  isReplay: boolean = false,
+  playMode: 'holmes' | 'moriarty' = 'holmes'
+) {
   const protagonist = scenarioData.meta.protagonist || 'watson';
   const isIrene = protagonist === 'irene';
+  const isMoriarty = playMode === 'moriarty'; // ← モリアーティモード判定
 
-  const initialTether = scenarioData.meta.tether_start || 50;
+  const initialTether = scenarioData.meta.tether_start || (isMoriarty ? 100 : 50); // M.C.は初期100%
   const beats = scenarioData.beats;
 
   const [beatIndex, setBeatIndex] = useState(0);
@@ -158,14 +163,18 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
         if (!newEv) {
           setFeedback({
             type: 'penalty',
-            msg: isIrene
+            msg: isMoriarty
+              ? `[${selectedSkill}] 視点を選択中。計画の欠陥を突くには【証拠】もセットしろ。`
+              : isIrene
               ? `[${selectedSkill}] 視点を選択中。相手の慢心を突く（COUNTER）には、それを証明する【証拠】もセットしなさい。`
               : `[${selectedSkill}] 視点を選択中。天才の暴走を繋ぎ止める（TETHER）には、主張を裏付ける【証拠】もセットしろ。`,
           });
         } else {
           setFeedback({
             type: 'success',
-            msg: isIrene
+            msg: isMoriarty
+              ? `[${selectedSkill}] 視点と証拠 [${newEv}] を提示する準備完了。右下の「REWRITE EQUATION」を押せ。`
+              : isIrene
               ? `[${selectedSkill}] 視点と証拠 [${newEv}] を提示する準備完了。右下の「COUNTER」を押してちょうだい。`
               : `[${selectedSkill}] 視点と証拠 [${newEv}] を提示する準備完了。右下の「TETHER THE GENIUS」を押せ。`,
           });
@@ -205,14 +214,18 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
     if (!selectedEvidence) {
       setFeedback({
         type: 'penalty',
-        msg: isIrene
+        msg: isMoriarty
+          ? `[${skillName}] 視点を選択中。計画の欠陥を突くには確たる【証拠】が必要だ。`
+          : isIrene
           ? `[${skillName}] 視点を選択中。しかし、反撃（COUNTER）には、確たる【証拠】のセットが必要よ。`
           : `[${skillName}] 視点を選択中。しかし、天才の暴走を繋ぎ止める（TETHER）には、確たる【証拠】のセットが必要だ。`,
       });
     } else {
       setFeedback({
         type: 'success',
-        msg: isIrene
+        msg: isMoriarty
+          ? `[${skillName}] 視点と証拠 [${selectedEvidence}] を提示する準備完了。右下の「REWRITE EQUATION」を押せ。`
+          : isIrene
           ? `[${skillName}] 視点と証拠 [${selectedEvidence}] を提示する準備完了。右下の「COUNTER」を押してちょうだい。`
           : `[${skillName}] 視点と証拠 [${selectedEvidence}] を提示する準備完了。右下の「TETHER THE GENIUS」を押せ。`,
       });
@@ -230,7 +243,7 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
       if (skill === 'TIMEOUT') {
         setFeedback({
           type: 'fail',
-          msg: `${currentBeat.interrupt.fail_msg}（TETHER -15）`,
+          msg: `${currentBeat.interrupt.fail_msg}（${isMoriarty ? 'DOMINATION' : 'TETHER'} -15）`,
         });
         updateTether(TETHER_PENALTY_MISS);
         return;
@@ -244,7 +257,7 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
       if (isSkillMatch && isEvidenceMatch) {
         setFeedback({
           type: 'success',
-          msg: `[${skill}] ${currentBeat.interrupt.success_msg}（TETHER +15）`,
+          msg: `[${skill}] ${currentBeat.interrupt.success_msg}（${isMoriarty ? 'DOMINATION' : 'TETHER'} +15）`,
         });
         updateTether(TETHER_REWARD_SUCCESS);
 
@@ -269,14 +282,16 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
       } else {
         setFeedback({
           type: 'penalty',
-          msg: isIrene
+          msg: isMoriarty
+            ? `[${skill}] 考え直せ。お前の計画には隙がある。（DOMINATION -15）`
+            : isIrene
             ? `[${skill}] その程度の機転じゃ、この窮地は抜け出せないわ。（TETHER -15）`
             : `[${skill}] その証拠では天才の暴走を繋ぎ止められないぞ、ワトスン。（TETHER -15）`,
         });
         updateTether(TETHER_PENALTY_FAIL);
       }
     },
-    [currentBeat, isResolved, getTextSpeed, updateTether, isIrene]
+    [currentBeat, isResolved, getTextSpeed, updateTether, isIrene, isMoriarty]
   );
 
   const nextBeat = () => {
@@ -297,7 +312,7 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
         if (isSkillMatch && isEvidenceMatch) {
           setFeedback({
             type: 'success',
-            msg: `[${selectedSkill}] ${currentBeat.interrupt.success_msg}（TETHER +15）`,
+            msg: `[${selectedSkill}] ${currentBeat.interrupt.success_msg}（${isMoriarty ? 'DOMINATION' : 'TETHER'} +15）`,
           });
           updateTether(TETHER_REWARD_SUCCESS);
           if (currentBeat.interrupt.correction_text) {
@@ -327,7 +342,9 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
         } else if (selectedSkill) {
           setFeedback({
             type: 'penalty',
-            msg: isIrene
+            msg: isMoriarty
+              ? `考え直せ。お前の計画には隙がある。（DOMINATION -15）`
+              : isIrene
               ? `その程度の機転じゃ、この窮地は抜け出せないわ。（TETHER -15）`
               : `その証拠では天才の暴走を繋ぎ止められないぞ、ワトスン。（TETHER -15）`,
           });
@@ -335,7 +352,7 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
         } else {
           setFeedback({
             type: 'fail',
-            msg: `${currentBeat.interrupt.fail_msg}（TETHER -15）`,
+            msg: `${currentBeat.interrupt.fail_msg}（${isMoriarty ? 'DOMINATION' : 'TETHER'} -15）`,
           });
           updateTether(TETHER_PENALTY_MISS);
         }
@@ -344,7 +361,9 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
         setIsResolved(true);
         setFeedback({
           type: 'penalty',
-          msg: isIrene
+          msg: isMoriarty
+            ? `無駄な思考だ。黙っていろ。（DOMINATION -5）`
+            : isIrene
             ? `つまらない手出しは無用よ。（TETHER -5）`
             : `邪魔をするな、ワトスン。思考の途中だ。（TETHER -5）`,
         });
@@ -363,17 +382,32 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
       }
 
       let rank = 'ABYSS';
-      let watson_journal = scenarioData.consequence?.watson_journal?.abyss || '';
+      let watson_journal = '';
       let basePoints = 1;
 
-      if (tether >= 80) {
-        rank = 'SYMPATHETIC';
-        watson_journal = scenarioData.consequence?.watson_journal?.sympathetic || '';
-        basePoints = 5; 
-      } else if (tether >= 40) {
-        rank = 'LUCID';
-        watson_journal = scenarioData.consequence?.watson_journal?.lucid || '';
-        basePoints = 3;
+      // ▼ M.C.モード用のランク判定
+      if (isMoriarty) {
+        if (tether >= 80) {
+          rank = 'MASTERPIECE';
+          basePoints = 5;
+        } else if (tether >= 40) {
+          rank = 'COMPROMISED';
+          basePoints = 3;
+        } else {
+          rank = 'FAILED';
+        }
+      } else {
+        if (tether >= 80) {
+          rank = 'SYMPATHETIC';
+          watson_journal = scenarioData.consequence?.watson_journal?.sympathetic || '';
+          basePoints = 5; 
+        } else if (tether >= 40) {
+          rank = 'LUCID';
+          watson_journal = scenarioData.consequence?.watson_journal?.lucid || '';
+          basePoints = 3;
+        } else {
+          watson_journal = scenarioData.consequence?.watson_journal?.abyss || '';
+        }
       }
 
       const finalPoints = isReplay ? 1 : basePoints;
@@ -415,5 +449,6 @@ export function useGameLogic(scenarioData: ScenarioData, isReplay: boolean = fal
     selectedSkill,
     isCompleted,
     endResult,
+    isMoriarty, // 状態をUI側へ渡す
   };
 }
