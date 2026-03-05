@@ -9,6 +9,7 @@ import ChatLog from '@/components/ChatLog';
 import { useGameLogic, ScenarioData } from '@/lib/useGameLogic';
 import { FileText, ArrowRight, Eye } from 'lucide-react';
 
+// 本編エピソード
 import episode00 from '@/data/episode_00.json';
 import episode01 from '@/data/episode_01.json';
 import episode02 from '@/data/episode_02.json';
@@ -29,22 +30,43 @@ import episode16 from '@/data/episode_16.json';
 import episode17 from '@/data/episode_17.json';
 import episode18 from '@/data/episode_18.json';
 import episode19 from '@/data/episode_19.json';
-// 新規追加エピソード
+import episode20 from '@/data/episode_20.json';
+import episode21 from '@/data/episode_21.json';
 import episode22 from '@/data/episode_22.json';
 import episode23 from '@/data/episode_23.json';
 import episode24 from '@/data/episode_24.json';
-// import episode25 from '@/data/episode_25.json';
-// import episode26 from '@/data/episode_26.json';
+import episode25 from '@/data/episode_25.json';
+import episode26 from '@/data/episode_26.json';
+import episode27 from '@/data/episode_27.json';
+import episode28 from '@/data/episode_28.json';
+import episode29 from '@/data/episode_29.json';
+import episode30 from '@/data/episode_30.json';
+import episode31 from '@/data/episode_31.json';
+import episode32 from '@/data/episode_32.json';
+import episode33 from '@/data/episode_33.json';
+import episode34 from '@/data/episode_34.json';
+import episode35 from '@/data/episode_35.json';
+import episode36 from '@/data/episode_36.json';
+import episode37 from '@/data/episode_37.json';
+import episode38 from '@/data/episode_38.json';
+import episode39 from '@/data/episode_39.json';
+import episode40 from '@/data/episode_40.json';
 
-import glossaryData from '@/data/glossary.json';
+// 幕間（Interlude）
+import interludeS1 from '@/data/interlude_s1.json';
+import interludeS2 from '@/data/interlude_s2.json';
+import interludeS3 from '@/data/interlude_s3.json';
 
 // SPエピソード
 import episodeSp01 from '@/data/episode_sp01.json';
-//import episodeSp02 from '@/data/episode_sp02.json';
-//import episodeSp03 from '@/data/episode_sp03.json';
+import episodeSp02 from '@/data/episode_sp02.json';
+import episodeSp03 from '@/data/episode_sp03.json';
 import episodeSp04 from '@/data/episode_sp04.json';
 import episodeSp05 from '@/data/episode_sp05.json';
 import episodeSp06 from '@/data/episode_sp06.json';
+
+// 大索引データ
+import glossaryData from '@/data/glossary.json';
 
 const SCENARIOS: Record<string, any> = {
   '#00': episode00, '#01': episode01, '#02': episode02, '#03': episode03,
@@ -52,8 +74,14 @@ const SCENARIOS: Record<string, any> = {
   '#08': episode08, '#09': episode09, '#10': episode10, '#11': episode11,
   '#12': episode12, '#13': episode13, '#14': episode14, '#15': episode15,
   '#16': episode16, '#17': episode17, '#18': episode18, '#19': episode19,
-  '#22': episode22, '#23': episode23, '#24': episode24, //'#25': episode25, '#26': episode26,
-  'SP-01': episodeSp01, //'SP-02': episodeSp02, 'SP-03': episodeSp03,
+  '#20': episode20, '#21': episode21, '#22': episode22, '#23': episode23,
+  '#24': episode24, '#25': episode25, '#26': episode26, '#27': episode27,
+  '#28': episode28, '#29': episode29, '#30': episode30, '#31': episode31,
+  '#32': episode32, '#33': episode33, '#34': episode34, '#35': episode35,
+  '#36': episode36, '#37': episode37, '#38': episode38, '#39': episode39,
+  '#40': episode40,
+  'Interlude-S1': interludeS1, 'Interlude-S2': interludeS2, 'Interlude-S3': interludeS3,
+  'SP-01': episodeSp01, 'SP-02': episodeSp02, 'SP-03': episodeSp03,
   'SP-04': episodeSp04, 'SP-05': episodeSp05, 'SP-06': episodeSp06,
 };
 
@@ -73,22 +101,23 @@ export default function GameView({
 }: GameViewProps) {
   const scenarioData = SCENARIOS[episodeId] || SCENARIOS['#00'];
   const protagonist = scenarioData.meta?.protagonist || 'watson';
-  const isIrene = protagonist === 'irene';
 
   const [activeGlossary, setActiveGlossary] = useState<{ word: string; desc: string; } | null>(null);
   const [isInterruptMode, setIsInterruptMode] = useState(false);
-  const [screenEffect, setScreenEffect] = useState<'none' | 'flash' | 'shake'>('none');
+  const [screenEffect, setScreenEffect] = useState<'none' | 'flash' | 'shake' | 'glass-shatter'>('none');
   const [isWigginsActive, setIsWigginsActive] = useState(false);
   const [ireneUsed, setIreneUsed] = useState(false);
 
   const isReplay = Boolean(clearedData[episodeId]);
-  const canUseIrene = unlockedTerms.includes('I007') && !isIrene; 
 
   const {
     currentBeat, displayedText, isStreaming, tether, feedback, handleInterrupt,
     nextBeat, skipStream, beatIndex, beats, collectedEvidence, selectedEvidence,
     collectEvidence, handleSelectEvidence, selectedSkill, isCompleted, endResult,
+    uiLabels, isMoriarty, isIrene
   } = useGameLogic(scenarioData as ScenarioData, isReplay);
+
+  const canUseIrene = unlockedTerms.includes('I007') && !isIrene; 
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
@@ -97,9 +126,14 @@ export default function GameView({
 
   useEffect(() => {
     if (feedback) {
-      if (feedback.type === 'success') setScreenEffect('flash');
-      else setScreenEffect('shake');
-      const timer = setTimeout(() => setScreenEffect('none'), 500);
+      if (feedback.isCriticalSuccess) {
+        setScreenEffect('glass-shatter');
+      } else if (feedback.type === 'success') {
+        setScreenEffect('flash');
+      } else {
+        setScreenEffect('shake');
+      }
+      const timer = setTimeout(() => setScreenEffect('none'), 800);
       return () => clearTimeout(timer);
     }
   }, [feedback]);
@@ -217,8 +251,17 @@ export default function GameView({
 
       {screenEffect === 'flash' && <div className="absolute inset-0 bg-white z-[60] animate-out fade-out duration-500 pointer-events-none mix-blend-overlay" />}
       {screenEffect === 'shake' && <div className="absolute inset-0 bg-rose-900/20 z-[60] animate-out fade-out duration-500 pointer-events-none" />}
+      
+      {screenEffect === 'glass-shatter' && (
+        <div className="absolute inset-0 z-[60] pointer-events-none flex items-center justify-center overflow-hidden">
+          <div className="absolute inset-0 bg-white/80 animate-out fade-out duration-700 mix-blend-overlay" />
+          <div className="text-4xl font-black text-rose-600 tracking-[0.5em] animate-out zoom-out-150 fade-out duration-700 rotate-12 drop-shadow-2xl">
+            NOISE CLEARED
+          </div>
+        </div>
+      )}
 
-      <TetherBar tether={tether} onArchiveClick={onBack} protagonist={protagonist} />
+      <TetherBar tether={tether} onArchiveClick={onBack} protagonist={protagonist} gaugeName={uiLabels.gaugeName} />
 
       <div
         className="flex-1 flex flex-col bg-[#f4ebd8] relative overflow-hidden cursor-pointer"
@@ -234,7 +277,6 @@ export default function GameView({
               Scene Context : {episodeId}
             </h2>
             <p className="text-sm sm:text-base text-[#5c4d43] italic font-serif leading-relaxed">
-              {/* [<NOISE>] タグを除去してから renderText に渡す */}
               {renderText((latestSystemBeat.text || "").replace(/\[<NOISE>\]/g, ''))}
             </p>
           </div>
@@ -244,8 +286,6 @@ export default function GameView({
           {chatHistory.map((beat: any) => {
             const isCurrent = beat.id === currentBeat.id;
             const textToShow = isCurrent ? displayedText : beat.text;
-            
-            // [<NOISE>] タグを除去
             const cleanText = (textToShow || "").replace(/\[<NOISE>\]/g, '');
 
             return (
@@ -318,6 +358,8 @@ export default function GameView({
               setIsInterruptMode(false);
             }}
             protagonist={protagonist}
+            isMoriarty={isMoriarty}
+            uiLabels={uiLabels}
           />
         ) : (
           <Controls
@@ -346,35 +388,43 @@ export default function GameView({
               <div className="flex justify-between items-end border-b border-[#8c7a6b]/30 border-dotted pb-3 mb-5 font-mono text-sm">
                 <div>
                   <span className="text-[#8c7a6b]">CASE ID:</span> <span className="font-bold">{episodeId}</span><br />
-                  <span className="text-[#8c7a6b]">FINAL {isIrene ? 'ELEGANCE' : 'TETHER'}:</span> <span className={`text-lg font-bold ${isIrene ? 'text-rose-600' : 'text-amber-700'}`}>{tether}%</span>
+                  <span className="text-[#8c7a6b]">FINAL {uiLabels.gaugeName}:</span> <span className={`text-lg font-bold ${isMoriarty ? 'text-fuchsia-600' : isIrene ? 'text-rose-600' : 'text-amber-700'}`}>{tether}%</span>
                 </div>
                 <div className={`border-2 px-3 py-1 font-bold text-lg uppercase tracking-widest rotate-6 opacity-90 rounded-sm bg-[#f4ebd8] shadow-sm ${
-                    endResult.rank === 'LUCID' ? 'border-emerald-700 text-emerald-800' : endResult.rank === 'SYMPATHETIC' ? 'border-blue-700 text-blue-800' : 'border-rose-800 text-rose-800'
+                    endResult.rank === 'LUCID' || endResult.rank === 'CLEARED' ? 'border-emerald-700 text-emerald-800' : endResult.rank === 'SYMPATHETIC' ? 'border-blue-700 text-blue-800' : 'border-rose-800 text-rose-800'
                   }`}>
                   {endResult.rank}
                 </div>
               </div>
 
               <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-2 custom-scrollbar">
-                {endResult.official_record && (
+                {endResult.consequenceData?.official_record && (
                   <div className="bg-[#e6d5c3]/50 p-3 sm:p-4 rounded-lg border border-[#8c7a6b]/20 font-mono text-xs shadow-inner">
-                    <p className="text-[#5c4d43] leading-relaxed">{endResult.official_record}</p>
+                    <p className="text-[#5c4d43] leading-relaxed">{endResult.consequenceData.official_record}</p>
                   </div>
                 )}
-                {endResult.watson_journal && (
+                {endResult.consequenceData?.watson_journal && (
                   <div className="p-4 rounded-lg border border-[#8c7a6b]/30 bg-[#fffcf7] shadow-sm">
                     <h3 className="font-bold text-[#3a2f29] mb-2 border-b border-[#8c7a6b]/20 pb-1 text-xs uppercase tracking-widest">
                       {isIrene ? "Irene's Journal" : "Watson's Journal"}
                     </h3>
-                    <p className="text-sm leading-relaxed text-[#5c4d43]">{endResult.watson_journal}</p>
+                    <p className="text-sm leading-relaxed text-[#5c4d43]">{endResult.consequenceData.watson_journal}</p>
                   </div>
                 )}
-                {endResult.holmes_note && (
+                {endResult.consequenceData?.holmes_note && (
                   <div className="p-4 rounded-lg bg-amber-600/5 border border-amber-700/20 shadow-sm">
                     <h3 className="font-bold text-amber-900 mb-1.5 italic text-xs uppercase tracking-widest">
-                      {isIrene ? "M.C. Report :" : "Holmes's Note :"}
+                      {isMoriarty ? "M.C. Report :" : "Holmes's Note :"}
                     </h3>
-                    <p className="text-sm leading-relaxed italic text-amber-800/90">{endResult.holmes_note}</p>
+                    <p className="text-sm leading-relaxed italic text-amber-800/90">{endResult.consequenceData.holmes_note}</p>
+                  </div>
+                )}
+                {endResult.consequenceData?.mycroft_note && (
+                  <div className="p-4 rounded-lg bg-blue-900/5 border border-blue-900/20 shadow-sm">
+                    <h3 className="font-bold text-blue-900 mb-1.5 italic text-xs uppercase tracking-widest">
+                      Mycroft's Note :
+                    </h3>
+                    <p className="text-sm leading-relaxed italic text-blue-900/90">{endResult.consequenceData.mycroft_note}</p>
                   </div>
                 )}
               </div>

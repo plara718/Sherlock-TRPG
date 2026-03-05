@@ -20,7 +20,7 @@
         { "id": "#11", "title": "ライゲートの地主たち", "status": "cleared" },
         { "id": "#12", "title": "五つのオレンジの種", "status": "cleared", "intervention": "Irene" },
         { "id": "#13", "title": "恐怖の谷", "status": "cleared", "intervention": "Wiggins" },
-        { "id": "interlude_s1", "title": "幕間：蜘蛛の巣の中心", "status": "cleared" }
+        { "id": "Interlude-S1", "title": "幕間：蜘蛛の巣の中心", "status": "locked" }
       ]
     },
     {
@@ -44,7 +44,8 @@
         { "id": "#26", "title": "バスカヴィル家の犬", "status": "locked", "intervention": "Irene" },
         { "id": "#27", "title": "青い紅玉", "status": "locked" },
         { "id": "#28", "title": "卑俗な慈善結社", "status": "locked" },
-        { "id": "#29", "title": "瀕死の探偵", "status": "locked" }
+        { "id": "#29", "title": "瀕死の探偵", "status": "locked" },
+        { "id": "Interlude-S2", "title": "幕間：迫り来る影", "status": "locked" }
       ]
     },
     {
@@ -63,7 +64,8 @@
         { "id": "#37", "title": "ショスコム荘", "status": "locked" },
         { "id": "#38", "title": "モリアーティの罠", "status": "locked", "intervention": "Irene" },
         { "id": "#39", "title": "最後の事件：前編", "status": "locked", "intervention": "Mycroft" },
-        { "id": "#40", "title": "最後の事件：後編", "status": "locked" }
+        { "id": "#40", "title": "最後の事件：後編", "status": "locked" },
+        { "id": "Interlude-S3", "title": "幕間：空白の特等席", "status": "locked" }
       ]
     },
     {

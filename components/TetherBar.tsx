@@ -1,19 +1,21 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Archive, BrainCircuit, Sparkles } from 'lucide-react';
+import { Archive, BrainCircuit, Sparkles, Skull } from 'lucide-react';
 
 type TetherBarProps = {
   tether: number;
   onArchiveClick: () => void;
-  protagonist?: string; // ← 追加
+  protagonist?: string;
+  gaugeName: string; // ← 追加
 };
 
-export default function TetherBar({ tether, onArchiveClick, protagonist = 'watson' }: TetherBarProps) {
+export default function TetherBar({ tether, onArchiveClick, protagonist = 'watson', gaugeName }: TetherBarProps) {
   const [flash, setFlash] = useState<'success' | 'damage' | null>(null);
   const prevTether = useRef(tether);
   
   const isIrene = protagonist === 'irene';
+  const isMoriarty = gaugeName === 'DOMINATION';
 
   useEffect(() => {
     if (tether > prevTether.current) {
@@ -30,9 +32,8 @@ export default function TetherBar({ tether, onArchiveClick, protagonist = 'watso
     return () => clearTimeout(timer);
   }, [tether]);
 
-  const barLabel = isIrene ? 'ELEGANCE' : 'TETHER';
-  const IconComponent = isIrene ? Sparkles : BrainCircuit;
-  const defaultColor = isIrene ? 'text-rose-400' : 'text-amber-600';
+  const IconComponent = isMoriarty ? Skull : (isIrene ? Sparkles : BrainCircuit);
+  const defaultColor = isMoriarty ? 'text-fuchsia-600' : (isIrene ? 'text-rose-400' : 'text-amber-600');
 
   return (
     <div
@@ -56,14 +57,14 @@ export default function TetherBar({ tether, onArchiveClick, protagonist = 'watso
         />
         <div className="flex-1 max-w-[200px]">
           <div className="flex justify-between text-[10px] sm:text-xs font-bold mb-1 font-mono tracking-widest">
-            <span className="text-[#8c7a6b]">{barLabel}</span>
+            <span className="text-[#8c7a6b]">{gaugeName}</span>
             <span
               className={`transition-colors duration-500 ${
                 flash === 'success'
                   ? 'text-emerald-400'
                   : flash === 'damage'
                   ? 'text-rose-400'
-                  : isIrene ? 'text-rose-400' : 'text-amber-500'
+                  : isMoriarty ? 'text-fuchsia-500' : (isIrene ? 'text-rose-400' : 'text-amber-500')
               }`}
             >
               {tether}%
@@ -81,10 +82,10 @@ export default function TetherBar({ tether, onArchiveClick, protagonist = 'watso
             <div
               className={`h-full transition-all duration-700 ease-out relative z-0 ${
                 tether >= 80
-                  ? 'bg-emerald-600'
+                  ? (isMoriarty ? 'bg-fuchsia-600' : 'bg-emerald-600')
                   : tether >= 40
-                  ? (isIrene ? 'bg-rose-500' : 'bg-amber-600')
-                  : 'bg-rose-600'
+                  ? (isMoriarty ? 'bg-fuchsia-800' : (isIrene ? 'bg-rose-500' : 'bg-amber-600'))
+                  : (isMoriarty ? 'bg-[#3a2f29]' : 'bg-rose-600')
               }`}
               style={{ width: `${tether}%` }}
             />

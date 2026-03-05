@@ -22,17 +22,19 @@ export type ScenarioData = {
     title: string;
     tether_start: number;
     world_state: any;
-    type?: string; 
+    type?: 'normal' | 'cutscene' | 'interlude'; // 拡張
     protagonist?: string; 
   };
   consequence?: { 
-    official_record: string;
-    watson_journal: {
+    official_record?: string;
+    watson_journal?: {
       sympathetic?: string;
       lucid?: string;
       abyss?: string;
     };
-    holmes_note: string;
+    holmes_note?: string;
+    // ▼ 動的なキー（mycroft_noteなど）を許容
+    [key: string]: any; 
   };
   beats: ScenarioBeat[];
 };
@@ -42,7 +44,6 @@ const TETHER_PENALTY_FAIL = -15;
 const TETHER_PENALTY_MISS = -15;
 const TETHER_PENALTY_WASTE = -5;
 
-// ▼ 引数に playMode を追加
 export function useGameLogic(
   scenarioData: ScenarioData, 
   isReplay: boolean = false,
@@ -50,9 +51,10 @@ export function useGameLogic(
 ) {
   const protagonist = scenarioData.meta.protagonist || 'watson';
   const isIrene = protagonist === 'irene';
-  const isMoriarty = playMode === 'moriarty'; // ← モリアーティモード判定
+  const isMoriarty = playMode === 'moriarty';
+  const isInterlude = scenarioData.meta.type === 'interlude'; // 幕間判定
 
-  const initialTether = scenarioData.meta.tether_start || (isMoriarty ? 100 : 50); // M.C.は初期100%
+  const initialTether = scenarioData.meta.tether_start || (isMoriarty ? 100 : 50);
   const beats = scenarioData.beats;
 
   const [beatIndex, setBeatIndex] = useState(0);
@@ -62,6 +64,7 @@ export function useGameLogic(
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'fail' | 'penalty';
     msg: string;
+    isCriticalSuccess?: boolean; // ▼ UIエフェクト用のトリガーを追加
   } | null>(null);
 
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
@@ -70,17 +73,23 @@ export function useGameLogic(
   const [isResolved, setIsResolved] = useState(false);
 
   const [isCompleted, setIsCompleted] = useState(false);
+  
+  // ▼ リザルトの型を柔軟に変更
   const [endResult, setEndResult] = useState<{
     rank: string;
-    official_record: string;
-    watson_journal: string;
-    holmes_note: string;
     points: number;
+    consequenceData: any; 
   } | null>(null);
 
   const textStreamRef = useRef<NodeJS.Timeout | null>(null);
   const currentTextIndex = useRef(0);
   const tetherRef = useRef(initialTether);
+
+  // ▼ UI表示用の動的ラベルを生成
+  const uiLabels = {
+    gaugeName: isMoriarty ? 'DOMINATION' : (isIrene ? 'CONTROL' : 'TETHER'),
+    actionButton: isMoriarty ? 'REWRITE EQUATION' : (isIrene ? 'COUNTER' : 'TETHER THE GENIUS'),
+  };
 
   const updateTether = useCallback((amount: number) => {
     setTether((prev) => {
@@ -149,7 +158,7 @@ export function useGameLogic(
       if (prev.includes(evidence)) return prev;
       setFeedback({
         type: 'success',
-        msg: `手帳に記録: [${evidence}]`,
+        msg: `記録: [${evidence}]`,
       });
       return [...prev, evidence];
     });
@@ -163,28 +172,17 @@ export function useGameLogic(
         if (!newEv) {
           setFeedback({
             type: 'penalty',
-            msg: isMoriarty
-              ? `[${selectedSkill}] 視点を選択中。計画の欠陥を突くには【証拠】もセットしろ。`
-              : isIrene
-              ? `[${selectedSkill}] 視点を選択中。相手の慢心を突く（COUNTER）には、それを証明する【証拠】もセットしなさい。`
-              : `[${selectedSkill}] 視点を選択中。天才の暴走を繋ぎ止める（TETHER）には、主張を裏付ける【証拠】もセットしろ。`,
+            msg: `[${selectedSkill}] 視点を選択中。実行には【証拠】もセットしてくれ。`,
           });
         } else {
           setFeedback({
             type: 'success',
-            msg: isMoriarty
-              ? `[${selectedSkill}] 視点と証拠 [${newEv}] を提示する準備完了。右下の「REWRITE EQUATION」を押せ。`
-              : isIrene
-              ? `[${selectedSkill}] 視点と証拠 [${newEv}] を提示する準備完了。右下の「COUNTER」を押してちょうだい。`
-              : `[${selectedSkill}] 視点と証拠 [${newEv}] を提示する準備完了。右下の「TETHER THE GENIUS」を押せ。`,
+            msg: `準備完了。右下の「${uiLabels.actionButton}」を押せ。`,
           });
         }
       } else {
         if (newEv) {
-          setFeedback({
-            type: 'success',
-            msg: `証拠 [${newEv}] をセットした。`,
-          });
+          setFeedback({ type: 'success', msg: `証拠 [${newEv}] をセットした。` });
         } else {
           setFeedback(null);
         }
@@ -199,10 +197,7 @@ export function useGameLogic(
     if (selectedSkill === skillName) {
       setSelectedSkill(null);
       if (selectedEvidence) {
-        setFeedback({
-          type: 'success',
-          msg: `証拠 [${selectedEvidence}] をセットした。`,
-        });
+        setFeedback({ type: 'success', msg: `証拠 [${selectedEvidence}] をセットした。` });
       } else {
         setFeedback(null);
       }
@@ -214,20 +209,12 @@ export function useGameLogic(
     if (!selectedEvidence) {
       setFeedback({
         type: 'penalty',
-        msg: isMoriarty
-          ? `[${skillName}] 視点を選択中。計画の欠陥を突くには確たる【証拠】が必要だ。`
-          : isIrene
-          ? `[${skillName}] 視点を選択中。しかし、反撃（COUNTER）には、確たる【証拠】のセットが必要よ。`
-          : `[${skillName}] 視点を選択中。しかし、天才の暴走を繋ぎ止める（TETHER）には、確たる【証拠】のセットが必要だ。`,
+        msg: `[${skillName}] 視点を選択中。実行には確たる【証拠】のセットが必要だ。`,
       });
     } else {
       setFeedback({
         type: 'success',
-        msg: isMoriarty
-          ? `[${skillName}] 視点と証拠 [${selectedEvidence}] を提示する準備完了。右下の「REWRITE EQUATION」を押せ。`
-          : isIrene
-          ? `[${skillName}] 視点と証拠 [${selectedEvidence}] を提示する準備完了。右下の「COUNTER」を押してちょうだい。`
-          : `[${skillName}] 視点と証拠 [${selectedEvidence}] を提示する準備完了。右下の「TETHER THE GENIUS」を押せ。`,
+        msg: `準備完了。右下の「${uiLabels.actionButton}」を押せ。`,
       });
     }
   };
@@ -243,7 +230,7 @@ export function useGameLogic(
       if (skill === 'TIMEOUT') {
         setFeedback({
           type: 'fail',
-          msg: `${currentBeat.interrupt.fail_msg}（${isMoriarty ? 'DOMINATION' : 'TETHER'} -15）`,
+          msg: `${currentBeat.interrupt.fail_msg}（${uiLabels.gaugeName} -15）`,
         });
         updateTether(TETHER_PENALTY_MISS);
         return;
@@ -257,7 +244,8 @@ export function useGameLogic(
       if (isSkillMatch && isEvidenceMatch) {
         setFeedback({
           type: 'success',
-          msg: `[${skill}] ${currentBeat.interrupt.success_msg}（${isMoriarty ? 'DOMINATION' : 'TETHER'} +15）`,
+          msg: `[${skill}] ${currentBeat.interrupt.success_msg}（${uiLabels.gaugeName} +15）`,
+          isCriticalSuccess: true, // ▼ シーズン3で画面を割るエフェクト用フラグ
         });
         updateTether(TETHER_REWARD_SUCCESS);
 
@@ -272,26 +260,19 @@ export function useGameLogic(
             }
             setDisplayedText((prev) => prev + correctionText[correctionIndex]);
             correctionIndex++;
-            textStreamRef.current = setTimeout(
-              streamCorrection,
-              getTextSpeed()
-            );
+            textStreamRef.current = setTimeout(streamCorrection, getTextSpeed());
           };
           textStreamRef.current = setTimeout(streamCorrection, getTextSpeed());
         }
       } else {
         setFeedback({
           type: 'penalty',
-          msg: isMoriarty
-            ? `[${skill}] 考え直せ。お前の計画には隙がある。（DOMINATION -15）`
-            : isIrene
-            ? `[${skill}] その程度の機転じゃ、この窮地は抜け出せないわ。（TETHER -15）`
-            : `[${skill}] その証拠では天才の暴走を繋ぎ止められないぞ、ワトスン。（TETHER -15）`,
+          msg: `[${skill}] そのアプローチでは状況を打開できない。（${uiLabels.gaugeName} -15）`,
         });
         updateTether(TETHER_PENALTY_FAIL);
       }
     },
-    [currentBeat, isResolved, getTextSpeed, updateTether, isIrene, isMoriarty]
+    [currentBeat, isResolved, getTextSpeed, updateTether, uiLabels.gaugeName]
   );
 
   const nextBeat = () => {
@@ -300,72 +281,17 @@ export function useGameLogic(
       return;
     }
 
-    if (!isResolved) {
+    if (!isResolved && !isInterlude) {
       if (currentBeat.interrupt) {
         setIsResolved(true);
-        const isSkillMatch =
-          selectedSkill === currentBeat.interrupt.required_skill;
-        const isEvidenceMatch = currentBeat.interrupt.required_evidence
-          ? selectedEvidence === currentBeat.interrupt.required_evidence
-          : true;
-
-        if (isSkillMatch && isEvidenceMatch) {
-          setFeedback({
-            type: 'success',
-            msg: `[${selectedSkill}] ${currentBeat.interrupt.success_msg}（${isMoriarty ? 'DOMINATION' : 'TETHER'} +15）`,
-          });
-          updateTether(TETHER_REWARD_SUCCESS);
-          if (currentBeat.interrupt.correction_text) {
-            setIsStreaming(true);
-            const correctionText =
-              '\n\n' + currentBeat.interrupt.correction_text;
-            let correctionIndex = 0;
-            const streamCorrection = () => {
-              if (correctionIndex >= correctionText.length) {
-                setIsStreaming(false);
-                return;
-              }
-              setDisplayedText(
-                (prev) => prev + correctionText[correctionIndex]
-              );
-              correctionIndex++;
-              textStreamRef.current = setTimeout(
-                streamCorrection,
-                getTextSpeed()
-              );
-            };
-            textStreamRef.current = setTimeout(
-              streamCorrection,
-              getTextSpeed()
-            );
-          }
-        } else if (selectedSkill) {
-          setFeedback({
-            type: 'penalty',
-            msg: isMoriarty
-              ? `考え直せ。お前の計画には隙がある。（DOMINATION -15）`
-              : isIrene
-              ? `その程度の機転じゃ、この窮地は抜け出せないわ。（TETHER -15）`
-              : `その証拠では天才の暴走を繋ぎ止められないぞ、ワトスン。（TETHER -15）`,
-          });
-          updateTether(TETHER_PENALTY_FAIL);
-        } else {
-          setFeedback({
-            type: 'fail',
-            msg: `${currentBeat.interrupt.fail_msg}（${isMoriarty ? 'DOMINATION' : 'TETHER'} -15）`,
-          });
-          updateTether(TETHER_PENALTY_MISS);
-        }
+        // Timeout扱いとしての処理（簡略化してevaluatePanelInterruptのロジックに任せても良いですが、既存踏襲）
+        evaluatePanelInterrupt('TIMEOUT', null);
         return;
       } else if (selectedSkill) {
         setIsResolved(true);
         setFeedback({
           type: 'penalty',
-          msg: isMoriarty
-            ? `無駄な思考だ。黙っていろ。（DOMINATION -5）`
-            : isIrene
-            ? `つまらない手出しは無用よ。（TETHER -5）`
-            : `邪魔をするな、ワトスン。思考の途中だ。（TETHER -5）`,
+          msg: `不要な干渉だ。（${uiLabels.gaugeName} -5）`,
         });
         updateTether(TETHER_PENALTY_WASTE);
         return;
@@ -375,17 +301,28 @@ export function useGameLogic(
     if (beatIndex < beats.length - 1) {
       setBeatIndex((prev) => prev + 1);
     } else {
+      // ▼ エンディング処理
       if (scenarioData.meta.type === 'cutscene') {
         setEndResult(null); 
         setIsCompleted(true);
         return;
       }
 
+      // 幕間（Interlude）の場合は無条件で「STORY_CLEARED」等の専用ランクとし、テキストをそのまま出力
+      if (isInterlude) {
+        setEndResult({
+          rank: 'CLEARED',
+          points: isReplay ? 0 : 1,
+          consequenceData: scenarioData.consequence || {}
+        });
+        setIsCompleted(true);
+        return;
+      }
+
       let rank = 'ABYSS';
-      let watson_journal = '';
+      let journalText = '';
       let basePoints = 1;
 
-      // ▼ M.C.モード用のランク判定
       if (isMoriarty) {
         if (tether >= 80) {
           rank = 'MASTERPIECE';
@@ -399,25 +336,27 @@ export function useGameLogic(
       } else {
         if (tether >= 80) {
           rank = 'SYMPATHETIC';
-          watson_journal = scenarioData.consequence?.watson_journal?.sympathetic || '';
+          journalText = scenarioData.consequence?.watson_journal?.sympathetic || '';
           basePoints = 5; 
         } else if (tether >= 40) {
           rank = 'LUCID';
-          watson_journal = scenarioData.consequence?.watson_journal?.lucid || '';
+          journalText = scenarioData.consequence?.watson_journal?.lucid || '';
           basePoints = 3;
         } else {
-          watson_journal = scenarioData.consequence?.watson_journal?.abyss || '';
+          journalText = scenarioData.consequence?.watson_journal?.abyss || '';
         }
       }
 
-      const finalPoints = isReplay ? 1 : basePoints;
+      // conseguenzaDataを再構築してUIに渡す
+      const finalConsequence = {
+        ...scenarioData.consequence,
+        watson_journal: journalText, // ランクに応じたテキストだけを渡す
+      };
 
       setEndResult({
         rank,
-        official_record: scenarioData.consequence?.official_record || '',
-        watson_journal,
-        holmes_note: scenarioData.consequence?.holmes_note || '',
-        points: finalPoints,
+        points: isReplay ? 1 : basePoints,
+        consequenceData: finalConsequence,
       });
       setIsCompleted(true);
     }
@@ -449,6 +388,8 @@ export function useGameLogic(
     selectedSkill,
     isCompleted,
     endResult,
-    isMoriarty, // 状態をUI側へ渡す
+    isMoriarty,
+    isIrene,
+    uiLabels, // ▼ UI側でボタン名などに使用
   };
 }

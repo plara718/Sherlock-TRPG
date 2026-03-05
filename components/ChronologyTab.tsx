@@ -38,14 +38,20 @@ export default function ChronologyTab({
   const displaySeason = archiveData.seasons.find((s: any) => s.season_id === activeTab) || archiveData.seasons[0];
   const allEpisodes = archiveData.seasons.flatMap((s: any) => s.episodes);
 
-  // SPステージ特殊解放条件判定
-  const checkSpPlayable = (epId: string) => {
+  // ▼ 特殊エピソード（SPおよび幕間）の解放条件を判定する関数
+  const checkSpecialPlayable = (epId: string) => {
     switch (epId) {
+      // 幕間
+      case 'Interlude-S1': return clearedEpisodes.includes('#13');
+      case 'Interlude-S2': return clearedEpisodes.includes('#29');
+      case 'Interlude-S3': return clearedEpisodes.includes('#40');
+      // SP（アイリーン編）
       case 'SP-01': return clearedEpisodes.includes('#14');
-      case 'SP-02': return clearedEpisodes.includes('#40');
-      case 'SP-03': return clearedEpisodes.includes('#58');
-      case 'SP-04': return clearedEpisodes.includes('#15');
-      case 'SP-05': return clearedEpisodes.includes('#29');
+      case 'SP-02': return clearedEpisodes.includes('#38');
+      case 'SP-03': return clearedEpisodes.includes('SP-02');
+      // SP（遊撃隊編）
+      case 'SP-04': return clearedEpisodes.includes('#29');
+      case 'SP-05': return clearedEpisodes.includes('SP-04');
       case 'SP-06': return clearedEpisodes.includes('SP-05');
       default: return false;
     }
@@ -116,14 +122,18 @@ export default function ChronologyTab({
                     const cData = clearedData[ep.id];
                     const globalIndex = allEpisodes.findIndex((e: any) => e.id === ep.id);
                     const prevEp = globalIndex > 0 ? allEpisodes[globalIndex - 1] : null;
-
-                    const summaryText = ep.summary || '';
-                    const isImplemented = !summaryText.includes('未解放') && !summaryText.includes('到達すると解放') && ep.status !== 'locked';
                     
+                    // 実装状況の判定（仮のモックデータなどを弾く）
+                    const isImplemented = ep.status !== 'locked';
+                    
+                    // ▼ 解放条件の判定ロジック
                     let isPlayable = false;
-                    if (ep.id.startsWith('SP-')) {
-                      isPlayable = checkSpPlayable(ep.id);
+                    
+                    if (ep.id.startsWith('SP-') || ep.id.startsWith('Interlude-')) {
+                      // SPおよび幕間は個別の特殊条件で解放
+                      isPlayable = isImplemented && checkSpecialPlayable(ep.id);
                     } else {
+                      // 通常の本編は、最初のエピソードか、1つ前のエピソードがクリア済みなら解放
                       const isNextPlayable = globalIndex === 0 || (prevEp && clearedData[prevEp.id]);
                       isPlayable = isImplemented && (!!cData || isNextPlayable);
                     }
@@ -144,7 +154,11 @@ export default function ChronologyTab({
                         >
                           <div className="flex-1 pr-4">
                             <div className="text-xs font-mono font-bold text-[#8c7a6b] mb-1 flex items-center gap-2">
-                              <span className={`px-1.5 py-0.5 rounded ${ep.id.startsWith('SP') ? 'bg-fuchsia-100 text-fuchsia-800' : 'bg-[#e6d5c3] text-[#5c4d43]'}`}>
+                              <span className={`px-1.5 py-0.5 rounded ${
+                                ep.id.startsWith('SP') ? 'bg-fuchsia-100 text-fuchsia-800' 
+                                : ep.id.startsWith('Interlude') ? 'bg-[#3a2f29] text-[#f4ebd8]'
+                                : 'bg-[#e6d5c3] text-[#5c4d43]'
+                              }`}>
                                 {ep.id}
                               </span>
                             </div>
@@ -156,7 +170,7 @@ export default function ChronologyTab({
                           <div className="flex items-center gap-2">
                             {cData ? (
                               <span className={`text-[10px] text-white px-2 py-1 rounded font-bold tracking-widest shadow-sm ${
-                                  cData.rank === 'LUCID' ? 'bg-emerald-700' : cData.rank === 'SYMPATHETIC' ? 'bg-blue-700' : 'bg-rose-800'
+                                  cData.rank === 'LUCID' || cData.rank === 'CLEARED' ? 'bg-emerald-700' : cData.rank === 'SYMPATHETIC' ? 'bg-blue-700' : 'bg-rose-800'
                                 }`}>
                                 {cData.rank}
                               </span>
@@ -164,7 +178,7 @@ export default function ChronologyTab({
                               <button
                                 onClick={(e) => { e.stopPropagation(); onPlayEpisode(ep.id); }}
                                 className={`text-[10px] text-white px-3 py-1.5 rounded-full font-bold tracking-widest shadow-md flex items-center gap-1 active:scale-95 transition-transform ${
-                                  ep.id.startsWith('SP') ? 'bg-fuchsia-700' : 'bg-amber-600'
+                                  ep.id.startsWith('SP') ? 'bg-fuchsia-700' : ep.id.startsWith('Interlude') ? 'bg-[#3a2f29]' : 'bg-amber-600'
                                 }`}
                               >
                                 <Play size={12} className="fill-current" /> PLAY
