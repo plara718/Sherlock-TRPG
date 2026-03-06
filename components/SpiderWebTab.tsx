@@ -55,7 +55,7 @@ export default function SpiderWebTab({
     ['SP-01', 'SP-02', 'SP-03', 'SP-04', 'SP-05', 'SP-06'].every(sp => clearedData[sp]);
 
   // ▼ シーズン4（終末時計）の進行度計算
-  const s4Episodes = ['#41', '#42', '#45', '#46', '#49', '#50', '#52', '#56', '#57', '#58'];
+  const s4Episodes = ['#41', '#42', '#43', '#44', '#45', '#46', '#47', '#48', '#49', '#50'];
   const s4ClearedCount = s4Episodes.filter(ep => clearedData[ep]).length;
   // 1894年から始まり、1エピソードクリアごとに2年進み、最終的に1914年（第一次大戦）に到達する
   const currentYear = 1894 + (s4ClearedCount * 2);
@@ -150,7 +150,7 @@ export default function SpiderWebTab({
               </span>
               <button 
                 onClick={() => { setCurrentSeason((prev) => Math.min(4, prev + 1) as 1|2|3|4); setSelectedPinId(null); }} 
-                disabled={currentSeason === 4 || !Object.keys(clearedData).includes('#40') && currentSeason === 3}
+                disabled={currentSeason === 4 || (!Object.keys(clearedData).includes('#40') && currentSeason === 3)}
                 className="hover:text-amber-600 disabled:opacity-30 transition-colors"
               >
                 <ChevronRight size={14} />

@@ -69,22 +69,19 @@ export default function GamePage() {
     setCurrentSeason(1);
     setMycroftIntel([]);
     setCurrentEpisodeId('#00');
-    setView('title'); // リセット時はタイトル画面に戻す
+    setView('title');
   };
 
-  // ▼ 新規：セーブデータのインポート（復元）処理
+  // セーブデータのインポート（復元）処理
   const handleLoadData = (dataStr: string) => {
     try {
-      // Base64文字列をデコードしてJSONパース
       const decoded = atob(dataStr);
       const saveData = JSON.parse(decoded);
       
-      // 簡易的なデータ検証
       if (typeof saveData !== 'object' || !saveData.unlockedTerms || !saveData.clearedData) {
         return false;
       }
 
-      // Stateの更新
       setUnlockedTerms(saveData.unlockedTerms || []);
       setReadTerms(saveData.readTerms || []);
       setInsightPoints(saveData.insightPoints || 0);
@@ -93,7 +90,6 @@ export default function GamePage() {
       setCurrentSeason(saveData.currentSeason || 1);
       setHasSaveData(true);
 
-      // LocalStorageの更新
       localStorage.setItem('tether_save_data', 'true');
       localStorage.setItem('tether_unlocked_terms', JSON.stringify(saveData.unlockedTerms || []));
       localStorage.setItem('tether_read_terms', JSON.stringify(saveData.readTerms || []));
@@ -105,12 +101,14 @@ export default function GamePage() {
       return true;
     } catch (e) {
       console.error("Data load failed", e);
-      return false; // 不正な文字列の場合はfalseを返す
+      return false;
     }
   };
 
   const triggerMycroftIntel = (epId: string) => {
-    const mycroftEps = ['#04', '#16', '#24', '#39', '#46', '#58'];
+    // ▼ 修正点：Season 4のエピソードID変更に伴い、#46→#44、#58→#50に変更
+    const mycroftEps = ['#04', '#16', '#24', '#39', '#44', '#50'];
+    
     if (mycroftEps.includes(epId) && !mycroftIntel.includes(epId)) {
       const availableTerms = glossaryData.terms.filter(t => !unlockedTerms.includes(t.id));
       const toUnlock: string[] = [];
@@ -168,7 +166,7 @@ export default function GamePage() {
     } else if (epId === '#40' && !isAlreadyCleared && currentSeason < 4) {
       setCurrentSeason(4);
       localStorage.setItem('tether_current_season', '4');
-      alert("【Season 3: 決戦 - CLEAR】\nライヘンバッハの滝での死闘を越え、伝説が帰還します。\n（Season 4: 帰還）のロックが解除されました。");
+      alert("【Season 3: 決戦 - CLEAR】\nライヘンバッハの滝での死闘を越え、伝説が帰還します。\n（Season 4: エピローグ）のロックが解除されました。");
     }
     setView('archive');
   };
@@ -265,8 +263,8 @@ export default function GamePage() {
             onReadTerm={handleReadTerm}
             onUnlockTruth={handleUnlockTruth}
             onLinkFail={handleLinkFail}
-            onLoadData={handleLoadData}   // ← 追加
-            onResetData={handleResetData} // ← 追加
+            onLoadData={handleLoadData}
+            onResetData={handleResetData}
           />
         </div>
       )}
