@@ -7,7 +7,7 @@ import GlossaryToast from '@/components/GlossaryToast';
 import InterruptPanel from '@/components/InterruptPanel';
 import ChatLog from '@/components/ChatLog'; 
 import { useGameLogic, ScenarioData } from '@/lib/useGameLogic';
-import { FileText, ArrowRight, Eye } from 'lucide-react';
+import { FileText, ArrowRight, Eye, AlertTriangle } from 'lucide-react';
 
 // 本編エピソード
 import episode00 from '@/data/episode_00.json';
@@ -107,6 +107,9 @@ export default function GameView({
   const [screenEffect, setScreenEffect] = useState<'none' | 'flash' | 'shake' | 'glass-shatter'>('none');
   const [isWigginsActive, setIsWigginsActive] = useState(false);
 
+  // ▼ 新規：Tether 0% 状態の管理
+  const [isSanityZero, setIsSanityZero] = useState(false);
+
   const isReplay = Boolean(clearedData[episodeId]);
 
   const {
@@ -124,16 +127,28 @@ export default function GameView({
 
   const isInterventionAvailable = 
     interventionType === 'Irene' ? (unlockedTerms.includes('I007') && !isIrene && !isMoriarty) :
-    interventionType === 'Mycroft' ? (!isIrene && !isMoriarty) : // マイクロフトは無条件で介入可能
+    interventionType === 'Mycroft' ? (!isIrene && !isMoriarty) :
     interventionType === 'Wiggins' ? (unlockedTerms.includes('W040') && !isIrene && !isMoriarty) :
     false;
 
   const [interventionUsed, setInterventionUsed] = useState(false);
 
-  // エピソードが変わったら介入状態をリセット
   useEffect(() => {
     setInterventionUsed(false);
+    setIsSanityZero(false);
   }, [episodeId]);
+
+  // ▼ Tether 0% の監視
+  useEffect(() => {
+    if (tether <= 0 && !isCompleted && !isInterlude(scenarioData)) {
+      setIsSanityZero(true);
+    } else {
+      setIsSanityZero(false);
+    }
+  }, [tether, isCompleted, scenarioData]);
+
+  // 幕間判定用ヘルパー
+  const isInterlude = (data: any) => data.meta?.type === 'interlude' || data.meta?.episode_id?.includes('Interlude');
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
@@ -198,7 +213,9 @@ export default function GameView({
             className={`font-bold cursor-pointer px-1.5 mx-0.5 rounded transition-all shadow-sm inline-flex items-center z-10 relative ${wigginsStyle} ${
               isCollected
                 ? 'bg-[#d8c8b8] text-[#8c7a6b] cursor-default'
-                : 'text-[#3a2f29] bg-amber-500/20 hover:bg-amber-500/40 border border-amber-600/30 active:scale-95'
+                : isSanityZero 
+                  ? 'text-rose-900 bg-rose-500/30 hover:bg-rose-500/50 border border-rose-600/50 active:scale-95 animate-pulse'
+                  : 'text-[#3a2f29] bg-amber-500/20 hover:bg-amber-500/40 border border-amber-600/30 active:scale-95'
             }`}
           >
             {word}
@@ -221,7 +238,9 @@ export default function GameView({
               <span
                 key={`g-${term.id}-${j}`}
                 onClick={(e) => { e.stopPropagation(); handleGlossaryClick(term); }}
-                className="text-amber-700 underline decoration-dotted cursor-help hover:text-amber-600 transition-colors font-bold z-10 relative"
+                className={`underline decoration-dotted cursor-help transition-colors font-bold z-10 relative ${
+                  isSanityZero ? 'text-rose-600 hover:text-rose-400' : 'text-amber-700 hover:text-amber-600'
+                }`}
               >
                 {term.trigger_word}
               </span>
@@ -234,7 +253,6 @@ export default function GameView({
     return elements;
   };
 
-  // ▼ 修正点：Systemのメッセージも含めたすべてのビートをチャットログに流す
   const chatHistory = beats.slice(0, beatIndex + 1);
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -261,14 +279,13 @@ export default function GameView({
   const hasUncollectedEvidence = currentBeat?.text.match(/\{.*?\}/g)?.some(match => !collectedEvidence.includes(match.slice(1, -1)));
 
   return (
-    <div className={`w-full max-w-2xl mx-auto relative bg-[#f4ebd8] flex flex-col h-[100dvh] touch-manipulation overscroll-none transition-transform duration-75 ${
+    <div className={`w-full max-w-2xl mx-auto relative flex flex-col h-[100dvh] touch-manipulation overscroll-none transition-transform duration-75 ${
       screenEffect === 'shake' ? '-translate-x-2' : ''
-    }`}>
+    } ${isSanityZero ? 'bg-[#1a0f0f]' : 'bg-[#f4ebd8]'}`}>
 
       {screenEffect === 'flash' && <div className="absolute inset-0 bg-white z-[60] animate-out fade-out duration-500 pointer-events-none mix-blend-overlay" />}
       {screenEffect === 'shake' && <div className="absolute inset-0 bg-rose-900/20 z-[60] animate-out fade-out duration-500 pointer-events-none" />}
       
-      {/* シーズン3用のノイズクリアエフェクト */}
       {screenEffect === 'glass-shatter' && (
         <div className="absolute inset-0 z-[60] pointer-events-none flex items-center justify-center overflow-hidden">
           <div className="absolute inset-0 bg-white/80 animate-out fade-out duration-700 mix-blend-overlay" />
@@ -278,43 +295,59 @@ export default function GameView({
         </div>
       )}
 
-      {/* TetherBar */}
+      {/* ▼ 発狂（Tether 0%）時のノイズオーバーレイ ▼ */}
+      {isSanityZero && !isCompleted && (
+        <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden mix-blend-multiply opacity-50 flex flex-col">
+           {/* ノイズスキャンライン */}
+           <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(225,29,72,0.1)_2px,rgba(225,29,72,0.1)_4px)] animate-[pulse_0.1s_infinite]" />
+           {/* 警告バナー */}
+           <div className="absolute top-[20%] w-full bg-rose-600/20 border-y-2 border-rose-600 text-rose-500 font-mono font-bold text-center py-2 tracking-[0.3em] backdrop-blur-sm animate-[pulse_1.5s_infinite] shadow-[0_0_20px_rgba(225,29,72,0.5)]">
+             <AlertTriangle className="inline-block mr-2 w-5 h-5 mb-1" />
+             WARNING: SANITY COMPROMISED
+             <AlertTriangle className="inline-block ml-2 w-5 h-5 mb-1" />
+           </div>
+        </div>
+      )}
+
       <TetherBar tether={tether} onArchiveClick={onBack} protagonist={protagonist} gaugeName={uiLabels.gaugeName} />
 
       <div
-        className="flex-1 flex flex-col bg-[#f4ebd8] relative overflow-hidden cursor-pointer"
+        className={`flex-1 flex flex-col relative overflow-hidden cursor-pointer transition-colors duration-1000 ${
+          isSanityZero ? 'bg-[#1a0f0f]' : 'bg-[#f4ebd8]'
+        }`}
         onClick={handleAreaClick}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
       >
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-[#3a2f29] to-transparent" />
+        <div className={`absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] ${
+          isSanityZero ? 'from-rose-900/20 opacity-30' : 'from-[#3a2f29] opacity-[0.03]'
+        } to-transparent`} />
 
-        {/* 修正点：System専用の固定ヘッダーエリアを削除。すべて下記のchatHistory内に描画されます */}
-
-        <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar relative">
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar relative z-20">
           {chatHistory.map((beat: any) => {
             const isCurrent = beat.id === currentBeat.id;
             const textToShow = isCurrent ? displayedText : beat.text;
             const cleanText = (textToShow || "").replace(/\[<NOISE>\]/g, '');
 
             return (
-              <ChatLog 
-                key={beat.id} 
-                speaker={beat.speaker} 
-                text={renderText(cleanText)} 
-                feedback={isCurrent ? feedback : null} 
-              />
+              <div key={beat.id} className={isSanityZero && isCurrent ? 'animate-[shake_0.5s_infinite]' : ''}>
+                <ChatLog 
+                  speaker={beat.speaker} 
+                  text={renderText(cleanText)} 
+                  feedback={isCurrent ? feedback : null} 
+                  // ChatLog 側で isSanityZero を受け取れるよう拡張するならここに追加可能
+                />
+              </div>
             );
           })}
           
           {isStreaming && currentBeat.speaker !== 'System' && (
-            <div className="inline-block w-2.5 h-5 bg-[#3a2f29] ml-1 animate-pulse align-middle" />
+            <div className={`inline-block w-2.5 h-5 ml-1 animate-pulse align-middle ${isSanityZero ? 'bg-rose-500' : 'bg-[#3a2f29]'}`} />
           )}
 
           <div ref={bottomRef} className="h-20" />
         </div>
 
-        {/* 下段の虫眼鏡（WIGGINS EYE：通常調査時用） */}
         {!isStreaming && hasUncollectedEvidence && !isInterruptMode && !isWigginsActive && unlockedTerms.includes('W040') && (
           <div className="absolute bottom-6 right-6 z-20 animate-in fade-in zoom-in duration-300">
              <button
@@ -329,8 +362,10 @@ export default function GameView({
       </div>
 
       {!isInterruptMode && collectedEvidence.length > 0 && (
-        <div className="p-3 bg-[#2a2420] flex flex-wrap gap-2 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.1)] overflow-x-auto custom-scrollbar border-t border-[#3a2f29]">
-          <span className="text-[10px] font-mono text-[#8c7a6b] flex items-center mr-1 tracking-widest uppercase">
+        <div className={`p-3 flex flex-wrap gap-2 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.1)] overflow-x-auto custom-scrollbar border-t z-20 relative ${
+          isSanityZero ? 'bg-[#2a0f15] border-rose-900/50' : 'bg-[#2a2420] border-[#3a2f29]'
+        }`}>
+          <span className={`text-[10px] font-mono flex items-center mr-1 tracking-widest uppercase ${isSanityZero ? 'text-rose-500' : 'text-[#8c7a6b]'}`}>
             EVIDENCE:
           </span>
           {collectedEvidence.map((ev) => (
@@ -340,8 +375,12 @@ export default function GameView({
               disabled={isStreaming}
               className={`whitespace-nowrap text-[10px] sm:text-xs px-2.5 py-1.5 rounded-full font-bold transition-all active:scale-95 z-20 relative ${
                 selectedEvidence === ev
-                  ? 'bg-amber-500 text-[#3a2f29] shadow-[0_0_10px_rgba(245,158,11,0.4)]'
-                  : 'bg-[#5c4d43] text-[#f4ebd8] hover:bg-[#8c7a6b]'
+                  ? isSanityZero 
+                    ? 'bg-rose-600 text-[#1a0f0f] shadow-[0_0_10px_rgba(225,29,72,0.4)]'
+                    : 'bg-amber-500 text-[#3a2f29] shadow-[0_0_10px_rgba(245,158,11,0.4)]'
+                  : isSanityZero
+                    ? 'bg-rose-950 text-rose-200 hover:bg-rose-900'
+                    : 'bg-[#5c4d43] text-[#f4ebd8] hover:bg-[#8c7a6b]'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {ev}
@@ -350,7 +389,7 @@ export default function GameView({
         </div>
       )}
 
-      <div onClick={(e) => e.stopPropagation()} className="shrink-0 bg-[#f4ebd8]">
+      <div onClick={(e) => e.stopPropagation()} className="shrink-0 relative z-30">
         {isInterruptMode ? (
           <InterruptPanel
             collectedEvidences={collectedEvidence}

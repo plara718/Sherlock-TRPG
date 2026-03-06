@@ -1,18 +1,17 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Lock, Search } from 'lucide-react';
+import { Lock, Search, AlertTriangle } from 'lucide-react';
 import glossaryData from '@/data/glossary.json';
 
 // --- 型定義 ---
-type ClearedData = Record<string, any>; // 汎用的な Record 型に変更して型エラーを防ぐ
+type ClearedData = Record<string, any>;
 
-// ArchiveView から渡される Props と完全に一致させる
 type GreatIndexTabProps = {
   unlockedTerms: string[];
   readTerms: string[];
   insightPoints: number;
-  clearedData?: ClearedData; // optionalにすることで親からの受け渡しエラーを防ぐ
+  clearedData?: ClearedData;
   onResearch: () => void;
   onReadTerm: (termId: string) => void;
 };
@@ -39,6 +38,10 @@ export default function GreatIndexTab({
 
   const clearedEpIds = Object.keys(clearedData); 
   
+  // ▼ 進行度の判定
+  const isSeason3Phase3 = clearedEpIds.includes('#38') && ['SP-01', 'SP-02', 'SP-03', 'SP-04', 'SP-05', 'SP-06'].every(sp => clearedEpIds.includes(sp));
+  const isPostReichenbach = clearedEpIds.includes('#40');
+  
   // 未解読で、かつ現在アンロック可能な用語の数を計算
   const unlockableTermsCount = glossaryData.terms.filter(
     (t) =>
@@ -62,12 +65,12 @@ export default function GreatIndexTab({
     <div className="animate-in fade-in duration-300">
       
       {/* ヘッダー部分 */}
-      <div className="flex items-end justify-between mb-6 border-b border-[#8c7a6b]/30 pb-4">
+      <div className={`flex items-end justify-between mb-6 border-b pb-4 ${isSeason3Phase3 && !isPostReichenbach ? 'border-rose-900/50' : 'border-[#8c7a6b]/30'}`}>
         <div>
-          <p className="text-[#8c7a6b] text-xs sm:text-sm font-mono tracking-widest">
-            大索引 - 網羅的犯罪アーカイブ
+          <p className={`text-xs sm:text-sm font-mono tracking-widest ${isSeason3Phase3 && !isPostReichenbach ? 'text-rose-600 animate-pulse' : 'text-[#8c7a6b]'}`}>
+            {isSeason3Phase3 && !isPostReichenbach ? 'SYSTEM ALERT - FATAL ERROR' : '大索引 - 網羅的犯罪アーカイブ'}
           </p>
-          <h2 className="text-2xl font-bold text-[#3a2f29] font-serif mt-1">
+          <h2 className={`text-2xl font-bold font-serif mt-1 ${isSeason3Phase3 && !isPostReichenbach ? 'text-rose-700' : 'text-[#3a2f29]'}`}>
             THE GREAT INDEX
           </h2>
         </div>
@@ -134,13 +137,38 @@ export default function GreatIndexTab({
             const isRead = readTerms.includes(term.id);
             const isNew = isUnlocked && !isRead;
             const isExpanded = expandedTermId === term.id;
+            
+            // ▼ 動的テキストのオーバーライド判定
+            let overrideJa = term.ja;
+            let overrideEn = term.en;
+            let overrideDetails = term.details;
+            let overrideCritique = term.critique;
+            let isGlitch = false;
+
+            // 例1：モリアーティ教授（M021）- 最終決戦前夜に赤くバグる
+            if (term.id === 'M021' && isSeason3Phase3 && !isPostReichenbach) {
+              isGlitch = true;
+              overrideDetails = "[SYSTEM OVERRIDE] 彼は数学の天才でも、犯罪界のナポレオンでもない。ただの鏡だ。私の論理が産み落とした、最も完璧な『殺意』そのものだ。インフラは燃えた。盤面は消えた。あとはただ、私と彼、どちらの知能が渊の底で冷たく死ぬかだけだ。";
+              overrideCritique = "「彼を道連れにできるのなら、私は喜んでこの命を絶とう。」";
+            }
+            
+            // 例2：モリアーティ教授（M021）- ライヘンバッハ以降は沈黙する
+            if (term.id === 'M021' && isPostReichenbach) {
+              overrideDetails = "【公式記録】1891年5月4日、スイス・ライヘンバッハの滝において転落死。ロンドンを支配した巨大な犯罪ネットワークは、彼と共に完全に消滅した。";
+              overrideCritique = "「（……この項に対するホームズの批評はない。彼もまた、淵の底へ消えたからだ）」";
+            }
+
+            // 例3：アイリーン・アドラー（I007）- SPクリア後に記載が追加
+            if (term.id === 'I007' && clearedEpIds.includes('SP-03')) {
+              overrideDetails = term.details + "\n\n【追記】彼女はボヘミア王の事件の後も大陸で暗躍を続け、モリアーティの資金網・情報網を単身で撹乱した。私（ワトスン）が知る限り、彼らの完全な数式を『盤面の外側』から破壊できたのは、彼女ただ一人である。";
+            }
 
             return (
               <div
                 key={term.id}
                 className={`rounded-xl border ${
                   isUnlocked
-                    ? 'bg-[#fffcf7] border-[#8c7a6b]/40 shadow-sm'
+                    ? isGlitch ? 'bg-[#1a0f0f] border-rose-900/80 shadow-[0_0_15px_rgba(225,29,72,0.3)]' : 'bg-[#fffcf7] border-[#8c7a6b]/40 shadow-sm'
                     : 'bg-[#e6d5c3]/40 border-transparent opacity-60'
                 } overflow-hidden transition-all duration-300`}
               >
@@ -157,7 +185,7 @@ export default function GreatIndexTab({
                 >
                   <div className="flex-1 pr-4">
                     <div className="flex items-center gap-2 mb-1">
-                      <div className="text-[10px] font-mono font-bold text-[#8c7a6b] px-1.5 py-0.5 rounded bg-[#e6d5c3]">
+                      <div className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${isGlitch ? 'bg-rose-950 text-rose-500' : 'bg-[#e6d5c3] text-[#8c7a6b]'}`}>
                         {term.id} / {isUnlocked ? term.category : '???'}
                       </div>
                       {isNew && (
@@ -165,15 +193,20 @@ export default function GreatIndexTab({
                           NEW
                         </span>
                       )}
+                      {isGlitch && !isNew && (
+                         <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-rose-500 animate-pulse uppercase tracking-widest border border-rose-900/50 bg-rose-950/50 px-1.5 py-0.5 rounded">
+                           <AlertTriangle size={10} /> CORRUPTED
+                         </span>
+                      )}
                     </div>
                     <h3 className={`font-bold text-base leading-tight font-serif mt-1 ${
-                        isUnlocked ? 'text-[#3a2f29]' : 'text-[#8c7a6b] blur-sm select-none'
+                        isUnlocked ? (isGlitch ? 'text-rose-600 font-black tracking-widest' : 'text-[#3a2f29]') : 'text-[#8c7a6b] blur-sm select-none'
                       }`}
                     >
-                      {isUnlocked ? term.ja : 'UNKNOWN DATA FILE'}
+                      {isUnlocked ? overrideJa : 'UNKNOWN DATA FILE'}
                     </h3>
-                    <p className={`text-[10px] font-mono mt-1 ${isUnlocked ? 'text-[#8c7a6b]' : 'text-transparent'}`}>
-                      {isUnlocked ? term.en : ''}
+                    <p className={`text-[10px] font-mono mt-1 ${isUnlocked ? (isGlitch ? 'text-rose-800' : 'text-[#8c7a6b]') : 'text-transparent'}`}>
+                      {isUnlocked ? overrideEn : ''}
                     </p>
                   </div>
                   {!isUnlocked && (
@@ -182,16 +215,16 @@ export default function GreatIndexTab({
                 </div>
 
                 {isUnlocked && isExpanded && (
-                  <div className="p-4 sm:p-5 border-t border-[#8c7a6b]/20 bg-[#f4ebd8]/50 animate-in slide-in-from-top-2">
-                    <p className="text-sm text-[#3a2f29] leading-relaxed font-serif">
-                      {term.details}
+                  <div className={`p-4 sm:p-5 border-t animate-in slide-in-from-top-2 ${isGlitch ? 'border-rose-900/50 bg-black/20' : 'border-[#8c7a6b]/20 bg-[#f4ebd8]/50'}`}>
+                    <p className={`text-sm leading-relaxed font-serif whitespace-pre-wrap ${isGlitch ? 'text-rose-500 font-bold' : 'text-[#3a2f29]'}`}>
+                      {overrideDetails}
                     </p>
-                    <div className="mt-4 bg-[#e6d5c3]/40 p-3 rounded-lg border border-[#8c7a6b]/30 shadow-inner">
-                      <p className="text-[9px] font-mono text-[#5c4d43] font-bold mb-1 tracking-widest uppercase">
-                        Holmes's Critique :
+                    <div className={`mt-4 p-3 rounded-lg border shadow-inner ${isGlitch ? 'bg-rose-950/30 border-rose-900/40' : 'bg-[#e6d5c3]/40 border-[#8c7a6b]/30'}`}>
+                      <p className={`text-[9px] font-mono font-bold mb-1 tracking-widest uppercase ${isGlitch ? 'text-rose-700' : 'text-[#5c4d43]'}`}>
+                        {isPostReichenbach && term.id === 'M021' ? "Watson's Journal :" : "Holmes's Critique :"}
                       </p>
-                      <p className="text-sm text-[#3a2f29] italic font-serif leading-relaxed">
-                        「{term.critique}」
+                      <p className={`text-sm italic font-serif leading-relaxed ${isGlitch ? 'text-rose-400 font-bold animate-[pulse_2s_ease-in-out_infinite]' : 'text-[#3a2f29]'}`}>
+                        {overrideCritique}
                       </p>
                     </div>
                   </div>

@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Network, Lock, HelpCircle, X, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Network, Lock, HelpCircle, X, AlertCircle, ChevronLeft, ChevronRight, Flame } from 'lucide-react';
 import spiderDataS1 from '@/data/spider_web_s1.json';
 import spiderDataS2 from '@/data/spider_web_s2.json';
+import spiderDataS3 from '@/data/spider_web_s3.json'; // 追加
 
-// --- 型定義 ---
 type SpiderWebTabProps = {
   clearedData?: Record<string, any>;
   unlockedTerms?: string[];
@@ -23,66 +23,95 @@ export default function SpiderWebTab({
   onUnlockTruth,
   onLinkFail,
 }: SpiderWebTabProps) {
-  // ▼ 進行度に応じて初期表示シーズンを自動判定する
-  const [currentSeason, setCurrentSeason] = useState<1 | 2>(() => {
-    // clearedDataのキー（例: "#01", "#14"）からエピソード番号を抽出し、
-    // 14以上（Season 2のエピソード）が含まれていればSeason 2を初期表示する
+  
+  const [currentSeason, setCurrentSeason] = useState<1 | 2 | 3>(() => {
+    const hasSeason3 = Object.keys(clearedData).some(id => {
+      const epNum = parseInt(id.replace('#', ''), 10);
+      return !isNaN(epNum) && epNum >= 30;
+    });
     const hasSeason2 = Object.keys(clearedData).some(id => {
       const epNum = parseInt(id.replace('#', ''), 10);
       return !isNaN(epNum) && epNum >= 14;
     });
-    return hasSeason2 ? 2 : 1;
+    return hasSeason3 ? 3 : hasSeason2 ? 2 : 1;
   });
   
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [errorNodeId, setErrorNodeId] = useState<string | null>(null);
+  const [fakeLines, setFakeLines] = useState<{x1: string, y1: string, x2: string, y2: string, opacity: number}[]>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<any[]>([]);
 
-  // ▼ 現在のシーズンに応じたデータを取得する
-  const currentSpiderData = currentSeason === 1 ? spiderDataS1 : spiderDataS2;
+  const currentSpiderData = currentSeason === 1 ? spiderDataS1 : currentSeason === 2 ? spiderDataS2 : spiderDataS3;
 
-  // チュートリアルの発火判定
+  // ▼ シーズン3のフェーズ3（最終決戦）への到達判定
+  const isS3Phase3 = currentSeason === 3 && 
+    clearedData['#38'] && 
+    ['SP-01', 'SP-02', 'SP-03', 'SP-04', 'SP-05', 'SP-06'].every(sp => clearedData[sp]);
+
   useEffect(() => {
     const hasClearedEp6 = Object.keys(clearedData).includes('#06');
     const hasSeenTutorial = localStorage.getItem('tether_spider_tutorial_done');
-    
     if (hasClearedEp6 && !hasSeenTutorial) {
       setTutorialStep(1);
     }
   }, [clearedData]);
 
+  // ▼ シーズン3・フェーズ1用のバグ（ノイズ）エフェクト生成
+  useEffect(() => {
+    if (currentSeason === 3 && !isS3Phase3) {
+      const interval = setInterval(() => {
+        const lines = Array.from({ length: 12 }).map(() => ({
+          x1: `${Math.random() * 100}%`,
+          y1: `${Math.random() * 100}%`,
+          x2: `${Math.random() * 100}%`,
+          y2: `${Math.random() * 100}%`,
+          opacity: Math.random() * 0.4 + 0.1
+        }));
+        setFakeLines(lines);
+      }, 150);
+      return () => clearInterval(interval);
+    } else {
+      setFakeLines([]);
+    }
+  }, [currentSeason, isS3Phase3]);
+
   // ノードの配置計算
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || isS3Phase3) return;
     const { clientWidth, clientHeight } = containerRef.current;
     const centerX = clientWidth / 2;
     const centerY = clientHeight / 2;
 
     const newNodes = currentSpiderData.pins.map((pin: any, index: number) => {
-      const isCleared = Object.keys(clearedData).includes(pin.source_episode);
-      const isTruthUnlocked = unlockedTerms.includes(pin.required_index_id);
+      let isCleared = false;
+      let isTruthUnlocked = false;
+      let isDestroyed = false;
+
+      if (currentSeason === 3) {
+        // シーズン3ではインフラ目標として常に表示
+        isCleared = true;
+        // SPシナリオクリアで「破壊」され、真実がアンロックされる
+        isDestroyed = !!clearedData[pin.destroyed_by];
+        isTruthUnlocked = isDestroyed;
+      } else {
+        isCleared = Object.keys(clearedData).includes(pin.source_episode);
+        isTruthUnlocked = unlockedTerms.includes(pin.required_index_id);
+      }
 
       const angle = (index / currentSpiderData.pins.length) * Math.PI * 2;
       const radius = isTruthUnlocked ? clientWidth * 0.15 : clientWidth * 0.35;
-
       const x = centerX + Math.cos(angle) * radius;
       const y = centerY + Math.sin(angle) * radius;
 
-      return {
-        ...pin,
-        x,
-        y,
-        isCleared,
-        isTruthUnlocked,
-      };
+      return { ...pin, x, y, isCleared, isTruthUnlocked, isDestroyed };
     });
 
     setNodes(newNodes);
-  }, [clearedData, unlockedTerms, currentSpiderData]);
+  }, [clearedData, unlockedTerms, currentSpiderData, currentSeason, isS3Phase3]);
 
   const handleTutorialNext = () => {
     if (tutorialStep === 1) {
@@ -103,48 +132,42 @@ export default function SpiderWebTab({
         <div className="flex items-center gap-3">
           <div>
             <div className="flex items-center gap-2 text-[#8c7a6b] text-[10px] sm:text-xs font-mono tracking-widest">
-              {/* ▼ シーズン切り替えUI */}
               <button 
-                onClick={() => {
-                  setCurrentSeason(1);
-                  setSelectedPinId(null);
-                }} 
+                onClick={() => { setCurrentSeason((prev) => Math.max(1, prev - 1) as 1|2|3); setSelectedPinId(null); }} 
                 disabled={currentSeason === 1}
-                className="hover:text-amber-600 disabled:opacity-30 disabled:hover:text-[#8c7a6b] transition-colors"
+                className="hover:text-amber-600 disabled:opacity-30 transition-colors"
               >
                 <ChevronLeft size={14} />
               </button>
-              <span>SEASON {currentSeason}</span>
+              <span className={currentSeason === 3 ? 'text-rose-600 font-bold animate-pulse' : ''}>
+                SEASON {currentSeason}
+              </span>
               <button 
-                onClick={() => {
-                  setCurrentSeason(2);
-                  setSelectedPinId(null);
-                }} 
-                disabled={currentSeason === 2}
-                className="hover:text-amber-600 disabled:opacity-30 disabled:hover:text-[#8c7a6b] transition-colors"
+                onClick={() => { setCurrentSeason((prev) => Math.min(3, prev + 1) as 1|2|3); setSelectedPinId(null); }} 
+                disabled={currentSeason === 3}
+                className="hover:text-amber-600 disabled:opacity-30 transition-colors"
               >
                 <ChevronRight size={14} />
               </button>
             </div>
             <h2 className="text-xl sm:text-2xl font-bold text-[#3a2f29] font-serif mt-1 flex items-center gap-2">
-              <Network size={24} className="text-amber-700" />
+              <Network size={24} className={currentSeason === 3 ? 'text-rose-700' : 'text-amber-700'} />
               THE SPIDER WEB
             </h2>
           </div>
           <button 
             onClick={() => setShowHelp(true)}
             className="mb-1 text-[#8c7a6b] hover:text-amber-600 transition-colors"
-            title="この画面について"
           >
             <HelpCircle size={20} />
           </button>
         </div>
         <div className="text-right">
           <p className="text-[10px] font-mono text-[#8c7a6b] uppercase tracking-widest mb-1">
-            Connections
+            {currentSeason === 3 ? 'Destroyed' : 'Connections'}
           </p>
-          <p className="text-lg font-bold text-amber-600 font-mono">
-            {nodes.filter((n) => n.isTruthUnlocked).length} / {currentSpiderData.pins.length}
+          <p className={`text-lg font-bold font-mono ${currentSeason === 3 ? 'text-rose-600' : 'text-amber-600'}`}>
+            {isS3Phase3 ? 'ALL' : nodes.filter((n) => n.isTruthUnlocked).length} / {currentSpiderData.pins.length}
           </p>
         </div>
       </div>
@@ -153,10 +176,7 @@ export default function SpiderWebTab({
       {showHelp && (
         <div className="absolute inset-0 z-50 bg-[#2a2420]/80 flex items-center justify-center p-4 animate-in fade-in backdrop-blur-sm">
           <div className="bg-[#f4ebd8] border-2 border-[#8c7a6b] p-6 rounded-xl shadow-2xl max-w-md w-full relative">
-            <button 
-              onClick={() => setShowHelp(false)}
-              className="absolute top-4 right-4 text-[#8c7a6b] hover:text-[#3a2f29]"
-            >
+            <button onClick={() => setShowHelp(false)} className="absolute top-4 right-4 text-[#8c7a6b] hover:text-[#3a2f29]">
               <X size={20} />
             </button>
             <h3 className="font-serif font-bold text-lg text-[#3a2f29] mb-3 border-b border-[#8c7a6b]/30 pb-2">
@@ -164,39 +184,14 @@ export default function SpiderWebTab({
               THE SPIDER WEB とは？
             </h3>
             <p className="text-sm text-[#5c4d43] leading-relaxed font-serif mb-6">
-              個々の犯罪は独立して存在しているのではない。ロンドンの地下には、それらを繋ぐ巨大な蜘蛛の巣が張り巡らされている。<br/><br/>
-              ここでは、解決した事件から得られた『署名』や『技術的共通点』をマッピングしている。大索引（THE GREAT INDEX）での解析が進み、特定の用語を解読することで、この画面の事件（点）が中央の黒幕へと線で結ばれていく。<br/><br/>
-              すべての線が中央へと収束する時、君は犯罪界のナポレオンが構築した、冷徹な数学的ネットワークの正体に辿り着くことになるだろう。
+              {currentSeason === 3 ? (
+                <>もはや事件の繋がりを推理する段階ではない。<br/><br/>ロンドンの地下に張り巡らされたモリアーティのインフラストラクチャー。アイリーンや遊撃隊を指揮し、各拠点を物理的に炎上・破壊せよ。<br/><br/>すべての手足を削ぎ落とした時、盤面を持たない一対一の死闘が始まる。</>
+              ) : (
+                <>個々の犯罪は独立して存在しているのではない。ロンドンの地下には、それらを繋ぐ巨大な蜘蛛の巣が張り巡らされている。<br/><br/>大索引（THE GREAT INDEX）での解析が進み、特定の用語を解読することで、この画面の事件（点）が中央の黒幕へと線で結ばれていく。</>
+              )}
             </p>
-            <button 
-              onClick={() => setShowHelp(false)}
-              className="w-full bg-[#5c4d43] text-[#f4ebd8] font-bold py-3 rounded-full text-sm tracking-widest hover:bg-[#3a2f29] transition-transform active:scale-95 shadow-md"
-            >
+            <button onClick={() => setShowHelp(false)} className="w-full bg-[#5c4d43] text-[#f4ebd8] font-bold py-3 rounded-full text-sm tracking-widest hover:bg-[#3a2f29] active:scale-95 shadow-md">
               CLOSE
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* チュートリアルオーバーレイ */}
-      {tutorialStep > 0 && (
-        <div 
-          className="absolute inset-0 z-[60] bg-[#2a2420]/80 flex items-center justify-center pointer-events-auto animate-in fade-in backdrop-blur-sm"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="bg-[#f4ebd8] border border-[#8c7a6b]/50 p-6 rounded-xl shadow-[0_0_30px_rgba(217,119,6,0.2)] max-w-sm text-center transform -translate-y-12">
-            <h3 className="text-amber-700 font-bold font-mono text-sm tracking-widest mb-3 border-b border-amber-700/20 pb-2">
-              SYSTEM INTERCEPT
-            </h3>
-            <p className="text-[#3a2f29] font-serif text-sm leading-relaxed mb-6">
-              {tutorialStep === 1 && "「ワトスン、これまでの事件を単なる偶然だと思っていないか？ ブリキ箱に眠っていた奇妙な記録群……それらを今こそ一つに繋ぎ合わせる時だ。」"}
-              {tutorialStep === 2 && "「見ろ。大索引のデータと照合することで、無関係に見えた事件が中央の『M.C.』という一つの重力源へ引き寄せられていく。ロンドンの地下には巨大な蜘蛛の巣が張られているのだ。」"}
-            </p>
-            <button 
-              onClick={handleTutorialNext}
-              className="bg-amber-600 hover:bg-amber-500 text-white font-bold px-6 py-2.5 rounded-full text-xs tracking-widest transition-transform active:scale-95 shadow-md"
-            >
-              {tutorialStep === 1 ? "NEXT" : "UNDERSTOOD (確認)"}
             </button>
           </div>
         </div>
@@ -205,116 +200,141 @@ export default function SpiderWebTab({
       {/* ネットワーク描画エリア */}
       <div
         ref={containerRef}
-        className={`flex-1 bg-[#2a2420] rounded-xl border border-[#3a2f29] relative overflow-hidden shadow-inner ${tutorialStep === 1 ? 'ring-2 ring-amber-500/50 animate-pulse' : ''}`}
-        onClick={() => {
-          if (tutorialStep === 0) setSelectedPinId(null);
-        }}
+        className={`flex-1 bg-[#2a2420] rounded-xl border relative overflow-hidden shadow-inner ${
+          currentSeason === 3 ? 'border-rose-900/50' : 'border-[#3a2f29]'
+        }`}
+        onClick={() => { if (tutorialStep === 0) setSelectedPinId(null); }}
       >
-        <div className="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-700/20 via-[#2a2420] to-black" />
-        
-        {/* 背景の同心円グリッド */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
-          <div className="w-[80%] h-[80%] border border-[#8c7a6b]/30 rounded-full absolute" />
-          <div className="w-[50%] h-[50%] border border-[#8c7a6b]/30 rounded-full absolute" />
-          <div className="w-[20%] h-[20%] border border-amber-900/40 rounded-full absolute bg-amber-900/10" />
-        </div>
-
-        {/* 接続線の描画 */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
-          {nodes.map((node) => {
-            if (!node.isCleared) return null;
-            if (!containerRef.current) return null;
-
-            const { clientWidth, clientHeight } = containerRef.current;
-            const centerX = clientWidth / 2;
-            const centerY = clientHeight / 2;
-
-            return (
-              <line
-                key={`line-${node.id}`}
-                x1={node.x}
-                y1={node.y}
-                x2={centerX}
-                y2={centerY}
-                stroke={node.isTruthUnlocked ? '#d97706' : '#5c4d43'}
-                strokeWidth={node.isTruthUnlocked ? 2 : 1}
-                strokeDasharray={node.isTruthUnlocked ? 'none' : '4 4'}
-                className="transition-all duration-1000 ease-in-out"
-              />
-            );
-          })}
-        </svg>
-
-        {/* 中央のコアノード */}
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center pointer-events-none">
-          <div className="w-12 h-12 bg-[#1a1512] border-2 border-amber-700 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(180,83,9,0.3)]">
-            <span className="text-amber-500 font-serif font-bold text-lg">
-              M.C.
-            </span>
-          </div>
-          <span className="mt-2 text-[10px] font-mono text-amber-600 bg-[#1a1512]/80 px-2 py-0.5 rounded tracking-widest border border-amber-900/50 backdrop-blur-sm">
-            THE CORE
-          </span>
-        </div>
-
-        {/* 各事件ノードの配置 */}
-        {nodes.map((node) => {
-          if (!node.isCleared) return null;
-          const isSelected = selectedPinId === node.id;
-          const isErrorShake = errorNodeId === node.id;
-
-          return (
-            <div
-              key={node.id}
-              className={`absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer z-20 transition-all duration-500 ease-out p-4 sm:p-6 ${
-                isErrorShake ? 'animate-[shake_0.4s_ease-in-out]' : ''
-              }`}
-              style={{ left: node.x, top: node.y }}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (tutorialStep > 0) return;
-                
-                setSelectedPinId(node.id);
-                if (!node.isTruthUnlocked) {
-                  setErrorNodeId(node.id);
-                  setTimeout(() => setErrorNodeId(null), 400);
-                }
-              }}
-            >
-              <div
-                className={`w-4 h-4 rounded-full border-2 transition-all duration-300 mx-auto ${
-                  isSelected
-                    ? 'bg-amber-400 border-[#f4ebd8] scale-150 shadow-[0_0_15px_rgba(251,191,36,0.5)]'
-                    : isErrorShake
-                    ? 'bg-rose-500 border-rose-200 scale-125 shadow-[0_0_15px_rgba(244,63,94,0.5)]'
-                    : node.isTruthUnlocked
-                    ? 'bg-amber-700 border-amber-400 hover:scale-125'
-                    : 'bg-[#5c4d43] border-[#8c7a6b] hover:scale-125 hover:bg-[#8c7a6b]'
-                }`}
-              />
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 w-max text-center pointer-events-none">
-                <p className={`text-[9px] font-mono px-1 rounded transition-colors ${
-                  isErrorShake ? 'text-rose-200 bg-rose-900/80' : 'text-[#d8c8b8] bg-[#1a1512]/80'
-                }`}>
-                  {node.source_episode}
-                </p>
+        {/* ▼ フェーズ3（最終決戦）専用の描画 ▼ */}
+        {isS3Phase3 ? (
+          <div className="absolute inset-0 bg-black z-10 flex flex-col items-center justify-center animate-in fade-in duration-1000">
+            {/* 特異点の赤い直線 */}
+            <svg className="absolute inset-0 w-full h-full">
+              <line x1="25%" y1="45%" x2="75%" y2="45%" stroke="#e11d48" strokeWidth="4" className="animate-[pulse_1.5s_ease-in-out_infinite] shadow-[0_0_20px_rgba(225,29,72,1)]" />
+            </svg>
+            
+            <div className="absolute top-[45%] left-[25%] transform -translate-x-1/2 -translate-y-1/2">
+              <div className="w-16 h-16 bg-blue-950 border-2 border-blue-500 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(59,130,246,0.6)]">
+                <span className="text-blue-100 font-serif font-bold text-xs tracking-widest">HOLMES</span>
               </div>
             </div>
-          );
-        })}
+            
+            <div className="absolute top-[45%] left-[75%] transform -translate-x-1/2 -translate-y-1/2">
+              <div className="w-16 h-16 bg-rose-950 border-2 border-rose-600 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(225,29,72,0.8)]">
+                <span className="text-rose-100 font-serif font-bold text-xs tracking-widest">M.C.</span>
+              </div>
+            </div>
 
-        {/* ノード詳細パネル（スマホ画面下部へのスライドイン） */}
-        {selectedNode && (
-          <div
-            className={`absolute bottom-4 left-4 right-4 bg-[#f4ebd8]/95 border-l-4 p-4 rounded-xl shadow-2xl z-30 backdrop-blur-md animate-in slide-in-from-bottom-4 ${
-              selectedNode.isTruthUnlocked ? 'border-amber-600' : 'border-[#8c7a6b]'
+            <div className="absolute bottom-12 text-rose-600 font-mono text-[10px] sm:text-xs tracking-[0.3em] animate-pulse text-center w-full px-4">
+              ALL INFRASTRUCTURE DESTROYED.<br/>ONLY KILLING INTENT REMAINS.
+            </div>
+          </div>
+        ) : (
+          /* ▼ 通常＆フェーズ1/2の描画 ▼ */
+          <>
+            <div className={`absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] ${currentSeason === 3 ? 'from-rose-900/30' : 'from-amber-700/20'} via-[#2a2420] to-black`} />
+            
+            {/* 背景の同心円グリッド */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
+              <div className={`w-[80%] h-[80%] border rounded-full absolute ${currentSeason === 3 ? 'border-rose-900/40' : 'border-[#8c7a6b]/30'}`} />
+              <div className={`w-[50%] h-[50%] border rounded-full absolute ${currentSeason === 3 ? 'border-rose-900/40' : 'border-[#8c7a6b]/30'}`} />
+            </div>
+
+            {/* バグエフェクト（シーズン3） */}
+            {currentSeason === 3 && (
+              <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
+                {fakeLines.map((line, i) => (
+                  <line key={`fake-${i}`} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} stroke="#e11d48" strokeWidth="1" opacity={line.opacity} />
+                ))}
+              </svg>
+            )}
+
+            {/* 正規の接続線 */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
+              {nodes.map((node) => {
+                if (!node.isCleared) return null;
+                if (!containerRef.current) return null;
+                const { clientWidth, clientHeight } = containerRef.current;
+                const centerX = clientWidth / 2;
+                const centerY = clientHeight / 2;
+
+                return (
+                  <line
+                    key={`line-${node.id}`}
+                    x1={node.x} y1={node.y} x2={centerX} y2={centerY}
+                    stroke={currentSeason === 3 ? (node.isDestroyed ? '#3f1d1d' : '#e11d48') : (node.isTruthUnlocked ? '#d97706' : '#5c4d43')}
+                    strokeWidth={currentSeason === 3 ? (node.isDestroyed ? 1 : 2) : (node.isTruthUnlocked ? 2 : 1)}
+                    strokeDasharray={currentSeason === 3 ? (node.isDestroyed ? '4 4' : 'none') : (node.isTruthUnlocked ? 'none' : '4 4')}
+                    className={currentSeason === 3 && !node.isDestroyed ? 'animate-[pulse_0.5s_infinite]' : 'transition-all duration-1000'}
+                  />
+                );
+              })}
+            </svg>
+
+            {/* 中央のコアノード */}
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center pointer-events-none">
+              <div className={`w-12 h-12 bg-[#1a1512] border-2 rounded-full flex items-center justify-center ${currentSeason === 3 ? 'border-rose-700 shadow-[0_0_30px_rgba(225,29,72,0.4)]' : 'border-amber-700 shadow-[0_0_20px_rgba(180,83,9,0.3)]'}`}>
+                <span className={`${currentSeason === 3 ? 'text-rose-500' : 'text-amber-500'} font-serif font-bold text-lg`}>M.C.</span>
+              </div>
+            </div>
+
+            {/* 各事件（インフラ）ノードの配置 */}
+            {nodes.map((node) => {
+              if (!node.isCleared) return null;
+              const isSelected = selectedPinId === node.id;
+              const isErrorShake = errorNodeId === node.id;
+
+              return (
+                <div
+                  key={node.id}
+                  className={`absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer z-20 p-4 sm:p-6 ${isErrorShake ? 'animate-[shake_0.4s_ease-in-out]' : ''}`}
+                  style={{ left: node.x, top: node.y }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (tutorialStep > 0) return;
+                    setSelectedPinId(node.id);
+                    if (!node.isTruthUnlocked) {
+                      setErrorNodeId(node.id);
+                      setTimeout(() => setErrorNodeId(null), 400);
+                    }
+                  }}
+                >
+                  <div className={`w-4 h-4 rounded-full border-2 transition-all duration-300 mx-auto flex items-center justify-center ${
+                    isSelected
+                      ? (currentSeason === 3 ? 'bg-rose-500 border-rose-200 scale-150 shadow-[0_0_20px_rgba(225,29,72,0.8)]' : 'bg-amber-400 border-[#f4ebd8] scale-150 shadow-[0_0_15px_rgba(251,191,36,0.5)]')
+                      : currentSeason === 3
+                        ? (node.isDestroyed ? 'bg-[#1a1512] border-[#3f1d1d]' : 'bg-rose-800 border-rose-400 animate-pulse hover:scale-125')
+                        : (node.isTruthUnlocked ? 'bg-amber-700 border-amber-400 hover:scale-125' : 'bg-[#5c4d43] border-[#8c7a6b] hover:scale-125 hover:bg-[#8c7a6b]')
+                  }`}>
+                    {/* 破壊済みアイコン */}
+                    {currentSeason === 3 && node.isDestroyed && <Flame size={10} className="text-rose-900" />}
+                  </div>
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 w-max text-center pointer-events-none">
+                    <p className={`text-[9px] font-mono px-1.5 py-0.5 rounded transition-colors ${
+                      currentSeason === 3 && node.isDestroyed ? 'text-rose-900 bg-black/80 line-through' : 'text-[#d8c8b8] bg-[#1a1512]/80'
+                    }`}>
+                      {node.source_episode}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        )}
+
+        {/* ノード詳細パネル */}
+        {selectedNode && !isS3Phase3 && (
+          <div className={`absolute bottom-4 left-4 right-4 bg-[#f4ebd8]/95 border-l-4 p-4 rounded-xl shadow-2xl z-30 backdrop-blur-md animate-in slide-in-from-bottom-4 ${
+              currentSeason === 3 ? (selectedNode.isTruthUnlocked ? 'border-rose-900' : 'border-rose-500') : (selectedNode.isTruthUnlocked ? 'border-amber-600' : 'border-[#8c7a6b]')
             }`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-start mb-2 border-b border-[#8c7a6b]/30 pb-2">
               <div>
                 <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full mr-2 ${
-                  selectedNode.isTruthUnlocked ? 'text-amber-800 bg-amber-200/50' : 'text-[#5c4d43] bg-[#d8c8b8]/50'
+                  currentSeason === 3 
+                    ? (selectedNode.isTruthUnlocked ? 'text-rose-200 bg-rose-950' : 'text-rose-900 bg-rose-200')
+                    : (selectedNode.isTruthUnlocked ? 'text-amber-800 bg-amber-200/50' : 'text-[#5c4d43] bg-[#d8c8b8]/50')
                 }`}>
                   {selectedNode.source_episode}
                 </span>
@@ -322,40 +342,37 @@ export default function SpiderWebTab({
                   {selectedNode.id.toUpperCase()}
                 </span>
               </div>
-              <button
-                onClick={() => setSelectedPinId(null)}
-                className="text-[#8c7a6b] hover:text-[#3a2f29] p-1"
-              >
+              <button onClick={() => setSelectedPinId(null)} className="text-[#8c7a6b] hover:text-[#3a2f29] p-1">
                 <X size={16} />
               </button>
             </div>
 
-            <h3 className="font-serif font-bold text-lg text-[#3a2f29] mb-3">
+            <h3 className={`font-serif font-bold text-lg mb-3 ${selectedNode.isTruthUnlocked && currentSeason === 3 ? 'text-rose-900 line-through decoration-rose-500/50' : 'text-[#3a2f29]'}`}>
               {selectedNode.title}
             </h3>
 
             {!selectedNode.isTruthUnlocked ? (
-              <div className="bg-[#e6d5c3]/50 p-3 rounded-lg border border-[#8c7a6b]/20 relative overflow-hidden">
-                <div className="flex items-center gap-2 text-[#8c7a6b] mb-2">
-                  <Lock size={14} className="text-rose-500/80" />
-                  <span className="text-[10px] font-mono uppercase tracking-widest text-rose-500/80">
-                    Encrypted Query
+              <div className={`p-3 rounded-lg border relative overflow-hidden ${currentSeason === 3 ? 'bg-rose-900/10 border-rose-500/30' : 'bg-[#e6d5c3]/50 border-[#8c7a6b]/20'}`}>
+                <div className={`flex items-center gap-2 mb-2 ${currentSeason === 3 ? 'text-rose-600' : 'text-[#8c7a6b]'}`}>
+                  <Lock size={14} />
+                  <span className="text-[10px] font-mono uppercase tracking-widest">
+                    {currentSeason === 3 ? 'Active Infrastructure' : 'Encrypted Query'}
                   </span>
                 </div>
                 <p className="text-sm text-[#5c4d43] italic mb-3 font-serif">
                   {selectedNode.question}
                 </p>
-                <div className="flex items-center justify-end gap-1 text-[9px] text-amber-700 font-mono bg-amber-600/10 py-1.5 px-2 rounded-full w-fit ml-auto border border-amber-600/20">
+                <div className={`flex items-center justify-end gap-1 text-[9px] font-mono py-1.5 px-2 rounded-full w-fit ml-auto border ${currentSeason === 3 ? 'text-rose-600 bg-rose-100 border-rose-200' : 'text-amber-700 bg-amber-600/10 border-amber-600/20'}`}>
                   <AlertCircle size={12} />
-                  大索引で [{selectedNode.required_index_id}] を解読せよ
+                  {currentSeason === 3 ? `[${selectedNode.destroyed_by}] をクリアしてインフラを破壊せよ` : `大索引で [${selectedNode.required_index_id}] を解読せよ`}
                 </div>
               </div>
             ) : (
-              <div className="bg-amber-600/10 p-4 rounded-lg border border-amber-600/20 animate-in fade-in">
-                <div className="flex items-center gap-2 text-amber-700 mb-2">
-                  <Network size={14} />
+              <div className={`p-4 rounded-lg border animate-in fade-in ${currentSeason === 3 ? 'bg-black/5 border-rose-900/30' : 'bg-amber-600/10 border-amber-600/20'}`}>
+                <div className={`flex items-center gap-2 mb-2 ${currentSeason === 3 ? 'text-rose-800' : 'text-amber-700'}`}>
+                  {currentSeason === 3 ? <Flame size={14} /> : <Network size={14} />}
                   <span className="text-[10px] font-mono uppercase tracking-widest font-bold">
-                    Truth Unlocked
+                    {currentSeason === 3 ? 'Infrastructure Destroyed' : 'Truth Unlocked'}
                   </span>
                 </div>
                 <p className="text-sm font-bold text-[#3a2f29] mb-2">

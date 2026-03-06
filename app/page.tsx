@@ -59,17 +59,53 @@ export default function GamePage() {
   };
 
   const handleResetData = () => {
-    if (window.confirm('すべての進捗データと大索引の記録をリセットしますか？')) {
-      localStorage.clear();
-      setHasSaveData(false);
-      setUnlockedTerms([]);
-      setReadTerms([]);
-      setInsightPoints(0);
-      setClearedData({});
-      setUnlockedTruths({});
-      setCurrentSeason(1);
-      setMycroftIntel([]);
-      setCurrentEpisodeId('#00');
+    localStorage.clear();
+    setHasSaveData(false);
+    setUnlockedTerms([]);
+    setReadTerms([]);
+    setInsightPoints(0);
+    setClearedData({});
+    setUnlockedTruths({});
+    setCurrentSeason(1);
+    setMycroftIntel([]);
+    setCurrentEpisodeId('#00');
+    setView('title'); // リセット時はタイトル画面に戻す
+  };
+
+  // ▼ 新規：セーブデータのインポート（復元）処理
+  const handleLoadData = (dataStr: string) => {
+    try {
+      // Base64文字列をデコードしてJSONパース
+      const decoded = atob(dataStr);
+      const saveData = JSON.parse(decoded);
+      
+      // 簡易的なデータ検証
+      if (typeof saveData !== 'object' || !saveData.unlockedTerms || !saveData.clearedData) {
+        return false;
+      }
+
+      // Stateの更新
+      setUnlockedTerms(saveData.unlockedTerms || []);
+      setReadTerms(saveData.readTerms || []);
+      setInsightPoints(saveData.insightPoints || 0);
+      setClearedData(saveData.clearedData || {});
+      setUnlockedTruths(saveData.unlockedTruths || {});
+      setCurrentSeason(saveData.currentSeason || 1);
+      setHasSaveData(true);
+
+      // LocalStorageの更新
+      localStorage.setItem('tether_save_data', 'true');
+      localStorage.setItem('tether_unlocked_terms', JSON.stringify(saveData.unlockedTerms || []));
+      localStorage.setItem('tether_read_terms', JSON.stringify(saveData.readTerms || []));
+      localStorage.setItem('tether_insight_points', (saveData.insightPoints || 0).toString());
+      localStorage.setItem('tether_cleared_data', JSON.stringify(saveData.clearedData || {}));
+      localStorage.setItem('tether_unlocked_truths', JSON.stringify(saveData.unlockedTruths || {}));
+      localStorage.setItem('tether_current_season', (saveData.currentSeason || 1).toString());
+      
+      return true;
+    } catch (e) {
+      console.error("Data load failed", e);
+      return false; // 不正な文字列の場合はfalseを返す
     }
   };
 
@@ -178,18 +214,23 @@ export default function GamePage() {
 
   if (!isInitialized) return <div className="h-[100dvh] bg-slate-900" />;
 
-  // スマホ極限最適化：h-[100dvh] と overscroll-none でネイティブアプリ化
   return (
     <div className="h-[100dvh] w-full bg-slate-900 text-slate-800 font-sans overflow-hidden overscroll-none relative">
       
-      {/* タイトル画面（フェードイン） */}
+      {/* タイトル画面 */}
       {view === 'title' && (
         <div className="absolute inset-0 z-10 animate-in fade-in duration-500">
-          <TitleView hasSaveData={hasSaveData} onStart={handleStartConnection} onReset={handleResetData} />
+          <TitleView 
+            hasSaveData={hasSaveData} 
+            onStart={handleStartConnection} 
+            onReset={handleResetData} 
+            currentSeason={currentSeason}
+            clearedData={clearedData}    
+          />
         </div>
       )}
 
-      {/* ゲーム画面（右からスライドイン） */}
+      {/* ゲーム画面 */}
       {view === 'game' && (
         <div className="absolute inset-0 z-20 bg-slate-900 animate-in slide-in-from-right-8 fade-in duration-300 shadow-2xl">
           <GameView
@@ -206,7 +247,7 @@ export default function GamePage() {
         </div>
       )}
 
-      {/* アーカイブ画面（下からスライドインして重なるモーダル風） */}
+      {/* アーカイブ画面 */}
       {view === 'archive' && (
         <div className="absolute inset-0 z-30 bg-[#f4ebd8] animate-in slide-in-from-bottom-8 fade-in duration-300">
           <ArchiveView
@@ -224,6 +265,8 @@ export default function GamePage() {
             onReadTerm={handleReadTerm}
             onUnlockTruth={handleUnlockTruth}
             onLinkFail={handleLinkFail}
+            onLoadData={handleLoadData}   // ← 追加
+            onResetData={handleResetData} // ← 追加
           />
         </div>
       )}
