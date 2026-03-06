@@ -123,7 +123,7 @@ export default function ChronologyTab({
                     const globalIndex = allEpisodes.findIndex((e: any) => e.id === ep.id);
                     const prevEp = globalIndex > 0 ? allEpisodes[globalIndex - 1] : null;
                     
-                    // 実装状況の判定（仮のモックデータなどを弾く）
+                    // 実装状況の判定
                     const isImplemented = ep.status !== 'locked';
                     
                     // ▼ 解放条件の判定ロジック
@@ -132,6 +132,11 @@ export default function ChronologyTab({
                     if (ep.id.startsWith('SP-') || ep.id.startsWith('Interlude-')) {
                       // SPおよび幕間は個別の特殊条件で解放
                       isPlayable = isImplemented && checkSpecialPlayable(ep.id);
+                    } else if (ep.id === '#39') {
+                      // ▼ 第39話の特別解放条件：第38話クリア ＋ すべてのSPシナリオクリア
+                      const is38Cleared = clearedEpisodes.includes('#38');
+                      const areAllSpCleared = ['SP-01', 'SP-02', 'SP-03', 'SP-04', 'SP-05', 'SP-06'].every(spId => clearedEpisodes.includes(spId));
+                      isPlayable = isImplemented && (!!cData || (is38Cleared && areAllSpCleared));
                     } else {
                       // 通常の本編は、最初のエピソードか、1つ前のエピソードがクリア済みなら解放
                       const isNextPlayable = globalIndex === 0 || (prevEp && clearedData[prevEp.id]);
@@ -147,7 +152,7 @@ export default function ChronologyTab({
                             : 'bg-[#e6d5c3]/40 border-transparent opacity-60'
                         } overflow-hidden transition-all duration-300`}
                       >
-                        {/* タップエリア（大きめ） */}
+                        {/* タップエリア */}
                         <div
                           onClick={() => isPlayable && setExpandedEp(isExpanded ? null : ep.id)}
                           className={`p-4 sm:p-5 flex items-center justify-between ${isPlayable ? 'cursor-pointer active:bg-[#f4ebd8]' : 'cursor-not-allowed'}`}
@@ -195,6 +200,12 @@ export default function ChronologyTab({
                             <p className="text-sm text-[#3a2f29] leading-relaxed font-serif mb-4">
                               {ep.summary || '詳細データがありません。'}
                             </p>
+                            {/* 未クリアで第39話の場合、特殊な警告を表示 */}
+                            {!cData && ep.id === '#39' && (
+                                <p className="text-xs text-rose-600 font-bold mb-4 font-mono bg-rose-100/50 p-2 rounded border border-rose-200">
+                                  [SYSTEM] 全てのSPシナリオクリアを確認。最終決戦のロックが解除されました。
+                                </p>
+                            )}
                             {cData && (
                               <div className="flex justify-between items-center mt-4">
                                 <button

@@ -106,7 +106,6 @@ export default function GameView({
   const [isInterruptMode, setIsInterruptMode] = useState(false);
   const [screenEffect, setScreenEffect] = useState<'none' | 'flash' | 'shake' | 'glass-shatter'>('none');
   const [isWigginsActive, setIsWigginsActive] = useState(false);
-  const [ireneUsed, setIreneUsed] = useState(false);
 
   const isReplay = Boolean(clearedData[episodeId]);
 
@@ -117,7 +116,24 @@ export default function GameView({
     uiLabels, isMoriarty, isIrene
   } = useGameLogic(scenarioData as ScenarioData, isReplay);
 
-  const canUseIrene = unlockedTerms.includes('I007') && !isIrene; 
+  // 介入システムの状態管理
+  const rawIntervention = scenarioData.meta?.intervention;
+  const interventionType = ['Irene', 'Mycroft', 'Wiggins'].includes(rawIntervention as string) 
+    ? (rawIntervention as 'Irene' | 'Mycroft' | 'Wiggins') 
+    : null;
+
+  const isInterventionAvailable = 
+    interventionType === 'Irene' ? (unlockedTerms.includes('I007') && !isIrene && !isMoriarty) :
+    interventionType === 'Mycroft' ? (!isIrene && !isMoriarty) : // マイクロフトは無条件で介入可能
+    interventionType === 'Wiggins' ? (unlockedTerms.includes('W040') && !isIrene && !isMoriarty) :
+    false;
+
+  const [interventionUsed, setInterventionUsed] = useState(false);
+
+  // エピソードが変わったら介入状態をリセット
+  useEffect(() => {
+    setInterventionUsed(false);
+  }, [episodeId]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
@@ -218,8 +234,8 @@ export default function GameView({
     return elements;
   };
 
-  const latestSystemBeat = beats.slice(0, beatIndex + 1).reverse().find((b: any) => b.speaker === 'System');
-  const chatHistory = beats.slice(0, beatIndex + 1).filter((b: any) => b.speaker !== 'System');
+  // ▼ 修正点：Systemのメッセージも含めたすべてのビートをチャットログに流す
+  const chatHistory = beats.slice(0, beatIndex + 1);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     isScrollingRef.current = false;
@@ -252,6 +268,7 @@ export default function GameView({
       {screenEffect === 'flash' && <div className="absolute inset-0 bg-white z-[60] animate-out fade-out duration-500 pointer-events-none mix-blend-overlay" />}
       {screenEffect === 'shake' && <div className="absolute inset-0 bg-rose-900/20 z-[60] animate-out fade-out duration-500 pointer-events-none" />}
       
+      {/* シーズン3用のノイズクリアエフェクト */}
       {screenEffect === 'glass-shatter' && (
         <div className="absolute inset-0 z-[60] pointer-events-none flex items-center justify-center overflow-hidden">
           <div className="absolute inset-0 bg-white/80 animate-out fade-out duration-700 mix-blend-overlay" />
@@ -261,6 +278,7 @@ export default function GameView({
         </div>
       )}
 
+      {/* TetherBar */}
       <TetherBar tether={tether} onArchiveClick={onBack} protagonist={protagonist} gaugeName={uiLabels.gaugeName} />
 
       <div
@@ -271,16 +289,7 @@ export default function GameView({
       >
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-[#3a2f29] to-transparent" />
 
-        {latestSystemBeat && (
-          <div className="p-4 sm:p-5 bg-[#e6d5c3] border-b border-[#8c7a6b]/30 shadow-sm flex-shrink-0 z-10 animate-in fade-in slide-in-from-top-2">
-            <h2 className="text-[10px] font-bold text-[#8c7a6b] mb-1.5 uppercase tracking-widest font-mono">
-              Scene Context : {episodeId}
-            </h2>
-            <p className="text-sm sm:text-base text-[#5c4d43] italic font-serif leading-relaxed">
-              {renderText((latestSystemBeat.text || "").replace(/\[<NOISE>\]/g, ''))}
-            </p>
-          </div>
-        )}
+        {/* 修正点：System専用の固定ヘッダーエリアを削除。すべて下記のchatHistory内に描画されます */}
 
         <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar relative">
           {chatHistory.map((beat: any) => {
@@ -305,6 +314,7 @@ export default function GameView({
           <div ref={bottomRef} className="h-20" />
         </div>
 
+        {/* 下段の虫眼鏡（WIGGINS EYE：通常調査時用） */}
         {!isStreaming && hasUncollectedEvidence && !isInterruptMode && !isWigginsActive && unlockedTerms.includes('W040') && (
           <div className="absolute bottom-6 right-6 z-20 animate-in fade-in zoom-in duration-300">
              <button
@@ -312,7 +322,7 @@ export default function GameView({
                 disabled={insightPoints < 1}
                 className="bg-amber-700 hover:bg-amber-600 disabled:bg-[#d8c8b8] disabled:text-[#8c7a6b] disabled:cursor-not-allowed text-white text-[10px] sm:text-xs font-bold px-4 py-3 rounded-full shadow-lg flex items-center gap-1.5 transition-transform active:scale-95"
              >
-                <Eye size={16} /> WIGGINS (1pt)
+                <Eye size={16} /> WIGGINS EYE (1pt)
              </button>
           </div>
         )}
@@ -345,9 +355,10 @@ export default function GameView({
           <InterruptPanel
             collectedEvidences={collectedEvidence}
             hintText={currentBeat?.interrupt?.hint}
-            canUseIrene={canUseIrene}
-            ireneUsed={ireneUsed}
-            onUseIrene={() => setIreneUsed(true)}
+            interventionType={interventionType}
+            isInterventionAvailable={isInterventionAvailable}
+            interventionUsed={interventionUsed}
+            onUseIntervention={() => setInterventionUsed(true)}
             onSubmit={(skill, evidence) => {
               if (evidence) handleSelectEvidence(evidence);
               setTimeout(() => handleInterrupt(skill), 10);

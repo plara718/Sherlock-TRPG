@@ -24,6 +24,7 @@ export type ScenarioData = {
     world_state: any;
     type?: 'normal' | 'cutscene' | 'interlude'; // 拡張
     protagonist?: string; 
+    intervention?: string; // ← 追加：介入NPCの指定
   };
   consequence?: { 
     official_record?: string;
@@ -33,7 +34,7 @@ export type ScenarioData = {
       abyss?: string;
     };
     holmes_note?: string;
-    // ▼ 動的なキー（mycroft_noteなど）を許容
+    // 動的なキー（mycroft_noteなど）を許容
     [key: string]: any; 
   };
   beats: ScenarioBeat[];
@@ -64,7 +65,7 @@ export function useGameLogic(
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'fail' | 'penalty';
     msg: string;
-    isCriticalSuccess?: boolean; // ▼ UIエフェクト用のトリガーを追加
+    isCriticalSuccess?: boolean; // UIエフェクト用のトリガーを追加
   } | null>(null);
 
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
@@ -74,7 +75,7 @@ export function useGameLogic(
 
   const [isCompleted, setIsCompleted] = useState(false);
   
-  // ▼ リザルトの型を柔軟に変更
+  // リザルトの型を柔軟に変更
   const [endResult, setEndResult] = useState<{
     rank: string;
     points: number;
@@ -85,7 +86,7 @@ export function useGameLogic(
   const currentTextIndex = useRef(0);
   const tetherRef = useRef(initialTether);
 
-  // ▼ UI表示用の動的ラベルを生成
+  // UI表示用の動的ラベルを生成
   const uiLabels = {
     gaugeName: isMoriarty ? 'DOMINATION' : (isIrene ? 'CONTROL' : 'TETHER'),
     actionButton: isMoriarty ? 'REWRITE EQUATION' : (isIrene ? 'COUNTER' : 'TETHER THE GENIUS'),
@@ -245,7 +246,7 @@ export function useGameLogic(
         setFeedback({
           type: 'success',
           msg: `[${skill}] ${currentBeat.interrupt.success_msg}（${uiLabels.gaugeName} +15）`,
-          isCriticalSuccess: true, // ▼ シーズン3で画面を割るエフェクト用フラグ
+          isCriticalSuccess: true, // シーズン3で画面を割るエフェクト用フラグ
         });
         updateTether(TETHER_REWARD_SUCCESS);
 
@@ -284,7 +285,7 @@ export function useGameLogic(
     if (!isResolved && !isInterlude) {
       if (currentBeat.interrupt) {
         setIsResolved(true);
-        // Timeout扱いとしての処理（簡略化してevaluatePanelInterruptのロジックに任せても良いですが、既存踏襲）
+        // Timeout扱いとしての処理
         evaluatePanelInterrupt('TIMEOUT', null);
         return;
       } else if (selectedSkill) {
@@ -301,14 +302,14 @@ export function useGameLogic(
     if (beatIndex < beats.length - 1) {
       setBeatIndex((prev) => prev + 1);
     } else {
-      // ▼ エンディング処理
+      // エンディング処理
       if (scenarioData.meta.type === 'cutscene') {
         setEndResult(null); 
         setIsCompleted(true);
         return;
       }
 
-      // 幕間（Interlude）の場合は無条件で「STORY_CLEARED」等の専用ランクとし、テキストをそのまま出力
+      // 幕間（Interlude）の場合は無条件で専用ランクとし、テキストをそのまま出力
       if (isInterlude) {
         setEndResult({
           rank: 'CLEARED',
@@ -347,7 +348,7 @@ export function useGameLogic(
         }
       }
 
-      // conseguenzaDataを再構築してUIに渡す
+      // consequenceDataを再構築してUIに渡す
       const finalConsequence = {
         ...scenarioData.consequence,
         watson_journal: journalText, // ランクに応じたテキストだけを渡す
@@ -390,6 +391,6 @@ export function useGameLogic(
     endResult,
     isMoriarty,
     isIrene,
-    uiLabels, // ▼ UI側でボタン名などに使用
+    uiLabels, 
   };
 }

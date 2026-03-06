@@ -1,27 +1,29 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldAlert, Fingerprint, BrainCircuit, HeartHandshake, Clock, HelpCircle, Sparkles } from 'lucide-react';
+import { ShieldAlert, Fingerprint, BrainCircuit, HeartHandshake, Clock, HelpCircle, Sparkles, Mail, Users } from 'lucide-react';
 
 type InterruptPanelProps = {
   collectedEvidences: string[];
   hintText?: string;
-  canUseIrene?: boolean; 
-  ireneUsed?: boolean;   
-  onUseIrene?: () => void; 
+  interventionType?: 'Irene' | 'Mycroft' | 'Wiggins' | null;
+  isInterventionAvailable?: boolean;
+  interventionUsed?: boolean;
+  onUseIntervention?: () => void;
   onSubmit: (skill: string, evidence: string | null) => void;
   onTimeUp: () => void;
   protagonist?: string;
-  uiLabels: { gaugeName: string; actionButton: string }; // ← 追加
-  isMoriarty?: boolean; // ← 追加
+  uiLabels: { gaugeName: string; actionButton: string };
+  isMoriarty?: boolean;
 };
 
 export default function InterruptPanel({
   collectedEvidences,
   hintText,
-  canUseIrene,
-  ireneUsed,
-  onUseIrene,
+  interventionType,
+  isInterventionAvailable,
+  interventionUsed,
+  onUseIntervention,
   onSubmit,
   onTimeUp,
   protagonist = 'watson',
@@ -54,7 +56,7 @@ export default function InterruptPanel({
       isMoriarty ? 'border-fuchsia-900' : isIrene ? 'border-fuchsia-800' : 'border-rose-800'
     }`}>
       
-      {/* 背景の薄い警告ノイズ */}
+      {/* 背景ノイズ */}
       <div className={`absolute inset-0 opacity-10 pointer-events-none bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(159,18,57,0.2)_10px,rgba(159,18,57,0.2)_20px)] ${
         isMoriarty || isIrene ? 'hue-rotate-[280deg]' : ''
       }`} />
@@ -121,42 +123,70 @@ export default function InterruptPanel({
           </button>
         </div>
 
-        {/* 証拠選択とヒント */}
+        {/* 証拠選択とヒント（介入機能） */}
         <div className="mb-6">
           <div className="text-[10px] sm:text-xs text-[#8c7a6b] font-mono mb-3 flex justify-between items-center">
             <span className="tracking-widest">SELECT EVIDENCE:</span>
             
-            {hintText && !canUseIrene && !isMoriarty && (
+            {/* 通常のヒント（介入キャラがいない場合） */}
+            {hintText && !isInterventionAvailable && !isMoriarty && (
               <button onClick={() => setShowHint(!showHint)} className="text-amber-600 flex items-center gap-1 hover:text-amber-500 bg-amber-900/20 px-2 py-0.5 rounded-full border border-amber-900/50">
                 <HelpCircle size={12} /> HINT
               </button>
             )}
             
-            {/* アイリーン視点・モリアーティ視点の時は、囁き機能を使えなくする */}
-            {canUseIrene && !ireneUsed && !isIrene && !isMoriarty && (
+            {/* 介入機能ボタン */}
+            {isInterventionAvailable && !interventionUsed && !isMoriarty && (
               <button 
-                onClick={() => { setShowHint(true); if (onUseIrene) onUseIrene(); }} 
-                className="text-fuchsia-400 flex items-center gap-1.5 font-bold animate-pulse px-3 py-1 border border-fuchsia-800 rounded-full bg-fuchsia-900/30 hover:bg-fuchsia-900/50 active:scale-95 shadow-[0_0_10px_rgba(192,38,211,0.2)]"
+                onClick={() => { setShowHint(true); if (onUseIntervention) onUseIntervention(); }} 
+                className={`flex items-center gap-1.5 font-bold animate-pulse px-3 py-1 border rounded-full active:scale-95 shadow-md transition-colors ${
+                  interventionType === 'Irene' ? 'text-fuchsia-400 border-fuchsia-800 bg-fuchsia-900/30 hover:bg-fuchsia-900/50 shadow-[0_0_10px_rgba(192,38,211,0.2)]' :
+                  interventionType === 'Mycroft' ? 'text-blue-400 border-blue-800 bg-blue-900/30 hover:bg-blue-900/50 shadow-[0_0_10px_rgba(59,130,246,0.2)]' :
+                  'text-amber-500 border-amber-700 bg-amber-900/30 hover:bg-amber-900/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                }`}
               >
-                <Sparkles size={12} /> IRENE'S WHISPER
+                {interventionType === 'Irene' && <Sparkles size={12} />}
+                {interventionType === 'Mycroft' && <Mail size={12} />}
+                {interventionType === 'Wiggins' && <Users size={12} />}
+                {interventionType === 'Irene' ? "IRENE'S WHISPER" : 
+                 interventionType === 'Mycroft' ? "MYCROFT'S CABLE" : 
+                 "WIGGINS' INFO"}
               </button>
             )}
             
-            {canUseIrene && ireneUsed && !isIrene && !isMoriarty && (
-              <span className="text-fuchsia-900 flex items-center gap-1 font-bold opacity-60">
-                 <Sparkles size={12} /> IRENE (USED)
+            {/* 介入機能使用済み状態 */}
+            {isInterventionAvailable && interventionUsed && !isMoriarty && (
+              <span className={`flex items-center gap-1 font-bold opacity-60 ${
+                  interventionType === 'Irene' ? 'text-fuchsia-900' :
+                  interventionType === 'Mycroft' ? 'text-blue-900' :
+                  'text-amber-900'
+              }`}>
+                 {interventionType === 'Irene' && <Sparkles size={12} />}
+                 {interventionType === 'Mycroft' && <Mail size={12} />}
+                 {interventionType === 'Wiggins' && <Users size={12} />}
+                 {interventionType === 'Irene' ? "IRENE (USED)" : 
+                  interventionType === 'Mycroft' ? "MYCROFT (USED)" : 
+                  "WIGGINS (USED)"}
               </span>
             )}
           </div>
           
+          {/* ヒント文の表示 */}
           {showHint && hintText && (
-            <div className={`p-3 sm:p-4 mb-4 rounded-lg text-[10px] sm:text-xs font-serif leading-relaxed animate-in fade-in slide-in-from-top-2 shadow-inner ${
-              ireneUsed ? 'bg-fuchsia-950/50 text-fuchsia-200 border border-fuchsia-800/50' : 'bg-[#2a2420] text-amber-200 border border-amber-900/50'
+            <div className={`p-3 sm:p-4 mb-4 rounded-lg text-[10px] sm:text-xs font-serif leading-relaxed animate-in fade-in slide-in-from-top-2 shadow-inner border ${
+              interventionUsed && interventionType === 'Irene' ? 'bg-fuchsia-950/50 text-fuchsia-200 border-fuchsia-800/50' : 
+              interventionUsed && interventionType === 'Mycroft' ? 'bg-blue-950/50 text-blue-200 border-blue-800/50' :
+              interventionUsed && interventionType === 'Wiggins' ? 'bg-amber-950/50 text-amber-200 border-amber-800/50' :
+              'bg-[#2a2420] text-amber-200 border-amber-900/50'
             }`}>
-              {ireneUsed ? `「あら、見逃しているわよワトスン先生。彼の目は節穴ね…… ${hintText}」` : hintText}
+              {interventionUsed && interventionType === 'Irene' ? `「あら、見逃しているわよワトスン先生。彼の目は節穴ね…… ${hintText}」` : 
+               interventionUsed && interventionType === 'Mycroft' ? `『弟よ、感情を排して盤面を見ろ。…… ${hintText}』` :
+               interventionUsed && interventionType === 'Wiggins' ? `「旦那、こいつが怪しいぜ！…… ${hintText}」` :
+               hintText}
             </div>
           )}
 
+          {/* 証拠ボタンリスト */}
           <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto custom-scrollbar">
             {collectedEvidences.length === 0 && (
               <span className="text-xs text-[#5c4d43] italic font-serif">No evidence collected...</span>
