@@ -51,6 +51,10 @@ import episode37 from '@/data/episode_37.json';
 import episode38 from '@/data/episode_38.json';
 import episode39 from '@/data/episode_39.json';
 import episode40 from '@/data/episode_40.json';
+import episode41 from '@/data/episode_41.json';
+import episode42 from '@/data/episode_42.json';
+import episode43 from '@/data/episode_43.json';
+import episode44 from '@/data/episode_44.json';
 
 // 幕間（Interlude）
 import interludeS1 from '@/data/interlude_s1.json';
@@ -79,7 +83,8 @@ const SCENARIOS: Record<string, any> = {
   '#28': episode28, '#29': episode29, '#30': episode30, '#31': episode31,
   '#32': episode32, '#33': episode33, '#34': episode34, '#35': episode35,
   '#36': episode36, '#37': episode37, '#38': episode38, '#39': episode39,
-  '#40': episode40,
+  '#40': episode40, '#41': episode41, '#42': episode42, '#43': episode43,
+  '#44': episode44,
   'Interlude-S1': interludeS1, 'Interlude-S2': interludeS2, 'Interlude-S3': interludeS3,
   'SP-01': episodeSp01, 'SP-02': episodeSp02, 'SP-03': episodeSp03,
   'SP-04': episodeSp04, 'SP-05': episodeSp05, 'SP-06': episodeSp06,
