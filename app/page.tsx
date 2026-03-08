@@ -4,12 +4,14 @@ import React, { useEffect, useState } from 'react';
 import TitleView from '@/components/TitleView';
 import GameView from '@/components/GameView';
 import ArchiveView from '@/components/ArchiveView';
+import EndRollView from '@/components/EndRollView'; // 新規追加
 import glossaryData from '@/data/glossary.json';
 
 type ClearedData = { [epId: string]: { rank: string; tether: number } };
 
 export default function GamePage() {
-  const [view, setView] = useState<'title' | 'game' | 'archive'>('title');
+  // ▼ 状態に 'endroll' を追加
+  const [view, setView] = useState<'title' | 'game' | 'archive' | 'endroll'>('title');
   const [hasSaveData, setHasSaveData] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [currentEpisodeId, setCurrentEpisodeId] = useState<string>('#00');
@@ -106,7 +108,6 @@ export default function GamePage() {
   };
 
   const triggerMycroftIntel = (epId: string) => {
-    // ▼ 修正点：Season 4のエピソードID変更に伴い、#46→#44、#58→#50に変更
     const mycroftEps = ['#04', '#16', '#24', '#39', '#44', '#50'];
     
     if (mycroftEps.includes(epId) && !mycroftIntel.includes(epId)) {
@@ -155,6 +156,12 @@ export default function GamePage() {
     setInsightPoints(newPoints);
     localStorage.setItem('tether_insight_points', newPoints.toString());
 
+    // ▼ 新規：最終話（#50）クリア時はエンドロールへ
+    if (epId === '#50' && !isAlreadyCleared) {
+      setView('endroll');
+      return; // アラートやアーカイブへの遷移をスキップ
+    }
+
     if (epId === '#13' && !isAlreadyCleared && currentSeason < 2) {
       setCurrentSeason(2);
       localStorage.setItem('tether_current_season', '2');
@@ -168,6 +175,7 @@ export default function GamePage() {
       localStorage.setItem('tether_current_season', '4');
       alert("【Season 3: 決戦 - CLEAR】\nライヘンバッハの滝での死闘を越え、伝説が帰還します。\n（Season 4: エピローグ）のロックが解除されました。");
     }
+    
     setView('archive');
   };
 
@@ -265,6 +273,18 @@ export default function GamePage() {
             onLinkFail={handleLinkFail}
             onLoadData={handleLoadData}
             onResetData={handleResetData}
+          />
+        </div>
+      )}
+
+      {/* エンドロール画面（新規追加） */}
+      {view === 'endroll' && (
+        <div className="absolute inset-0 z-40 bg-[#1a1512] animate-in fade-in duration-1000">
+          <EndRollView
+            unlockedTerms={unlockedTerms}
+            clearedData={clearedData}
+            insightPoints={insightPoints}
+            onBackToTitle={() => setView('title')}
           />
         </div>
       )}
