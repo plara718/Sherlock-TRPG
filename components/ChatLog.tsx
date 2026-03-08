@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 
 type ChatLogProps = {
   speaker: string;
@@ -41,9 +42,11 @@ export default function ChatLog({ speaker, text, feedback }: ChatLogProps) {
           {/* アイコン表示エリア */}
           <div className="shrink-0 mt-1">
             {iconPath ? (
-              <img 
+              <Image 
                 src={iconPath} 
                 alt={speaker} 
+                width={48}
+                height={48}
                 className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-[#8c7a6b] shadow-md object-cover bg-[#1a1512]"
               />
             ) : (

@@ -51,10 +51,18 @@ import episode37 from '@/data/episode_37.json';
 import episode38 from '@/data/episode_38.json';
 import episode39 from '@/data/episode_39.json';
 import episode40 from '@/data/episode_40.json';
+
+// Season 4 エピソード
 import episode41 from '@/data/episode_41.json';
 import episode42 from '@/data/episode_42.json';
 import episode43 from '@/data/episode_43.json';
 import episode44 from '@/data/episode_44.json';
+//import episode45 from '@/data/episode_45.json';
+//import episode46 from '@/data/episode_46.json';
+//import episode47 from '@/data/episode_47.json';
+//import episode48 from '@/data/episode_48.json';
+//import episode49 from '@/data/episode_49.json';
+//import episode50 from '@/data/episode_50.json';
 
 // 幕間（Interlude）
 import interludeS1 from '@/data/interlude_s1.json';
@@ -84,7 +92,9 @@ const SCENARIOS: Record<string, any> = {
   '#32': episode32, '#33': episode33, '#34': episode34, '#35': episode35,
   '#36': episode36, '#37': episode37, '#38': episode38, '#39': episode39,
   '#40': episode40, '#41': episode41, '#42': episode42, '#43': episode43,
-  '#44': episode44,
+  '#44': episode44, 
+  //'#45': episode45, '#46': episode46, '#47': episode47,
+  //'#48': episode48, '#49': episode49, '#50': episode50,
   'Interlude-S1': interludeS1, 'Interlude-S2': interludeS2, 'Interlude-S3': interludeS3,
   'SP-01': episodeSp01, 'SP-02': episodeSp02, 'SP-03': episodeSp03,
   'SP-04': episodeSp04, 'SP-05': episodeSp05, 'SP-06': episodeSp06,
@@ -112,7 +122,6 @@ export default function GameView({
   const [screenEffect, setScreenEffect] = useState<'none' | 'flash' | 'shake' | 'glass-shatter'>('none');
   const [isWigginsActive, setIsWigginsActive] = useState(false);
 
-  // ▼ 新規：Tether 0% 状態の管理
   const [isSanityZero, setIsSanityZero] = useState(false);
 
   const isReplay = Boolean(clearedData[episodeId]);
@@ -124,7 +133,6 @@ export default function GameView({
     uiLabels, isMoriarty, isIrene
   } = useGameLogic(scenarioData as ScenarioData, isReplay);
 
-  // 介入システムの状態管理
   const rawIntervention = scenarioData.meta?.intervention;
   const interventionType = ['Irene', 'Mycroft', 'Wiggins'].includes(rawIntervention as string) 
     ? (rawIntervention as 'Irene' | 'Mycroft' | 'Wiggins') 
@@ -143,7 +151,6 @@ export default function GameView({
     setIsSanityZero(false);
   }, [episodeId]);
 
-  // ▼ Tether 0% の監視
   useEffect(() => {
     if (tether <= 0 && !isCompleted && !isInterlude(scenarioData)) {
       setIsSanityZero(true);
@@ -152,7 +159,6 @@ export default function GameView({
     }
   }, [tether, isCompleted, scenarioData]);
 
-  // 幕間判定用ヘルパー
   const isInterlude = (data: any) => data.meta?.type === 'interlude' || data.meta?.episode_id?.includes('Interlude');
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -300,12 +306,9 @@ export default function GameView({
         </div>
       )}
 
-      {/* ▼ 発狂（Tether 0%）時のノイズオーバーレイ ▼ */}
       {isSanityZero && !isCompleted && (
         <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden mix-blend-multiply opacity-50 flex flex-col">
-           {/* ノイズスキャンライン */}
            <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(225,29,72,0.1)_2px,rgba(225,29,72,0.1)_4px)] animate-[pulse_0.1s_infinite]" />
-           {/* 警告バナー */}
            <div className="absolute top-[20%] w-full bg-rose-600/20 border-y-2 border-rose-600 text-rose-500 font-mono font-bold text-center py-2 tracking-[0.3em] backdrop-blur-sm animate-[pulse_1.5s_infinite] shadow-[0_0_20px_rgba(225,29,72,0.5)]">
              <AlertTriangle className="inline-block mr-2 w-5 h-5 mb-1" />
              WARNING: SANITY COMPROMISED
@@ -340,7 +343,6 @@ export default function GameView({
                   speaker={beat.speaker} 
                   text={renderText(cleanText)} 
                   feedback={isCurrent ? feedback : null} 
-                  // ChatLog 側で isSanityZero を受け取れるよう拡張するならここに追加可能
                 />
               </div>
             );
@@ -461,7 +463,7 @@ export default function GameView({
                 {endResult.consequenceData?.watson_journal && (
                   <div className="p-4 rounded-lg border border-[#8c7a6b]/30 bg-[#fffcf7] shadow-sm">
                     <h3 className="font-bold text-[#3a2f29] mb-2 border-b border-[#8c7a6b]/20 pb-1 text-xs uppercase tracking-widest">
-                      {isIrene ? "Irene's Journal" : "Watson's Journal"}
+                      {isIrene ? "Irene&apos;s Journal" : "Watson&apos;s Journal"}
                     </h3>
                     <p className="text-sm leading-relaxed text-[#5c4d43]">{endResult.consequenceData.watson_journal}</p>
                   </div>
@@ -469,7 +471,7 @@ export default function GameView({
                 {endResult.consequenceData?.holmes_note && (
                   <div className="p-4 rounded-lg bg-amber-600/5 border border-amber-700/20 shadow-sm">
                     <h3 className="font-bold text-amber-900 mb-1.5 italic text-xs uppercase tracking-widest">
-                      {isMoriarty ? "M.C. Report :" : "Holmes's Note :"}
+                      {isMoriarty ? "M.C. Report :" : "Holmes&apos;s Note :"}
                     </h3>
                     <p className="text-sm leading-relaxed italic text-amber-800/90">{endResult.consequenceData.holmes_note}</p>
                   </div>
@@ -477,7 +479,7 @@ export default function GameView({
                 {endResult.consequenceData?.mycroft_note && (
                   <div className="p-4 rounded-lg bg-blue-900/5 border border-blue-900/20 shadow-sm">
                     <h3 className="font-bold text-blue-900 mb-1.5 italic text-xs uppercase tracking-widest">
-                      Mycroft's Note :
+                      Mycroft&apos;s Note :
                     </h3>
                     <p className="text-sm leading-relaxed italic text-blue-900/90">{endResult.consequenceData.mycroft_note}</p>
                   </div>
