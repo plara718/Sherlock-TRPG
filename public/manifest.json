@@ -1,17 +1,23 @@
 {
-    "name": "TETHER: Sherlock Holmes TRPG",
-    "short_name": "TETHER",
-    "description": "Connect to the mind of Sherlock Holmes.",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#1a1512",
-    "theme_color": "#1a1512",
-    "icons": [
-      {
-        "src": "/images/app_icon.png",
-        "sizes": "512x512",
-        "type": "image/png",
-        "purpose": "any maskable"
-      }
-    ]
-  }
+  "name": "TETHER: Sherlock Holmes TRPG",
+  "short_name": "TETHER",
+  "description": "Connect to the mind of Sherlock Holmes.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1512",
+  "theme_color": "#1a1512",
+  "icons": [
+    {
+      "src": "/images/app_icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/app_icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
