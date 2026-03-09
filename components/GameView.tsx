@@ -9,95 +9,8 @@ import ChatLog from '@/components/ChatLog';
 import { useGameLogic, ScenarioData } from '@/lib/useGameLogic';
 import { FileText, ArrowRight, Eye, AlertTriangle } from 'lucide-react';
 
-// 本編エピソード
-import episode00 from '@/data/episode_00.json';
-import episode01 from '@/data/episode_01.json';
-import episode02 from '@/data/episode_02.json';
-import episode03 from '@/data/episode_03.json';
-import episode04 from '@/data/episode_04.json';
-import episode05 from '@/data/episode_05.json';
-import episode06 from '@/data/episode_06.json';
-import episode07 from '@/data/episode_07.json';
-import episode08 from '@/data/episode_08.json';
-import episode09 from '@/data/episode_09.json';
-import episode10 from '@/data/episode_10.json';
-import episode11 from '@/data/episode_11.json';
-import episode12 from '@/data/episode_12.json';
-import episode13 from '@/data/episode_13.json';
-import episode14 from '@/data/episode_14.json';
-import episode15 from '@/data/episode_15.json';
-import episode16 from '@/data/episode_16.json';
-import episode17 from '@/data/episode_17.json';
-import episode18 from '@/data/episode_18.json';
-import episode19 from '@/data/episode_19.json';
-import episode20 from '@/data/episode_20.json';
-import episode21 from '@/data/episode_21.json';
-import episode22 from '@/data/episode_22.json';
-import episode23 from '@/data/episode_23.json';
-import episode24 from '@/data/episode_24.json';
-import episode25 from '@/data/episode_25.json';
-import episode26 from '@/data/episode_26.json';
-import episode27 from '@/data/episode_27.json';
-import episode28 from '@/data/episode_28.json';
-import episode29 from '@/data/episode_29.json';
-import episode30 from '@/data/episode_30.json';
-import episode31 from '@/data/episode_31.json';
-import episode32 from '@/data/episode_32.json';
-import episode33 from '@/data/episode_33.json';
-import episode34 from '@/data/episode_34.json';
-import episode35 from '@/data/episode_35.json';
-import episode36 from '@/data/episode_36.json';
-import episode37 from '@/data/episode_37.json';
-import episode38 from '@/data/episode_38.json';
-import episode39 from '@/data/episode_39.json';
-import episode40 from '@/data/episode_40.json';
-
-// Season 4 エピソード
-import episode41 from '@/data/episode_41.json';
-import episode42 from '@/data/episode_42.json';
-import episode43 from '@/data/episode_43.json';
-import episode44 from '@/data/episode_44.json';
-import episode45 from '@/data/episode_45.json';
-import episode46 from '@/data/episode_46.json';
-import episode47 from '@/data/episode_47.json';
-import episode48 from '@/data/episode_48.json';
-import episode49 from '@/data/episode_49.json';
-import episode50 from '@/data/episode_50.json';
-
-// 幕間（Interlude）
-import interludeS1 from '@/data/interlude_s1.json';
-import interludeS2 from '@/data/interlude_s2.json';
-import interludeS3 from '@/data/interlude_s3.json';
-
-// SPエピソード
-import episodeSp01 from '@/data/episode_sp01.json';
-import episodeSp02 from '@/data/episode_sp02.json';
-import episodeSp03 from '@/data/episode_sp03.json';
-import episodeSp04 from '@/data/episode_sp04.json';
-import episodeSp05 from '@/data/episode_sp05.json';
-import episodeSp06 from '@/data/episode_sp06.json';
-
-// 大索引データ
+// 大索引データ（これはゲーム全体で即座に使うため静的インポートのまま）
 import glossaryData from '@/data/glossary.json';
-
-const SCENARIOS: Record<string, any> = {
-  '#00': episode00, '#01': episode01, '#02': episode02, '#03': episode03,
-  '#04': episode04, '#05': episode05, '#06': episode06, '#07': episode07,
-  '#08': episode08, '#09': episode09, '#10': episode10, '#11': episode11,
-  '#12': episode12, '#13': episode13, '#14': episode14, '#15': episode15,
-  '#16': episode16, '#17': episode17, '#18': episode18, '#19': episode19,
-  '#20': episode20, '#21': episode21, '#22': episode22, '#23': episode23,
-  '#24': episode24, '#25': episode25, '#26': episode26, '#27': episode27,
-  '#28': episode28, '#29': episode29, '#30': episode30, '#31': episode31,
-  '#32': episode32, '#33': episode33, '#34': episode34, '#35': episode35,
-  '#36': episode36, '#37': episode37, '#38': episode38, '#39': episode39,
-  '#40': episode40, '#41': episode41, '#42': episode42, '#43': episode43,
-  '#44': episode44, '#45': episode45, '#46': episode46, '#47': episode47,
-  '#48': episode48, '#49': episode49, '#50': episode50,
-  'Interlude-S1': interludeS1, 'Interlude-S2': interludeS2, 'Interlude-S3': interludeS3,
-  'SP-01': episodeSp01, 'SP-02': episodeSp02, 'SP-03': episodeSp03,
-  'SP-04': episodeSp04, 'SP-05': episodeSp05, 'SP-06': episodeSp06,
-};
 
 type GameViewProps = {
   episodeId: string;
@@ -110,10 +23,76 @@ type GameViewProps = {
   onEpisodeComplete: (epId: string, rank: string, tether: number, points: number) => void;
 };
 
-export default function GameView({
-  episodeId, onBack, unlockedTerms, setUnlockedTerms, clearedData, insightPoints, onSpendPoint, onEpisodeComplete,
-}: GameViewProps) {
-  const scenarioData = SCENARIOS[episodeId] || SCENARIOS['#00'];
+// ▼ 1. 動的インポートを管理するラッパーコンポーネント ▼
+export default function GameView(props: GameViewProps) {
+  const [scenarioData, setScenarioData] = useState<any>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    setScenarioData(null); // エピソードが切り替わったら一度リセット
+    setError(false);
+
+    const fetchScenario = async () => {
+      try {
+        let fileName = '';
+        if (props.episodeId.startsWith('Interlude')) {
+          fileName = `interlude_${props.episodeId.split('-')[1].toLowerCase()}`; // Interlude-S1 -> interlude_s1
+        } else if (props.episodeId.startsWith('SP-')) {
+          fileName = `episode_sp${props.episodeId.split('-')[1]}`; // SP-01 -> episode_sp01
+        } else {
+          fileName = `episode_${props.episodeId.replace('#', '')}`; // #00 -> episode_00
+        }
+        
+        // 必要なJSONデータだけを非同期でチャンク（分割）読み込み
+        const module = await import(`@/data/${fileName}.json`);
+        
+        if (isMounted) {
+          setScenarioData(module.default || module);
+        }
+      } catch (err) {
+        console.error("Failed to load scenario data:", err);
+        if (isMounted) setError(true);
+      }
+    };
+
+    fetchScenario();
+    return () => { isMounted = false; };
+  }, [props.episodeId]);
+
+  // エラー発生時のUI
+  if (error) {
+    return (
+      <div className="h-[100dvh] w-full bg-[#1a0f0f] flex flex-col items-center justify-center font-mono text-rose-500 tracking-widest text-xs p-4 text-center">
+        <AlertTriangle className="mb-4 text-rose-600 animate-pulse" size={32} />
+        <p>SYSTEM ERROR: DATA NOT FOUND.</p>
+        <p className="mt-2 text-[#8c7a6b]">指定されたエピソードデータが見つかりません。</p>
+        <button onClick={props.onBack} className="mt-8 border border-rose-900 text-rose-600 px-6 py-2 hover:bg-rose-950 rounded-full transition-colors active:scale-95">
+          RETURN TO ARCHIVE
+        </button>
+      </div>
+    );
+  }
+
+  // データ読み込み中（ロード中）のUI
+  if (!scenarioData) {
+    return (
+      <div className="h-[100dvh] w-full bg-[#1a1512] flex flex-col items-center justify-center font-mono text-[#8c7a6b] tracking-[0.3em] text-xs">
+        <div className="w-8 h-8 border-2 border-t-[#8c7a6b] border-r-[#8c7a6b] border-b-transparent border-l-transparent rounded-full animate-spin mb-4" />
+        LOADING TETHER DATA...
+      </div>
+    );
+  }
+
+  // データが読み込めたら、本体のゲームエンジンへデータを渡す
+  return <GameContent {...props} scenarioData={scenarioData} />;
+}
+
+// ▼ 2. 実際のゲーム処理を行う本体コンポーネント ▼
+function GameContent({
+  episodeId, onBack, unlockedTerms, setUnlockedTerms, clearedData, insightPoints, onSpendPoint, onEpisodeComplete, scenarioData
+}: GameViewProps & { scenarioData: any }) {
+  
   const protagonist = scenarioData.meta?.protagonist || 'watson';
 
   const [activeGlossary, setActiveGlossary] = useState<{ word: string; desc: string; } | null>(null);
@@ -289,7 +268,6 @@ export default function GameView({
   const hasUncollectedEvidence = currentBeat?.text.match(/\{.*?\}/g)?.some(match => !collectedEvidence.includes(match.slice(1, -1)));
 
   return (
-    // ▼ select-none を追加して意図しないテキスト選択を防止
     <div className={`w-full max-w-2xl mx-auto relative flex flex-col h-[100dvh] touch-manipulation overscroll-none transition-transform duration-75 select-none ${
       screenEffect === 'shake' ? '-translate-x-2' : ''
     } ${isSanityZero ? 'bg-[#1a0f0f]' : 'bg-[#f4ebd8]'}`}>
@@ -306,7 +284,6 @@ export default function GameView({
         </div>
       )}
 
-      {/* ▼ 発狂（Tether 0%）時のノイズオーバーレイ（負荷軽減のため backdrop-blur を削除） ▼ */}
       {isSanityZero && !isCompleted && (
         <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden mix-blend-multiply opacity-50 flex flex-col">
            <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(225,29,72,0.1)_2px,rgba(225,29,72,0.1)_4px)] animate-[pulse_0.1s_infinite]" />
@@ -357,7 +334,6 @@ export default function GameView({
         </div>
 
         {!isStreaming && hasUncollectedEvidence && !isInterruptMode && !isWigginsActive && unlockedTerms.includes('W040') && (
-          // ▼ セーフエリア対応：iPhoneのホームバーと被らないように位置を調整
           <div className="absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-6 z-20 animate-in fade-in zoom-in duration-300">
              <button
                 onClick={handleWigginsEye}
@@ -398,7 +374,6 @@ export default function GameView({
         </div>
       )}
 
-      {/* ▼ セーフエリア対応：iPhoneのホームバーとUIが被らないように pb-[env(safe-area-inset-bottom)] を追加 */}
       <div onClick={(e) => e.stopPropagation()} className="shrink-0 relative z-30 pb-[env(safe-area-inset-bottom)] bg-[#f4ebd8]">
         {isInterruptMode ? (
           <InterruptPanel
@@ -482,7 +457,7 @@ export default function GameView({
                 {endResult.consequenceData?.mycroft_note && (
                   <div className="p-4 rounded-lg bg-blue-900/5 border border-blue-900/20 shadow-sm">
                     <h3 className="font-bold text-blue-900 mb-1.5 italic text-xs uppercase tracking-widest">
-                      Mycroft's Note :
+                      Mycroft&apos;s Note :
                     </h3>
                     <p className="text-sm leading-relaxed italic text-blue-900/90">{endResult.consequenceData.mycroft_note}</p>
                   </div>
