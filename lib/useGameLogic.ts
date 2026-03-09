@@ -56,7 +56,6 @@ export function useGameLogic(
   const initialTether = scenarioData.meta.tether_start || (isMoriarty ? 100 : 50);
   const beats = scenarioData.beats;
 
-  // ▼ 新規：IDベースの進行管理と、表示済みのチャット履歴を独立して保持
   const [currentBeatId, setCurrentBeatId] = useState<string>(beats[0]?.id || '');
   const [chatHistory, setChatHistory] = useState<ScenarioBeat[]>(beats[0] ? [beats[0]] : []);
 
@@ -217,7 +216,6 @@ export function useGameLogic(
     }
   }, [currentBeat, isResolved, getTextSpeed, updateTether, uiLabels.gaugeName]);
 
-  // ▼ 新規：選択肢が選ばれたときのジャンプ処理
   const handleChoice = (nextId: string) => {
     if (isStreaming) return;
     setCurrentBeatId(nextId);
@@ -244,8 +242,9 @@ export function useGameLogic(
       }
     }
 
-    // 次に進むべきBeatのIDを決定（next_beat_idがあれば優先）
-    let nextId = null;
+    // ▼ 修正点：明示的に string | null 型として定義
+    let nextId: string | null = null;
+    
     if (currentBeat.next_beat_id) {
       nextId = currentBeat.next_beat_id;
     } else if (currentBeatIndex < beats.length - 1) {
@@ -298,9 +297,9 @@ export function useGameLogic(
     handleInterrupt,
     evaluatePanelInterrupt,
     nextBeat,
-    handleChoice,  // ← これがGameViewに渡されます
+    handleChoice,
     skipStream,
-    chatHistory,   // ← これがGameViewに渡されます
+    chatHistory,
     collectedEvidence,
     selectedEvidence,
     collectEvidence,
