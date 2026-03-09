@@ -57,12 +57,12 @@ import episode41 from '@/data/episode_41.json';
 import episode42 from '@/data/episode_42.json';
 import episode43 from '@/data/episode_43.json';
 import episode44 from '@/data/episode_44.json';
-//import episode45 from '@/data/episode_45.json';
-//import episode46 from '@/data/episode_46.json';
-//import episode47 from '@/data/episode_47.json';
-//import episode48 from '@/data/episode_48.json';
-//import episode49 from '@/data/episode_49.json';
-//import episode50 from '@/data/episode_50.json';
+import episode45 from '@/data/episode_45.json';
+import episode46 from '@/data/episode_46.json';
+import episode47 from '@/data/episode_47.json';
+import episode48 from '@/data/episode_48.json';
+import episode49 from '@/data/episode_49.json';
+import episode50 from '@/data/episode_50.json';
 
 // 幕間（Interlude）
 import interludeS1 from '@/data/interlude_s1.json';
@@ -92,9 +92,8 @@ const SCENARIOS: Record<string, any> = {
   '#32': episode32, '#33': episode33, '#34': episode34, '#35': episode35,
   '#36': episode36, '#37': episode37, '#38': episode38, '#39': episode39,
   '#40': episode40, '#41': episode41, '#42': episode42, '#43': episode43,
-  '#44': episode44, 
-  //'#45': episode45, '#46': episode46, '#47': episode47,
-  //'#48': episode48, '#49': episode49, '#50': episode50,
+  '#44': episode44, '#45': episode45, '#46': episode46, '#47': episode47,
+  '#48': episode48, '#49': episode49, '#50': episode50,
   'Interlude-S1': interludeS1, 'Interlude-S2': interludeS2, 'Interlude-S3': interludeS3,
   'SP-01': episodeSp01, 'SP-02': episodeSp02, 'SP-03': episodeSp03,
   'SP-04': episodeSp04, 'SP-05': episodeSp05, 'SP-06': episodeSp06,
@@ -290,7 +289,8 @@ export default function GameView({
   const hasUncollectedEvidence = currentBeat?.text.match(/\{.*?\}/g)?.some(match => !collectedEvidence.includes(match.slice(1, -1)));
 
   return (
-    <div className={`w-full max-w-2xl mx-auto relative flex flex-col h-[100dvh] touch-manipulation overscroll-none transition-transform duration-75 ${
+    // ▼ select-none を追加して意図しないテキスト選択を防止
+    <div className={`w-full max-w-2xl mx-auto relative flex flex-col h-[100dvh] touch-manipulation overscroll-none transition-transform duration-75 select-none ${
       screenEffect === 'shake' ? '-translate-x-2' : ''
     } ${isSanityZero ? 'bg-[#1a0f0f]' : 'bg-[#f4ebd8]'}`}>
 
@@ -306,10 +306,11 @@ export default function GameView({
         </div>
       )}
 
+      {/* ▼ 発狂（Tether 0%）時のノイズオーバーレイ（負荷軽減のため backdrop-blur を削除） ▼ */}
       {isSanityZero && !isCompleted && (
         <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden mix-blend-multiply opacity-50 flex flex-col">
            <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(225,29,72,0.1)_2px,rgba(225,29,72,0.1)_4px)] animate-[pulse_0.1s_infinite]" />
-           <div className="absolute top-[20%] w-full bg-rose-600/20 border-y-2 border-rose-600 text-rose-500 font-mono font-bold text-center py-2 tracking-[0.3em] backdrop-blur-sm animate-[pulse_1.5s_infinite] shadow-[0_0_20px_rgba(225,29,72,0.5)]">
+           <div className="absolute top-[20%] w-full bg-rose-600/20 border-y-2 border-rose-600 text-rose-500 font-mono font-bold text-center py-2 tracking-[0.3em] animate-[pulse_1.5s_infinite] shadow-[0_0_20px_rgba(225,29,72,0.5)]">
              <AlertTriangle className="inline-block mr-2 w-5 h-5 mb-1" />
              WARNING: SANITY COMPROMISED
              <AlertTriangle className="inline-block ml-2 w-5 h-5 mb-1" />
@@ -356,7 +357,8 @@ export default function GameView({
         </div>
 
         {!isStreaming && hasUncollectedEvidence && !isInterruptMode && !isWigginsActive && unlockedTerms.includes('W040') && (
-          <div className="absolute bottom-6 right-6 z-20 animate-in fade-in zoom-in duration-300">
+          // ▼ セーフエリア対応：iPhoneのホームバーと被らないように位置を調整
+          <div className="absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-6 z-20 animate-in fade-in zoom-in duration-300">
              <button
                 onClick={handleWigginsEye}
                 disabled={insightPoints < 1}
@@ -396,7 +398,8 @@ export default function GameView({
         </div>
       )}
 
-      <div onClick={(e) => e.stopPropagation()} className="shrink-0 relative z-30">
+      {/* ▼ セーフエリア対応：iPhoneのホームバーとUIが被らないように pb-[env(safe-area-inset-bottom)] を追加 */}
+      <div onClick={(e) => e.stopPropagation()} className="shrink-0 relative z-30 pb-[env(safe-area-inset-bottom)] bg-[#f4ebd8]">
         {isInterruptMode ? (
           <InterruptPanel
             collectedEvidences={collectedEvidence}
@@ -463,7 +466,7 @@ export default function GameView({
                 {endResult.consequenceData?.watson_journal && (
                   <div className="p-4 rounded-lg border border-[#8c7a6b]/30 bg-[#fffcf7] shadow-sm">
                     <h3 className="font-bold text-[#3a2f29] mb-2 border-b border-[#8c7a6b]/20 pb-1 text-xs uppercase tracking-widest">
-                      {isIrene ? "Irene&apos;s Journal" : "Watson&apos;s Journal"}
+                      {isIrene ? "Irene's Journal" : "Watson's Journal"}
                     </h3>
                     <p className="text-sm leading-relaxed text-[#5c4d43]">{endResult.consequenceData.watson_journal}</p>
                   </div>
@@ -471,7 +474,7 @@ export default function GameView({
                 {endResult.consequenceData?.holmes_note && (
                   <div className="p-4 rounded-lg bg-amber-600/5 border border-amber-700/20 shadow-sm">
                     <h3 className="font-bold text-amber-900 mb-1.5 italic text-xs uppercase tracking-widest">
-                      {isMoriarty ? "M.C. Report :" : "Holmes&apos;s Note :"}
+                      {isMoriarty ? "M.C. Report :" : "Holmes's Note :"}
                     </h3>
                     <p className="text-sm leading-relaxed italic text-amber-800/90">{endResult.consequenceData.holmes_note}</p>
                   </div>
@@ -479,7 +482,7 @@ export default function GameView({
                 {endResult.consequenceData?.mycroft_note && (
                   <div className="p-4 rounded-lg bg-blue-900/5 border border-blue-900/20 shadow-sm">
                     <h3 className="font-bold text-blue-900 mb-1.5 italic text-xs uppercase tracking-widest">
-                      Mycroft&apos;s Note :
+                      Mycroft's Note :
                     </h3>
                     <p className="text-sm leading-relaxed italic text-blue-900/90">{endResult.consequenceData.mycroft_note}</p>
                   </div>

@@ -38,8 +38,10 @@ export default function GreatIndexTab({
 
   const clearedEpIds = Object.keys(clearedData); 
   
-  // ▼ 進行度の判定
-  const isSeason3Phase3 = clearedEpIds.includes('#38') && ['SP-01', 'SP-02', 'SP-03', 'SP-04', 'SP-05', 'SP-06'].every(sp => clearedEpIds.includes(sp));
+  // ▼ 進行度の判定（条件を緩和）
+  // 変更前: SP1〜6の全クリアが必須だった
+  // 変更後: 第38話または第39話をクリアしていれば、最終決戦前のバグ演出が発生する
+  const isSeason3Phase3 = clearedEpIds.includes('#38') || clearedEpIds.includes('#39');
   const isPostReichenbach = clearedEpIds.includes('#40');
   
   // 未解読で、かつ現在アンロック可能な用語の数を計算

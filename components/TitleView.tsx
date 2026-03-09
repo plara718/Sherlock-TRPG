@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 type TitleViewProps = {
   hasSaveData: boolean;
@@ -18,6 +18,15 @@ export default function TitleView({
   clearedData = {},
 }: TitleViewProps) {
   
+  const [isPWA, setIsPWA] = useState(false);
+
+  useEffect(() => {
+    // PWA（ホーム画面に追加された状態）で起動しているかを判定
+    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone) {
+      setIsPWA(true);
+    }
+  }, []);
+
   // 進行度の判定
   const isPostReichenbach = currentSeason >= 4 || Object.keys(clearedData).includes('#40');
   const isSeason3 = currentSeason === 3 && !isPostReichenbach;
@@ -60,7 +69,7 @@ export default function TitleView({
         <div className="absolute inset-0 pointer-events-none z-0 opacity-20 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQwIj48cmVjdCB3aWR0aD0iMSIgaGVpZ2h0PSIyMCIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==')] animate-[slide-down_0.5s_linear_infinite]" />
       )}
 
-      <div className="z-10 flex flex-col items-center text-center animate-in fade-in zoom-in-95 duration-1000 ease-out">
+      <div className="z-10 flex flex-col items-center text-center animate-in fade-in zoom-in-95 duration-1000 ease-out w-full max-w-md">
         <h2 className={`${theme.textAccent} font-mono text-xs sm:text-sm tracking-[0.3em] mb-4 drop-shadow-md ${isSeason3 ? 'animate-pulse' : ''}`}>
           {theme.systemStatus}
         </h2>
@@ -75,7 +84,7 @@ export default function TitleView({
 
         <button
           onClick={onStart}
-          className={`group relative px-8 py-4 bg-transparent border ${theme.borderAccent} ${theme.buttonText} font-bold font-mono tracking-widest rounded-full ${theme.buttonHoverBg} ${theme.buttonHoverText} ${theme.buttonHoverBorder} transition-all duration-300 active:scale-95 ${theme.shadow} backdrop-blur-sm`}
+          className={`group relative px-8 py-4 bg-transparent border ${theme.borderAccent} ${theme.buttonText} font-bold font-mono tracking-widest rounded-full ${theme.buttonHoverBg} ${theme.buttonHoverText} ${theme.buttonHoverBorder} transition-all duration-300 active:scale-95 ${theme.shadow} backdrop-blur-sm w-full sm:w-auto`}
         >
           {hasSaveData ? '> RESUME CONNECTION' : '> INITIALIZE TETHER'}
         </button>
@@ -87,6 +96,17 @@ export default function TitleView({
           >
             [ DEBUG: FORMAT SYSTEM ]
           </button>
+        )}
+
+        {/* PWA起動時かつセーブデータが無い場合の警告アナウンス */}
+        {isPWA && !hasSaveData && (
+          <div className="mt-8 p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg text-left animate-in fade-in slide-in-from-bottom-2">
+            <p className="text-[10px] font-mono text-amber-500 font-bold mb-1 tracking-widest">[ SYSTEM NOTICE ]</p>
+            <p className="text-xs text-amber-100/80 leading-relaxed font-serif">
+              ブラウザからアプリへ移行した探偵諸君へ。
+              以前のデータは「ブラウザ側のアーカイブ」からエクスポートし、INITIALIZE後に「DATA IMPORT」で復元したまえ。
+            </p>
+          </div>
         )}
       </div>
     </div>

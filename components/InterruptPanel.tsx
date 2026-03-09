@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldAlert, Fingerprint, BrainCircuit, HeartHandshake, Clock, HelpCircle, Sparkles, Mail, Users } from 'lucide-react';
+// ▼ Network を import に追加しました
+import { ShieldAlert, Fingerprint, BrainCircuit, HeartHandshake, Clock, HelpCircle, Sparkles, Mail, Users, Network } from 'lucide-react';
 
 type InterruptPanelProps = {
   collectedEvidences: string[];
@@ -30,177 +31,138 @@ export default function InterruptPanel({
   uiLabels,
   isMoriarty = false,
 }: InterruptPanelProps) {
+  const [timeLeft, setTimeLeft] = useState(15);
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
   const [selectedEvidence, setSelectedEvidence] = useState<string | null>(null);
-  const [timeLeft, setTimeLeft] = useState(15);
   const [showHint, setShowHint] = useState(false);
 
   const isIrene = protagonist === 'irene';
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          onTimeUp();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    if (timeLeft <= 0) { onTimeUp(); return; }
+    const timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
     return () => clearInterval(timer);
-  }, [onTimeUp]);
+  }, [timeLeft, onTimeUp]);
+
+  const skillOptions = isMoriarty
+    ? [
+        { id: 'LINK', label: 'LINK (結合)', icon: <Network size={16} /> },
+        { id: 'SCOPE', label: 'SCOPE (俯瞰)', icon: <BrainCircuit size={16} /> },
+        { id: 'ANALYZE', label: 'ANALYZE (解体)', icon: <Fingerprint size={16} /> }
+      ]
+    : isIrene
+      ? [
+          { id: 'LINK', label: 'LINK (結合)', icon: <Network size={16} /> },
+          { id: 'SCOPE', label: 'SCOPE (俯瞰)', icon: <BrainCircuit size={16} /> },
+          { id: 'EMPATHY', label: 'EMPATHY (共感)', icon: <HeartHandshake size={16} /> }
+        ]
+      : [
+          { id: 'LINK', label: 'LINK (結合)', icon: <Network size={16} /> },
+          { id: 'SCOPE', label: 'SCOPE (俯瞰)', icon: <BrainCircuit size={16} /> },
+          { id: 'MEDICAL', label: 'MEDICAL (医学)', icon: <HeartHandshake size={16} /> }
+        ];
+
+  const renderInterventionButton = () => {
+    if (!interventionType || !isInterventionAvailable || interventionUsed) return null;
+
+    let icon, label, colorClass, borderClass;
+    switch (interventionType) {
+      case 'Irene':
+        icon = <Sparkles size={14} />; label = "Irene's Whisper"; colorClass = "bg-rose-900 hover:bg-rose-800 text-rose-100"; borderClass = "border-rose-500/50"; break;
+      case 'Mycroft':
+        icon = <Mail size={14} />; label = "Mycroft's Telegram"; colorClass = "bg-blue-900 hover:bg-blue-800 text-blue-100"; borderClass = "border-blue-500/50"; break;
+      case 'Wiggins':
+        icon = <Users size={14} />; label = "Wiggins's Report"; colorClass = "bg-amber-700 hover:bg-amber-600 text-amber-50"; borderClass = "border-amber-400/50"; break;
+    }
+
+    return (
+      <button
+        onClick={() => { setShowHint(true); if(onUseIntervention) onUseIntervention(); }}
+        className={`flex items-center justify-center gap-1.5 w-full py-2.5 mt-3 rounded-lg border text-xs font-bold tracking-widest uppercase transition-transform active:scale-95 shadow-md ${colorClass} ${borderClass} animate-pulse`}
+      >
+        {icon} {label} (介入を要請する)
+      </button>
+    );
+  };
 
   return (
-    <div className={`p-4 sm:p-5 bg-[#1a1512] border-t-4 shadow-[0_-10px_30px_rgba(159,18,57,0.3)] animate-in slide-in-from-bottom-4 relative overflow-hidden ${
-      isMoriarty ? 'border-fuchsia-900' : isIrene ? 'border-fuchsia-800' : 'border-rose-800'
+    <div className={`p-4 sm:p-6 border-t-2 shadow-[0_-10px_30px_rgba(0,0,0,0.2)] animate-in slide-in-from-bottom-full duration-300 relative select-none pb-[calc(1rem+env(safe-area-inset-bottom))] ${
+      isMoriarty ? 'bg-[#1a0f15] border-fuchsia-900/50' : isIrene ? 'bg-[#1a0f12] border-rose-900/50' : 'bg-[#1a1512] border-rose-900/50'
     }`}>
       
-      {/* 背景ノイズ */}
-      <div className={`absolute inset-0 opacity-10 pointer-events-none bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(159,18,57,0.2)_10px,rgba(159,18,57,0.2)_20px)] ${
-        isMoriarty || isIrene ? 'hue-rotate-[280deg]' : ''
-      }`} />
-
-      <div className="relative z-10">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className={`${
-            isMoriarty ? 'text-fuchsia-500' : isIrene ? 'text-fuchsia-400' : 'text-rose-500'
-          } font-bold tracking-widest flex items-center gap-2 font-mono uppercase text-sm sm:text-base`}>
-            <ShieldAlert size={18} className="animate-pulse" />
-            {isMoriarty ? 'Detect Flaw' : isIrene ? 'Detect Arrogance' : 'Detect Hallucination'}
-          </h3>
-          <div className={`font-mono text-xl sm:text-2xl font-bold flex items-center gap-2 bg-black/40 px-3 py-1 rounded-lg border ${
-            timeLeft <= 5 ? 'text-rose-500 animate-pulse border-rose-900/50' : 'text-[#d8c8b8] border-[#5c4d43]'
-          }`}>
-            <Clock size={18} /> 00:{timeLeft.toString().padStart(2, '0')}
-          </div>
-        </div>
-
-        <p className="text-[10px] sm:text-xs text-[#8c7a6b] mb-5 font-mono leading-relaxed">
-          {isMoriarty
-            ? '愚か者の計画の欠陥を突け。確たる証拠をもって相手の論理を破壊しろ。'
-            : isIrene 
-            ? '敵の慢心を突け。相手の隙となる視点と、それを証明する証拠を突きつけなさい。' 
-            : '天才の暴走を繋ぎ止めろ。適切な視点と裏付けとなる証拠を提示せよ。'}
-        </p>
-
-        {/* スキル選択 */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-5">
-          <button
-            onClick={() => setSelectedSkill('SCOPE')}
-            className={`flex flex-col items-center py-3 sm:py-4 rounded-xl border-2 transition-all active:scale-95 ${
-              selectedSkill === 'SCOPE'
-                ? 'bg-blue-900/30 border-blue-500/80 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
-                : 'bg-[#2a2420] border-[#3a2f29] text-[#8c7a6b] hover:border-[#5c4d43] hover:text-[#d8c8b8]'
-            }`}
-          >
-            <Fingerprint size={22} className="mb-1.5" />
-            <span className="text-[10px] sm:text-xs font-bold tracking-wider">SCOPE</span>
-          </button>
-          
-          <button
-            onClick={() => setSelectedSkill('LOGIC')}
-            className={`flex flex-col items-center py-3 sm:py-4 rounded-xl border-2 transition-all active:scale-95 ${
-              selectedSkill === 'LOGIC'
-                ? 'bg-emerald-900/30 border-emerald-500/80 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
-                : 'bg-[#2a2420] border-[#3a2f29] text-[#8c7a6b] hover:border-[#5c4d43] hover:text-[#d8c8b8]'
-            }`}
-          >
-            <BrainCircuit size={22} className="mb-1.5" />
-            <span className="text-[10px] sm:text-xs font-bold tracking-wider">LOGIC</span>
-          </button>
-          
-          <button
-            onClick={() => setSelectedSkill('HEART')}
-            className={`flex flex-col items-center py-3 sm:py-4 rounded-xl border-2 transition-all active:scale-95 ${
-              selectedSkill === 'HEART'
-                ? 'bg-amber-900/30 border-amber-500/80 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
-                : 'bg-[#2a2420] border-[#3a2f29] text-[#8c7a6b] hover:border-[#5c4d43] hover:text-[#d8c8b8]'
-            }`}
-          >
-            <HeartHandshake size={22} className="mb-1.5" />
-            <span className="text-[10px] sm:text-xs font-bold tracking-wider">HEART</span>
-          </button>
-        </div>
-
-        {/* 証拠選択とヒント（介入機能） */}
-        <div className="mb-6">
-          <div className="text-[10px] sm:text-xs text-[#8c7a6b] font-mono mb-3 flex justify-between items-center">
-            <span className="tracking-widest">SELECT EVIDENCE:</span>
-            
-            {/* 通常のヒント（介入キャラがいない場合） */}
-            {hintText && !isInterventionAvailable && !isMoriarty && (
-              <button onClick={() => setShowHint(!showHint)} className="text-amber-600 flex items-center gap-1 hover:text-amber-500 bg-amber-900/20 px-2 py-0.5 rounded-full border border-amber-900/50">
-                <HelpCircle size={12} /> HINT
-              </button>
-            )}
-            
-            {/* 介入機能ボタン */}
-            {isInterventionAvailable && !interventionUsed && !isMoriarty && (
-              <button 
-                onClick={() => { setShowHint(true); if (onUseIntervention) onUseIntervention(); }} 
-                className={`flex items-center gap-1.5 font-bold animate-pulse px-3 py-1 border rounded-full active:scale-95 shadow-md transition-colors ${
-                  interventionType === 'Irene' ? 'text-fuchsia-400 border-fuchsia-800 bg-fuchsia-900/30 hover:bg-fuchsia-900/50 shadow-[0_0_10px_rgba(192,38,211,0.2)]' :
-                  interventionType === 'Mycroft' ? 'text-blue-400 border-blue-800 bg-blue-900/30 hover:bg-blue-900/50 shadow-[0_0_10px_rgba(59,130,246,0.2)]' :
-                  'text-amber-500 border-amber-700 bg-amber-900/30 hover:bg-amber-900/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
-                }`}
-              >
-                {interventionType === 'Irene' && <Sparkles size={12} />}
-                {interventionType === 'Mycroft' && <Mail size={12} />}
-                {interventionType === 'Wiggins' && <Users size={12} />}
-                {interventionType === 'Irene' ? "IRENE'S WHISPER" : 
-                 interventionType === 'Mycroft' ? "MYCROFT'S CABLE" : 
-                 "WIGGINS' INFO"}
-              </button>
-            )}
-            
-            {/* 介入機能使用済み状態 */}
-            {isInterventionAvailable && interventionUsed && !isMoriarty && (
-              <span className={`flex items-center gap-1 font-bold opacity-60 ${
-                  interventionType === 'Irene' ? 'text-fuchsia-900' :
-                  interventionType === 'Mycroft' ? 'text-blue-900' :
-                  'text-amber-900'
-              }`}>
-                 {interventionType === 'Irene' && <Sparkles size={12} />}
-                 {interventionType === 'Mycroft' && <Mail size={12} />}
-                 {interventionType === 'Wiggins' && <Users size={12} />}
-                 {interventionType === 'Irene' ? "IRENE (USED)" : 
-                  interventionType === 'Mycroft' ? "MYCROFT (USED)" : 
-                  "WIGGINS (USED)"}
-              </span>
-            )}
-          </div>
-          
-          {/* ヒント文の表示 */}
-          {showHint && hintText && (
-            <div className={`p-3 sm:p-4 mb-4 rounded-lg text-[10px] sm:text-xs font-serif leading-relaxed animate-in fade-in slide-in-from-top-2 shadow-inner border ${
-              interventionUsed && interventionType === 'Irene' ? 'bg-fuchsia-950/50 text-fuchsia-200 border-fuchsia-800/50' : 
-              interventionUsed && interventionType === 'Mycroft' ? 'bg-blue-950/50 text-blue-200 border-blue-800/50' :
-              interventionUsed && interventionType === 'Wiggins' ? 'bg-amber-950/50 text-amber-200 border-amber-800/50' :
-              'bg-[#2a2420] text-amber-200 border-amber-900/50'
-            }`}>
-              {interventionUsed && interventionType === 'Irene' ? `「あら、見逃しているわよワトスン先生。彼の目は節穴ね…… ${hintText}」` : 
-               interventionUsed && interventionType === 'Mycroft' ? `『弟よ、感情を排して盤面を見ろ。…… ${hintText}』` :
-               interventionUsed && interventionType === 'Wiggins' ? `「旦那、こいつが怪しいぜ！…… ${hintText}」` :
-               hintText}
+      <div className="absolute inset-0 pointer-events-none opacity-10 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')]" />
+      
+      <div className="max-w-xl mx-auto relative z-10">
+        <div className="flex justify-between items-end mb-4">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className={isMoriarty ? 'text-fuchsia-500 animate-pulse' : 'text-rose-500 animate-pulse'} />
+            <div>
+              <p className={`text-[10px] font-mono tracking-widest uppercase ${isMoriarty ? 'text-fuchsia-400' : 'text-rose-400'}`}>System Warning</p>
+              <h3 className="text-white font-bold text-sm sm:text-base tracking-widest">LOGIC INTERRUPT REQUIRED</h3>
             </div>
-          )}
+          </div>
+          <div className={`text-3xl font-black font-mono tabular-nums tracking-tighter ${timeLeft <= 5 ? 'text-rose-500 animate-[shake_0.5s_infinite]' : 'text-white'}`}>
+            00:{timeLeft.toString().padStart(2, '0')}
+          </div>
+        </div>
 
-          {/* 証拠ボタンリスト */}
-          <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto custom-scrollbar">
-            {collectedEvidences.length === 0 && (
-              <span className="text-xs text-[#5c4d43] italic font-serif">No evidence collected...</span>
+        {hintText && !showHint && (
+          <div className="mb-4">
+            {renderInterventionButton() || (
+              <button 
+                onClick={() => setShowHint(true)}
+                className="w-full bg-[#2a2420] hover:bg-[#3a2f29] text-[#8c7a6b] hover:text-[#d8c8b8] border border-[#8c7a6b]/30 py-2.5 rounded-lg text-xs font-bold tracking-widest transition-colors flex items-center justify-center gap-2"
+              >
+                <HelpCircle size={14} /> HINT (推論の補助を要求)
+              </button>
             )}
-            {collectedEvidences.map(ev => (
+          </div>
+        )}
+
+        {showHint && (
+          <div className={`mb-4 p-3 rounded-lg border text-sm font-serif leading-relaxed animate-in fade-in slide-in-from-top-2 shadow-inner ${
+            interventionType === 'Irene' ? 'bg-rose-950/30 border-rose-500/30 text-rose-100' :
+            interventionType === 'Mycroft' ? 'bg-blue-950/30 border-blue-500/30 text-blue-100' :
+            interventionType === 'Wiggins' ? 'bg-amber-950/30 border-amber-500/30 text-amber-100' :
+            'bg-[#2a2420] border-[#8c7a6b]/30 text-[#d8c8b8]'
+          }`}>
+            <span className="font-bold mr-2 text-[10px] tracking-widest uppercase opacity-70">
+              {interventionType ? `${interventionType}:` : 'HINT:'}
+            </span>
+            {hintText}
+          </div>
+        )}
+
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-5">
+          {skillOptions.map((skill) => (
+            <button
+              key={skill.id}
+              onClick={() => setSelectedSkill(skill.id)}
+              className={`py-3 rounded-xl flex flex-col items-center gap-1.5 transition-all border-2 active:scale-95 ${
+                selectedSkill === skill.id
+                  ? isMoriarty ? 'bg-fuchsia-900/40 border-fuchsia-500 text-fuchsia-100 shadow-[0_0_15px_rgba(217,70,239,0.3)]' : isIrene ? 'bg-rose-900/40 border-rose-500 text-rose-100 shadow-[0_0_15px_rgba(225,29,72,0.3)]' : 'bg-emerald-900/40 border-emerald-500 text-emerald-100 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                  : 'bg-[#2a2420] border-[#3a2f29] text-[#8c7a6b] hover:bg-[#3a2f29] hover:border-[#5c4d43] hover:text-[#d8c8b8]'
+              }`}
+            >
+              {skill.icon}
+              <span className="text-[9px] sm:text-[10px] font-bold tracking-widest">{skill.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="mb-5">
+          <p className="text-[10px] font-mono text-[#8c7a6b] mb-2 uppercase tracking-widest flex items-center gap-2">
+            Evidence Link <span className="text-[8px] opacity-60">(Optional)</span>
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {collectedEvidences.map((ev) => (
               <button
                 key={ev}
-                onClick={() => setSelectedEvidence(prev => prev === ev ? null : ev)}
-                className={`text-[10px] sm:text-xs px-3 py-1.5 rounded-full border transition-all active:scale-95 ${
+                onClick={() => setSelectedEvidence(selectedEvidence === ev ? null : ev)}
+                className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all active:scale-95 border ${
                   selectedEvidence === ev
-                    ? (isMoriarty || isIrene) 
-                      ? 'bg-fuchsia-900 border-fuchsia-500 text-fuchsia-100 shadow-[0_0_10px_rgba(217,70,239,0.4)]'
-                      : 'bg-rose-900 border-rose-500 text-rose-100 shadow-[0_0_10px_rgba(225,29,72,0.4)]'
-                    : 'bg-[#2a2420] border-[#3a2f29] text-[#d8c8b8] hover:border-[#5c4d43]'
+                    ? 'bg-amber-600 text-[#1a1512] border-amber-500 shadow-[0_0_10px_rgba(217,119,6,0.5)]'
+                    : 'bg-[#2a2420] text-[#a8988a] border-[#3a2f29] hover:bg-[#3a2f29] hover:text-[#f4ebd8]'
                 }`}
               >
                 {ev}
