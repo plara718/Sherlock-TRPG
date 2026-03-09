@@ -67,7 +67,7 @@ const TermCard = memo(function TermCard({
           </p>
           <div className={`mt-4 p-3 rounded-lg border shadow-inner ${isGlitch ? 'bg-rose-950/30 border-rose-900/40' : 'bg-[#e6d5c3]/40 border-[#8c7a6b]/30'}`}>
             <p className={`text-[9px] font-mono font-bold mb-1 tracking-widest uppercase ${isGlitch ? 'text-rose-700' : 'text-[#5c4d43]'}`}>
-              {isPostReichenbach && term.id === 'M021' ? "Watson's Journal :" : "Holmes's Critique :"}
+              {isPostReichenbach && term.id === 'M021' ? "Watson&apos;s Journal :" : "Holmes&apos;s Critique :"}
             </p>
             <p className={`text-sm italic font-serif leading-relaxed ${isGlitch ? 'text-rose-400 font-bold animate-[pulse_2s_ease-in-out_infinite]' : 'text-[#3a2f29]'}`}>
               {overrideCritique}
@@ -248,7 +248,7 @@ export default function GreatIndexTab() {
           })
         ) : (
           <div className="text-center py-12 text-[#8c7a6b] font-mono text-xs border border-dashed border-[#8c7a6b]/30 rounded-xl bg-[#e6d5c3]/20">
-            No unread data found in "{selectedLetter}".
+            No unread data found in &quot;{selectedLetter}&quot;.
           </div>
         )}
       </div>
