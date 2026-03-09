@@ -193,9 +193,19 @@ export default function ArchiveView({
           {activeTab === 'index' && (
             <GreatIndexTab unlockedTerms={unlockedTerms} readTerms={readTerms} insightPoints={insightPoints} clearedData={clearedData} onResearch={onResearch} onReadTerm={onReadTerm} />
           )}
+          
+          {/* ▼ 修正点：SpiderWebTab の不要なプロパティを削除し、必要なプロパティだけを渡す */}
           {activeTab === 'spider' && (
-            <SpiderWebTab currentSeason={currentSeason} clearedEpisodes={clearedEpisodes} insightPoints={insightPoints} unlockedTruths={unlockedTruths} onUnlockTruth={onUnlockTruth} onLinkFail={onLinkFail} />
+            <SpiderWebTab 
+              clearedData={clearedData} 
+              unlockedTerms={unlockedTerms} 
+              unlockedTruths={unlockedTruths} 
+              insightPoints={insightPoints} 
+              onUnlockTruth={onUnlockTruth} 
+              onLinkFail={onLinkFail} 
+            />
           )}
+
           {activeTab === 'settings' && renderSettings()}
         </div>
       </div>
