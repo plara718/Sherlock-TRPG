@@ -3,52 +3,35 @@
 import React, { useState } from 'react';
 import { BookOpen, Network, Database, Home, Settings, Save, Upload, Trash2, CheckCircle2 } from 'lucide-react';
 import ChronologyTab from './ChronologyTab';
-
 import OriginGreatIndexTab from './GreatIndexTab';
 import OriginSpiderWebTab from './SpiderWebTab';
+import { useSaveData } from '@/lib/SaveDataContext'; // ▼ Contextをインポート
 
 const GreatIndexTab = OriginGreatIndexTab as any;
 const SpiderWebTab = OriginSpiderWebTab as any;
 
-interface ArchiveViewProps {
-  currentSeason?: number;
-  unlockedTerms?: string[];
-  readTerms?: string[];
-  insightPoints?: number;
-  clearedData?: Record<string, any>;
-  unlockedTruths?: Record<string, any>;
-  clearedEpisodes?: string[]; 
-  onReturnTitle?: () => void;
-  onReturnGame?: () => void;
-  onPlayEpisode: (epId: string) => void;
-  onResearch: () => void;
-  onReadTerm: (termId: string) => void;
-  onUnlockTruth: (pinId: string, truthData: any, linkCost: number) => void;
-  onLinkFail: (linkCost: number) => void;
-  onLoadData: (dataStr: string) => boolean;
-  onResetData: () => void;
-}
+export default function ArchiveView() {
+  // ▼ Propsで受け取っていたものをContextから直接取得
+  const {
+    currentSeason,
+    unlockedTerms,
+    readTerms,
+    insightPoints,
+    clearedData,
+    unlockedTruths,
+    setView,
+    handlePlayEpisode,
+    handleResearch,
+    handleReadTerm,
+    handleUnlockTruth,
+    handleLinkFail,
+    handleLoadData,
+    handleResetData,
+  } = useSaveData();
 
-export default function ArchiveView({
-  currentSeason = 1,
-  unlockedTerms = [],
-  readTerms = [],
-  insightPoints = 0,
-  clearedData = {},
-  unlockedTruths = {},
-  clearedEpisodes = [],
-  onReturnTitle,
-  onReturnGame,
-  onPlayEpisode,
-  onResearch,
-  onReadTerm,
-  onUnlockTruth,
-  onLinkFail,
-  onLoadData,
-  onResetData,
-}: ArchiveViewProps) {
+  const clearedEpisodes = Object.keys(clearedData);
+
   const [activeTab, setActiveTab] = useState<'case' | 'index' | 'spider' | 'settings'>('case');
-
   const [importStr, setImportStr] = useState('');
   const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [showCopySuccess, setShowCopySuccess] = useState(false);
@@ -70,7 +53,7 @@ export default function ArchiveView({
 
   const handleImportSubmit = () => {
     if (!importStr) return;
-    const success = onLoadData(importStr);
+    const success = handleLoadData(importStr);
     setImportStatus(success ? 'success' : 'error');
     if (success) {
       setTimeout(() => setImportStatus('idle'), 2000);
@@ -144,7 +127,7 @@ export default function ArchiveView({
                 <button onClick={() => setShowConfirmReset(false)} className="flex-1 bg-[#e6d5c3] text-[#5c4d43] hover:bg-[#d8c8b8] py-2.5 rounded-lg text-xs font-bold transition-colors">
                   CANCEL
                 </button>
-                <button onClick={onResetData} className="flex-1 bg-rose-700 text-white hover:bg-rose-800 py-2.5 rounded-lg text-xs font-bold tracking-widest transition-colors shadow-inner">
+                <button onClick={handleResetData} className="flex-1 bg-rose-700 text-white hover:bg-rose-800 py-2.5 rounded-lg text-xs font-bold tracking-widest transition-colors shadow-inner">
                   EXECUTE
                 </button>
               </div>
@@ -162,7 +145,7 @@ export default function ArchiveView({
   return (
     <div className={`h-[100dvh] flex flex-col transition-colors duration-1000 select-none ${isSeason3 ? 'bg-[#1a0f0f]' : 'bg-[#f4ebd8]'}`}>
       <header className={`shrink-0 border-b flex justify-between items-center p-3 sm:p-4 shadow-sm z-10 relative ${isSeason3 ? 'bg-rose-950/20 border-rose-900/50' : 'bg-[#fffcf7] border-[#8c7a6b]/20'}`}>
-        <button onClick={onReturnTitle} className={`transition-colors flex items-center gap-2 active:scale-95 ${isSeason3 ? 'text-rose-600 hover:text-rose-400' : 'text-[#8c7a6b] hover:text-[#5c4d43]'}`}>
+        <button onClick={() => setView('title')} className={`transition-colors flex items-center gap-2 active:scale-95 ${isSeason3 ? 'text-rose-600 hover:text-rose-400' : 'text-[#8c7a6b] hover:text-[#5c4d43]'}`}>
           <Home size={20} />
           <span className="hidden sm:inline text-xs font-bold tracking-widest">TITLE</span>
         </button>
@@ -176,11 +159,9 @@ export default function ArchiveView({
             <p className={`text-[9px] font-mono tracking-widest uppercase ${isSeason3 ? 'text-rose-800' : 'text-[#8c7a6b]'}`}>Insight Pts</p>
             <p className={`text-base sm:text-lg font-bold font-mono leading-none ${isSeason3 ? 'text-rose-500' : 'text-amber-600'}`}>{insightPoints}</p>
           </div>
-          {onReturnGame && (
-             <button onClick={onReturnGame} className={`px-3 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-xs font-bold tracking-widest rounded-full transition-transform active:scale-95 shadow-md ${isSeason3 ? 'bg-rose-800 hover:bg-rose-700 text-rose-100' : 'bg-[#3a2f29] hover:bg-[#1a1512] text-[#f4ebd8]'}`}>
-               RETURN
-             </button>
-          )}
+          <button onClick={() => setView('game')} className={`px-3 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-xs font-bold tracking-widest rounded-full transition-transform active:scale-95 shadow-md ${isSeason3 ? 'bg-rose-800 hover:bg-rose-700 text-rose-100' : 'bg-[#3a2f29] hover:bg-[#1a1512] text-[#f4ebd8]'}`}>
+            RETURN
+          </button>
         </div>
       </header>
 
@@ -188,24 +169,14 @@ export default function ArchiveView({
         {isSeason3 && <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,#1a0f0f_100%)] z-0" />}
         <div className="relative z-10 p-4 sm:p-6 max-w-4xl mx-auto pb-24 sm:pb-32">
           {activeTab === 'case' && (
-            <ChronologyTab currentSeason={currentSeason} clearedData={clearedData} clearedEpisodes={clearedEpisodes} onPlayEpisode={onPlayEpisode} />
+            <ChronologyTab currentSeason={currentSeason} clearedData={clearedData} clearedEpisodes={clearedEpisodes} onPlayEpisode={handlePlayEpisode} />
           )}
           {activeTab === 'index' && (
-            <GreatIndexTab unlockedTerms={unlockedTerms} readTerms={readTerms} insightPoints={insightPoints} clearedData={clearedData} onResearch={onResearch} onReadTerm={onReadTerm} />
+            <GreatIndexTab unlockedTerms={unlockedTerms} readTerms={readTerms} insightPoints={insightPoints} clearedData={clearedData} onResearch={handleResearch} onReadTerm={handleReadTerm} />
           )}
-          
-          {/* ▼ 修正点：SpiderWebTab の不要なプロパティを削除し、必要なプロパティだけを渡す */}
           {activeTab === 'spider' && (
-            <SpiderWebTab 
-              clearedData={clearedData} 
-              unlockedTerms={unlockedTerms} 
-              unlockedTruths={unlockedTruths} 
-              insightPoints={insightPoints} 
-              onUnlockTruth={onUnlockTruth} 
-              onLinkFail={onLinkFail} 
-            />
+            <SpiderWebTab clearedData={clearedData} unlockedTerms={unlockedTerms} unlockedTruths={unlockedTruths} insightPoints={insightPoints} onUnlockTruth={handleUnlockTruth} onLinkFail={handleLinkFail} />
           )}
-
           {activeTab === 'settings' && renderSettings()}
         </div>
       </div>

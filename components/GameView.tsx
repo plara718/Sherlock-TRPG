@@ -9,19 +9,12 @@ import ChatLog from '@/components/ChatLog';
 import { useGameLogic, ScenarioData } from '@/lib/useGameLogic';
 import { FileText, ArrowRight, Eye, AlertTriangle } from 'lucide-react';
 import glossaryData from '@/data/glossary.json';
+import { useSaveData } from '@/lib/SaveDataContext'; // ▼ Contextをインポート
 
-type GameViewProps = {
-  episodeId: string;
-  onBack: () => void;
-  unlockedTerms: string[];
-  setUnlockedTerms: (terms: string[]) => void;
-  clearedData: { [epId: string]: { rank: string; tether: number } };
-  insightPoints: number;
-  onSpendPoint: (amount: number) => boolean;
-  onEpisodeComplete: (epId: string, rank: string, tether: number, points: number) => void;
-};
+// Propsの型定義は不要になったため削除しました
 
-export default function GameView(props: GameViewProps) {
+export default function GameView() {
+  const ctx = useSaveData();
   const [scenarioData, setScenarioData] = useState<any>(null);
   const [error, setError] = useState(false);
 
@@ -33,13 +26,10 @@ export default function GameView(props: GameViewProps) {
     const fetchScenario = async () => {
       try {
         let fileName = '';
-        if (props.episodeId.startsWith('Interlude')) {
-          fileName = `interlude_${props.episodeId.split('-')[1].toLowerCase()}`;
-        } else if (props.episodeId.startsWith('SP-')) {
-          fileName = `episode_sp${props.episodeId.split('-')[1]}`;
-        } else {
-          fileName = `episode_${props.episodeId.replace('#', '')}`;
-        }
+        if (ctx.currentEpisodeId.startsWith('Interlude')) fileName = `interlude_${ctx.currentEpisodeId.split('-')[1].toLowerCase()}`;
+        else if (ctx.currentEpisodeId.startsWith('SP-')) fileName = `episode_sp${ctx.currentEpisodeId.split('-')[1]}`;
+        else fileName = `episode_${ctx.currentEpisodeId.replace('#', '')}`;
+        
         const scenarioModule = await import(`@/data/${fileName}.json`);
         if (isMounted) setScenarioData(scenarioModule.default || scenarioModule);
       } catch (err) {
@@ -49,15 +39,14 @@ export default function GameView(props: GameViewProps) {
     };
     fetchScenario();
     return () => { isMounted = false; };
-  }, [props.episodeId]);
+  }, [ctx.currentEpisodeId]);
 
   if (error) {
     return (
       <div className="h-[100dvh] w-full bg-[#1a0f0f] flex flex-col items-center justify-center font-mono text-rose-500 tracking-widest text-xs p-4 text-center">
         <AlertTriangle className="mb-4 text-rose-600 animate-pulse" size={32} />
         <p>SYSTEM ERROR: DATA NOT FOUND.</p>
-        <p className="mt-2 text-[#8c7a6b]">指定されたエピソードデータが見つかりません。</p>
-        <button onClick={props.onBack} className="mt-8 border border-rose-900 text-rose-600 px-6 py-2 hover:bg-rose-950 rounded-full transition-colors active:scale-95">RETURN TO ARCHIVE</button>
+        <button onClick={() => ctx.setView('archive')} className="mt-8 border border-rose-900 text-rose-600 px-6 py-2 hover:bg-rose-950 rounded-full transition-colors active:scale-95">RETURN TO ARCHIVE</button>
       </div>
     );
   }
@@ -70,30 +59,32 @@ export default function GameView(props: GameViewProps) {
       </div>
     );
   }
-  return <GameContent {...props} scenarioData={scenarioData} />;
+  return <GameContent scenarioData={scenarioData} />;
 }
 
-function GameContent({
-  episodeId, onBack, unlockedTerms, setUnlockedTerms, clearedData, insightPoints, onSpendPoint, onEpisodeComplete, scenarioData
-}: GameViewProps & { scenarioData: any }) {
+function GameContent({ scenarioData }: { scenarioData: any }) {
+  const ctx = useSaveData(); // ▼ Contextを呼び出し
+  const episodeId = ctx.currentEpisodeId;
+  const onBack = () => ctx.setView('archive');
+
   const protagonist = scenarioData.meta?.protagonist || 'watson';
   const [activeGlossary, setActiveGlossary] = useState<{ word: string; desc: string; } | null>(null);
   const [isInterruptMode, setIsInterruptMode] = useState(false);
   const [screenEffect, setScreenEffect] = useState<'none' | 'flash' | 'shake' | 'glass-shatter'>('none');
   const [isWigginsActive, setIsWigginsActive] = useState(false);
   const [isSanityZero, setIsSanityZero] = useState(false);
-  const isReplay = Boolean(clearedData[episodeId]);
+  const isReplay = Boolean(ctx.clearedData[episodeId]);
 
   const {
     currentBeat, displayedText, isStreaming, tether, feedback, handleInterrupt,
-    nextBeat, skipStream, beatIndex, beats, collectedEvidence, selectedEvidence,
+    nextBeat, handleChoice, skipStream, chatHistory, collectedEvidence, selectedEvidence,
     collectEvidence, handleSelectEvidence, selectedSkill, isCompleted, endResult,
     uiLabels, isMoriarty, isIrene
   } = useGameLogic(scenarioData as ScenarioData, isReplay);
 
   const rawIntervention = scenarioData.meta?.intervention;
   const interventionType = ['Irene', 'Mycroft', 'Wiggins'].includes(rawIntervention as string) ? (rawIntervention as 'Irene' | 'Mycroft' | 'Wiggins') : null;
-  const isInterventionAvailable = interventionType === 'Irene' ? (unlockedTerms.includes('I007') && !isIrene && !isMoriarty) : interventionType === 'Mycroft' ? (!isIrene && !isMoriarty) : interventionType === 'Wiggins' ? (unlockedTerms.includes('W040') && !isIrene && !isMoriarty) : false;
+  const isInterventionAvailable = interventionType === 'Irene' ? (ctx.unlockedTerms.includes('I007') && !isIrene && !isMoriarty) : interventionType === 'Mycroft' ? (!isIrene && !isMoriarty) : interventionType === 'Wiggins' ? (ctx.unlockedTerms.includes('W040') && !isIrene && !isMoriarty) : false;
   const [interventionUsed, setInterventionUsed] = useState(false);
 
   useEffect(() => { setInterventionUsed(false); setIsSanityZero(false); }, [episodeId]);
@@ -117,13 +108,13 @@ function GameContent({
     setIsWigginsActive(false);
   }, [currentBeat, isStreaming]);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [displayedText, beatIndex, collectedEvidence, isInterruptMode]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [displayedText, chatHistory.length, collectedEvidence, isInterruptMode]);
 
   const handleGlossaryClick = (term: any) => {
-    if (unlockedTerms.includes(term.id)) {
+    if (ctx.unlockedTerms.includes(term.id)) {
       setActiveGlossary({ word: term.ja, desc: "このデータは既に大索引に登録されています。詳細はアーカイブで確認してください。" });
     } else {
-      setUnlockedTerms([...unlockedTerms, term.id]);
+      ctx.setUnlockedTerms([...ctx.unlockedTerms, term.id]);
       setActiveGlossary({ word: term.ja, desc: "【NEW】大索引に新規データが登録されました！ 事件解決後、アーカイブから詳細を解読できます。" });
     }
   };
@@ -160,8 +151,6 @@ function GameContent({
     return elements;
   };
 
-  const chatHistory = beats.slice(0, beatIndex + 1);
-
   return (
     <div className={`w-full max-w-2xl mx-auto relative flex flex-col h-[100dvh] touch-manipulation overscroll-none transition-transform duration-75 select-none ${screenEffect === 'shake' ? '-translate-x-2' : ''} ${isSanityZero ? 'bg-[#1a0f0f]' : 'bg-[#f4ebd8]'}`}>
       {screenEffect === 'flash' && <div className="absolute inset-0 bg-white z-[60] animate-out fade-out duration-500 pointer-events-none mix-blend-overlay" />}
@@ -188,15 +177,14 @@ function GameContent({
         <div className={`absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] ${isSanityZero ? 'from-rose-900/20 opacity-30' : 'from-[#3a2f29] opacity-[0.03]'} to-transparent`} />
         
         <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar relative z-20">
-          {chatHistory.map((beat: any) => {
-            const isCurrent = beat.id === currentBeat.id;
+          {chatHistory.map((beat: any, idx: number) => {
+            const isCurrent = idx === chatHistory.length - 1;
             const textToShow = isCurrent ? displayedText : beat.text;
             const cleanText = (textToShow || "").replace(/\[<NOISE>\]/g, '');
-            // ▼ 新規：Systemの発言かつ「【」で始まる場合はメタ通知として扱う
             const isMetaNotice = beat.speaker === 'System' && cleanText.startsWith('【');
 
             return (
-              <div key={beat.id} className={isSanityZero && isCurrent ? 'animate-[shake_0.5s_infinite]' : ''}>
+              <div key={idx} className={isSanityZero && isCurrent ? 'animate-[shake_0.5s_infinite]' : ''}>
                 <ChatLog speaker={beat.speaker} text={renderText(cleanText)} feedback={isCurrent ? feedback : null} isMetaNotice={isMetaNotice} />
               </div>
             );
@@ -205,9 +193,9 @@ function GameContent({
           <div ref={bottomRef} className="h-20" />
         </div>
 
-        {!isStreaming && currentBeat?.text.match(/\{.*?\}/g)?.some(match => !collectedEvidence.includes(match.slice(1, -1))) && !isInterruptMode && !isWigginsActive && unlockedTerms.includes('W040') && (
+        {!isStreaming && currentBeat?.text.match(/\{.*?\}/g)?.some(match => !collectedEvidence.includes(match.slice(1, -1))) && !isInterruptMode && !isWigginsActive && ctx.unlockedTerms.includes('W040') && (
           <div className="absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-6 z-20 animate-in fade-in zoom-in duration-300">
-             <button onClick={(e) => { e.stopPropagation(); if (insightPoints >= 1 && !isWigginsActive && onSpendPoint(1)) setIsWigginsActive(true); }} disabled={insightPoints < 1} className="bg-amber-700 hover:bg-amber-600 disabled:bg-[#d8c8b8] disabled:text-[#8c7a6b] disabled:cursor-not-allowed text-white text-[10px] sm:text-xs font-bold px-4 py-3 rounded-full shadow-lg flex items-center gap-1.5 transition-transform active:scale-95"><Eye size={16} /> WIGGINS EYE (1pt)</button>
+             <button onClick={(e) => { e.stopPropagation(); if (ctx.insightPoints >= 1 && !isWigginsActive && ctx.handleSpendPoint(1)) setIsWigginsActive(true); }} disabled={ctx.insightPoints < 1} className="bg-amber-700 hover:bg-amber-600 disabled:bg-[#d8c8b8] disabled:text-[#8c7a6b] disabled:cursor-not-allowed text-white text-[10px] sm:text-xs font-bold px-4 py-3 rounded-full shadow-lg flex items-center gap-1.5 transition-transform active:scale-95"><Eye size={16} /> WIGGINS EYE (1pt)</button>
           </div>
         )}
       </div>
@@ -222,7 +210,14 @@ function GameContent({
       )}
 
       <div onClick={(e) => e.stopPropagation()} className="shrink-0 relative z-30 pb-[env(safe-area-inset-bottom)] bg-[#f4ebd8]">
-        {isInterruptMode ? (
+        {currentBeat?.choices && !isStreaming ? (
+          <div className="p-4 flex flex-col gap-3 border-t-2 border-[#8c7a6b]/30 bg-[#1a1512] shadow-[0_-10px_30px_rgba(0,0,0,0.2)] animate-in slide-in-from-bottom-full duration-300">
+            <p className="text-[10px] font-mono text-amber-500 mb-1 text-center tracking-[0.3em] uppercase animate-pulse">LOGIC BRANCH</p>
+            {currentBeat.choices.map((choice: any, idx: number) => (
+              <button key={idx} onClick={() => handleChoice(choice.next_beat_id)} className="w-full py-3.5 sm:py-4 bg-[#2a2420] hover:bg-[#3a2f29] border border-[#8c7a6b]/50 hover:border-amber-500/50 text-[#d8c8b8] hover:text-amber-400 font-bold font-serif tracking-widest rounded-lg shadow-md transition-all active:scale-95 text-sm">{choice.label}</button>
+            ))}
+          </div>
+        ) : isInterruptMode ? (
           <InterruptPanel collectedEvidences={collectedEvidence} hintText={currentBeat?.interrupt?.hint} interventionType={interventionType} isInterventionAvailable={isInterventionAvailable} interventionUsed={interventionUsed} onUseIntervention={() => setInterventionUsed(true)} onSubmit={(skill, evidence) => { if (evidence) handleSelectEvidence(evidence); setTimeout(() => handleInterrupt(skill), 10); setIsInterruptMode(false); }} onTimeUp={() => { handleInterrupt('TIMEOUT'); setIsInterruptMode(false); }} protagonist={protagonist} isMoriarty={isMoriarty} uiLabels={uiLabels} />
         ) : (
           <Controls isStreaming={isStreaming && currentBeat.speaker !== 'System'} selectedSkill={selectedSkill} onNext={nextBeat} onInterrupt={handleInterrupt} />
@@ -247,7 +242,7 @@ function GameContent({
                 {endResult.consequenceData?.holmes_note && <div className="p-4 rounded-lg bg-amber-600/5 border border-amber-700/20 shadow-sm"><h3 className="font-bold text-amber-900 mb-1.5 italic text-xs uppercase tracking-widest">{isMoriarty ? "M.C. Report :" : "Holmes's Note :"}</h3><p className="text-sm leading-relaxed italic text-amber-800/90">{endResult.consequenceData.holmes_note}</p></div>}
               </div>
               <div className="mt-6 text-center pt-4"><p className="text-[10px] text-[#8c7a6b] tracking-widest uppercase mb-1 font-mono">Insight Points Acquired</p><p className="text-4xl font-bold text-amber-600 font-mono drop-shadow-sm">+{endResult.points} pt</p>{isReplay && <p className="text-[9px] text-amber-800/70 mt-1 font-mono tracking-tighter">*再プレイ報酬適用</p>}</div>
-              <button onClick={() => onEpisodeComplete(episodeId, endResult.rank, tether, endResult.points)} className="w-full mt-6 bg-[#3a2f29] hover:bg-[#1a1512] text-[#f4ebd8] font-bold py-3.5 rounded-full tracking-widest transition-transform active:scale-95 shadow-md text-sm">FILE ARCHIVE (記録完了)</button>
+              <button onClick={() => ctx.handleEpisodeComplete(episodeId, endResult.rank, tether, endResult.points)} className="w-full mt-6 bg-[#3a2f29] hover:bg-[#1a1512] text-[#f4ebd8] font-bold py-3.5 rounded-full tracking-widest transition-transform active:scale-95 shadow-md text-sm">FILE ARCHIVE (記録完了)</button>
             </div>
           </div>
         </div>
@@ -256,7 +251,7 @@ function GameContent({
       {isCompleted && !endResult && (
         <div className="absolute inset-0 z-50 bg-[#1a1512]/95 flex flex-col items-center justify-center p-4 animate-in fade-in duration-1000 backdrop-blur-md">
           <p className="text-[#f4ebd8] text-lg font-serif tracking-widest mb-10 animate-pulse text-center">―― そして、記録は次へ繋がる。</p>
-          <button onClick={() => onEpisodeComplete(episodeId, "INTERLUDE", tether, 0)} className="bg-transparent border border-[#8c7a6b] text-[#f4ebd8] hover:bg-[#f4ebd8] hover:text-[#1a1512] font-bold py-3 px-8 rounded-full tracking-widest transition-all duration-300 flex items-center gap-2 active:scale-95">次へ進む <ArrowRight size={20} /></button>
+          <button onClick={() => ctx.handleEpisodeComplete(episodeId, "INTERLUDE", tether, 0)} className="bg-transparent border border-[#8c7a6b] text-[#f4ebd8] hover:bg-[#f4ebd8] hover:text-[#1a1512] font-bold py-3 px-8 rounded-full tracking-widest transition-all duration-300 flex items-center gap-2 active:scale-95">次へ進む <ArrowRight size={20} /></button>
         </div>
       )}
     </div>
