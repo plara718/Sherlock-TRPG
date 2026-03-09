@@ -9,7 +9,7 @@ import ChatLog from '@/components/ChatLog';
 import { useGameLogic, ScenarioData } from '@/lib/useGameLogic';
 import { FileText, ArrowRight, Eye, AlertTriangle } from 'lucide-react';
 
-// 大索引データ（これはゲーム全体で即座に使うため静的インポートのまま）
+// 大索引データ
 import glossaryData from '@/data/glossary.json';
 
 type GameViewProps = {
@@ -30,25 +30,25 @@ export default function GameView(props: GameViewProps) {
 
   useEffect(() => {
     let isMounted = true;
-    setScenarioData(null); // エピソードが切り替わったら一度リセット
+    setScenarioData(null);
     setError(false);
 
     const fetchScenario = async () => {
       try {
         let fileName = '';
         if (props.episodeId.startsWith('Interlude')) {
-          fileName = `interlude_${props.episodeId.split('-')[1].toLowerCase()}`; // Interlude-S1 -> interlude_s1
+          fileName = `interlude_${props.episodeId.split('-')[1].toLowerCase()}`;
         } else if (props.episodeId.startsWith('SP-')) {
-          fileName = `episode_sp${props.episodeId.split('-')[1]}`; // SP-01 -> episode_sp01
+          fileName = `episode_sp${props.episodeId.split('-')[1]}`;
         } else {
-          fileName = `episode_${props.episodeId.replace('#', '')}`; // #00 -> episode_00
+          fileName = `episode_${props.episodeId.replace('#', '')}`;
         }
         
-        // 必要なJSONデータだけを非同期でチャンク（分割）読み込み
-        const module = await import(`@/data/${fileName}.json`);
+        // ▼ 修正点: 変数名を module から scenarioModule に変更
+        const scenarioModule = await import(`@/data/${fileName}.json`);
         
         if (isMounted) {
-          setScenarioData(module.default || module);
+          setScenarioData(scenarioModule.default || scenarioModule);
         }
       } catch (err) {
         console.error("Failed to load scenario data:", err);
@@ -60,7 +60,6 @@ export default function GameView(props: GameViewProps) {
     return () => { isMounted = false; };
   }, [props.episodeId]);
 
-  // エラー発生時のUI
   if (error) {
     return (
       <div className="h-[100dvh] w-full bg-[#1a0f0f] flex flex-col items-center justify-center font-mono text-rose-500 tracking-widest text-xs p-4 text-center">
@@ -74,7 +73,6 @@ export default function GameView(props: GameViewProps) {
     );
   }
 
-  // データ読み込み中（ロード中）のUI
   if (!scenarioData) {
     return (
       <div className="h-[100dvh] w-full bg-[#1a1512] flex flex-col items-center justify-center font-mono text-[#8c7a6b] tracking-[0.3em] text-xs">
@@ -84,7 +82,6 @@ export default function GameView(props: GameViewProps) {
     );
   }
 
-  // データが読み込めたら、本体のゲームエンジンへデータを渡す
   return <GameContent {...props} scenarioData={scenarioData} />;
 }
 
@@ -99,9 +96,7 @@ function GameContent({
   const [isInterruptMode, setIsInterruptMode] = useState(false);
   const [screenEffect, setScreenEffect] = useState<'none' | 'flash' | 'shake' | 'glass-shatter'>('none');
   const [isWigginsActive, setIsWigginsActive] = useState(false);
-
   const [isSanityZero, setIsSanityZero] = useState(false);
-
   const isReplay = Boolean(clearedData[episodeId]);
 
   const {
@@ -449,7 +444,7 @@ function GameContent({
                 {endResult.consequenceData?.holmes_note && (
                   <div className="p-4 rounded-lg bg-amber-600/5 border border-amber-700/20 shadow-sm">
                     <h3 className="font-bold text-amber-900 mb-1.5 italic text-xs uppercase tracking-widest">
-                      {isMoriarty ? "M.C. Report :" : "Holmes's Note :"}
+                      {isMoriarty ? "M.C. Report :" : "Holmes&apos;s Note :"}
                     </h3>
                     <p className="text-sm leading-relaxed italic text-amber-800/90">{endResult.consequenceData.holmes_note}</p>
                   </div>
