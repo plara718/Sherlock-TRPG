@@ -57,6 +57,10 @@ export default function GreatIndexTab() {
 
   const [expandedTermId, setExpandedTermId] = useState<string | null>(null);
   const [selectedLetter, setSelectedLetter] = useState<string>('ALL');
+  
+  // ▼ 新規追加：検索・カテゴリ用のステート
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
   // ガチャ演出用のステート
   const [isDecrypting, setIsDecrypting] = useState(false);
@@ -71,55 +75,73 @@ export default function GreatIndexTab() {
   const isSeason3Phase3 = clearedEpIds.includes('#38') || clearedEpIds.includes('#39');
   const isPostReichenbach = clearedEpIds.includes('#40');
   
+  // ▼ 新規追加：JSONから存在するカテゴリを自動抽出
+  const CATEGORIES = ['ALL', ...Array.from(new Set(glossaryData.terms.map((t: any) => t.category)))].filter(Boolean) as string[];
+
   const availableTerms = glossaryData.terms.filter(
     (t) => !unlockedTerms.includes(t.id) && (t.appearance === 'general' || clearedEpIds.includes(t.appearance) || t.appearance.startsWith('SP-'))
   );
 
-  // ガチャ実行ロジック
   const executeGacha = () => {
     if (insightPoints <= 0 || availableTerms.length === 0) return;
-    
-    // ポイント消費
     if (!handleSpendPoint(1)) return;
 
-    // 用語を抽選
     const randomTerm = availableTerms[Math.floor(Math.random() * availableTerms.length)];
     
-    // 演出開始
     setIsDecrypting(true);
     setNewlyUnlockedTerm(randomTerm);
 
-    // 1.5秒のハッキング演出後にポップアップ表示
     setTimeout(() => {
       setIsDecrypting(false);
       setShowPopup(true);
-      
-      // データ的にアンロックを確定させる
       setUnlockedTerms([...unlockedTerms, randomTerm.id]);
     }, 1500);
   };
 
-  // ポップアップを閉じる処理
   const closePopup = () => {
     setShowPopup(false);
     setNewlyUnlockedTerm(null);
-    setSelectedLetter('NEW'); // 自動でNEWタブへ
+    setSelectedLetter('NEW'); 
     setExpandedTermId(null);
   };
 
+  // ▼ 修正：検索とカテゴリ絞り込みを統合したフィルター処理
   const filteredTerms = glossaryData.terms.filter((term) => {
-    if (selectedLetter === 'NEW') return unlockedTerms.includes(term.id) && !readTerms.includes(term.id);
-    if (selectedLetter === 'ALL') return true;
-    return term.id.startsWith(selectedLetter);
+    // 検索入力がある場合：アルファベットタブを無視して全体検索（未アンロックは隠す）
+    if (searchQuery.trim() !== '') {
+      const isUnlocked = unlockedTerms.includes(term.id);
+      if (!isUnlocked) return false;
+      if (selectedCategory !== 'ALL' && term.category !== selectedCategory) return false;
+
+      const q = searchQuery.toLowerCase();
+      const matchJa = term.ja?.toLowerCase().includes(q);
+      const matchEn = term.en?.toLowerCase().includes(q);
+      const matchDetails = term.details?.toLowerCase().includes(q);
+      return matchJa || matchEn || matchDetails;
+    }
+
+    // 検索がない通常の絞り込み
+    if (selectedLetter === 'NEW') {
+      if (!(unlockedTerms.includes(term.id) && !readTerms.includes(term.id))) return false;
+    } else if (selectedLetter !== 'ALL') {
+      if (!term.id.startsWith(selectedLetter)) return false;
+    }
+
+    if (selectedCategory !== 'ALL' && term.category !== selectedCategory) {
+      return false;
+    }
+
+    return true;
   });
 
   const hasNewInLetter = useCallback((letter: string) => {
     if (letter === 'NEW') return false; 
     return glossaryData.terms.some((term) => {
       if (letter !== 'ALL' && !term.id.startsWith(letter)) return false;
+      if (selectedCategory !== 'ALL' && term.category !== selectedCategory) return false;
       return unlockedTerms.includes(term.id) && !readTerms.includes(term.id);
     });
-  }, [unlockedTerms, readTerms]);
+  }, [unlockedTerms, readTerms, selectedCategory]);
 
   const handleToggleTerm = useCallback((termId: string, isUnlocked: boolean, isRead: boolean) => {
     if (isUnlocked) {
@@ -131,7 +153,7 @@ export default function GreatIndexTab() {
   return (
     <div className="animate-in fade-in duration-300 relative min-h-screen">
       
-      {/* ▼ ガチャ演出：ノイズ走査線画面（Z-Index高） */}
+      {/* ガチャ演出：ノイズ走査線画面 */}
       {isDecrypting && (
         <div className="fixed inset-0 z-50 bg-[#0a0a0a] flex flex-col items-center justify-center overflow-hidden">
           <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(16,185,129,0.1)_2px,rgba(16,185,129,0.1)_4px)] animate-[pulse_0.1s_infinite]" />
@@ -142,14 +164,13 @@ export default function GreatIndexTab() {
           <p className="mt-4 font-mono text-emerald-600/60 text-xs tracking-widest">
             EXTRACTING DATA FROM THE INDEX
           </p>
-          {/* ランダムな文字が流れるエフェクト */}
           <div className="absolute bottom-10 w-full text-center font-mono text-[10px] text-emerald-800/40 break-all px-4 overflow-hidden h-20 opacity-50">
             {Array.from({length: 200}).map(() => Math.random().toString(36).substring(2, 3)).join('')}
           </div>
         </div>
       )}
 
-      {/* ▼ ガチャ演出：獲得結果ポップアップ */}
+      {/* ガチャ演出：獲得結果ポップアップ */}
       {showPopup && newlyUnlockedTerm && (
         <div className="fixed inset-0 z-50 bg-[#1a1512]/90 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-[#fffcf7] max-w-sm w-full rounded-2xl shadow-2xl border-2 border-emerald-600/50 relative overflow-hidden animate-in zoom-in-95 duration-500">
@@ -178,8 +199,8 @@ export default function GreatIndexTab() {
         </div>
       )}
 
-      {/* 以下、通常の大索引UI（変更なし） */}
-      <div className={`flex items-end justify-between mb-6 border-b pb-4 ${isSeason3Phase3 && !isPostReichenbach ? 'border-rose-900/50' : 'border-[#8c7a6b]/30'}`}>
+      {/* ヘッダーエリア */}
+      <div className={`flex items-end justify-between mb-4 border-b pb-4 ${isSeason3Phase3 && !isPostReichenbach ? 'border-rose-900/50' : 'border-[#8c7a6b]/30'}`}>
         <div>
           <p className={`text-xs sm:text-sm font-mono tracking-widest ${isSeason3Phase3 && !isPostReichenbach ? 'text-rose-600 animate-pulse' : 'text-[#8c7a6b]'}`}>
             {isSeason3Phase3 && !isPostReichenbach ? 'SYSTEM ALERT - FATAL ERROR' : '大索引 - 網羅的犯罪アーカイブ'}
@@ -199,7 +220,7 @@ export default function GreatIndexTab() {
 
           {availableTerms.length > 0 ? (
             <button
-              onClick={executeGacha} // ▼ 修正：ContextのhandleResearchではなく独自のexecuteGachaを呼ぶ
+              onClick={executeGacha}
               disabled={insightPoints <= 0 || isDecrypting}
               className="flex items-center gap-1 text-[10px] sm:text-xs bg-amber-600 hover:bg-amber-500 text-white font-bold px-3 py-1.5 rounded-full disabled:bg-[#d8c8b8] disabled:text-[#8c7a6b] disabled:cursor-not-allowed transition-all active:scale-95 shadow-md"
             >
@@ -213,6 +234,38 @@ export default function GreatIndexTab() {
         </div>
       </div>
 
+      {/* ▼ 新規追加：検索バー＆カテゴリフィルタ */}
+      <div className="mb-4 space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8c7a6b] w-4 h-4" />
+          <input 
+            type="text" 
+            placeholder="インデックス内を検索 (アンロック済みのデータのみ)" 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-[#fffcf7] border border-[#8c7a6b]/30 text-[#3a2f29] rounded-lg pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600 placeholder:text-[#8c7a6b]/50 transition-colors shadow-sm"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8c7a6b] hover:text-[#3a2f29] transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 custom-scrollbar snap-x">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => { setSelectedCategory(cat); setExpandedTermId(null); }}
+              className={`snap-start px-3 py-1.5 text-xs font-bold rounded-full border transition-colors whitespace-nowrap ${selectedCategory === cat ? 'bg-[#5c4d43] text-[#f4ebd8] border-[#5c4d43] shadow-md' : 'bg-[#e6d5c3]/50 text-[#5c4d43] border-[#8c7a6b]/30 hover:bg-[#d8c8b8]'}`}
+            >
+              {cat === 'ALL' ? 'すべてのカテゴリ' : cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* アルファベットタブ */}
       <div className="flex overflow-x-auto gap-2 mb-6 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 custom-scrollbar snap-x">
         {ALPHABETS.map((letter) => {
           const showNewBadge = hasNewInLetter(letter);
@@ -222,7 +275,7 @@ export default function GreatIndexTab() {
           return (
             <button
               key={letter}
-              onClick={() => { setSelectedLetter(letter); setExpandedTermId(null); }}
+              onClick={() => { setSelectedLetter(letter); setExpandedTermId(null); setSearchQuery(''); }}
               className={`snap-start relative px-4 py-1.5 font-mono font-bold text-xs sm:text-sm rounded-full transition-colors flex-shrink-0 border ${isSelected ? isNewTab ? 'bg-rose-700 text-white border-rose-700 shadow-md' : 'bg-[#5c4d43] text-[#f4ebd8] border-[#5c4d43] shadow-md' : isNewTab ? 'bg-rose-100 text-rose-700 border-rose-200 hover:bg-rose-200' : 'bg-[#e6d5c3] text-[#5c4d43] border-[#8c7a6b]/30 hover:bg-[#d8c8b8]'}`}
             >
               {letter}
@@ -232,7 +285,8 @@ export default function GreatIndexTab() {
         })}
       </div>
 
-      <div className="grid gap-3">
+      {/* 検索結果リスト */}
+      <div className="grid gap-3 pb-20">
         {filteredTerms.length > 0 ? (
           filteredTerms.map((term) => {
             const isUnlocked = unlockedTerms.includes(term.id);
@@ -260,7 +314,7 @@ export default function GreatIndexTab() {
           })
         ) : (
           <div className="text-center py-12 text-[#8c7a6b] font-mono text-xs border border-dashed border-[#8c7a6b]/30 rounded-xl bg-[#e6d5c3]/20">
-            No unread data found in &quot;{selectedLetter}&quot;.
+            {searchQuery ? `No matches found for "${searchQuery}".` : `No unread data found in "${selectedLetter}".`}
           </div>
         )}
       </div>
