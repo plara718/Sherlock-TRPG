@@ -15,6 +15,7 @@ type InterruptPanelProps = {
   protagonist?: string;
   uiLabels: { gaugeName: string; actionButton: string };
   isMoriarty?: boolean;
+  isEvidenceRequired?: boolean; // ▼ 新規追加
 };
 
 export default function InterruptPanel({
@@ -29,15 +30,13 @@ export default function InterruptPanel({
   protagonist = 'watson',
   uiLabels,
   isMoriarty = false,
+  isEvidenceRequired = false,
 }: InterruptPanelProps) {
   const [timeLeft, setTimeLeft] = useState(15);
-  const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
   const [selectedEvidence, setSelectedEvidence] = useState<string | null>(null);
   const [showHint, setShowHint] = useState(false);
 
   const isIrene = protagonist === 'irene';
-
-  // ▼ 新規：テキストが「【」から始まる場合は、チュートリアル用のメタ指示と判定し自動表示する
   const isMetaHint = hintText?.startsWith('【');
 
   useEffect(() => {
@@ -97,7 +96,6 @@ export default function InterruptPanel({
           </div>
         </div>
 
-        {/* ▼ メタ指示でない場合のみ HINT ボタンを表示 */}
         {hintText && !showHint && !isMetaHint && (
           <div className="mb-4">
             {renderInterventionButton() || (
@@ -108,10 +106,9 @@ export default function InterruptPanel({
           </div>
         )}
 
-        {/* ▼ ボタンが押されたか、またはメタ指示（チュートリアル）の場合は自動で本文を表示 */}
         {(showHint || isMetaHint) && hintText && (
           <div className={`mb-4 p-3 sm:p-4 rounded-lg border text-sm font-serif leading-relaxed animate-in fade-in slide-in-from-top-2 shadow-inner ${
-            isMetaHint ? 'bg-amber-500/20 border-amber-500/50 text-amber-50 font-sans font-bold shadow-[0_0_15px_rgba(245,158,11,0.2)]' : // チュートリアル用の目立つスタイル
+            isMetaHint ? 'bg-amber-500/20 border-amber-500/50 text-amber-50 font-sans font-bold shadow-[0_0_15px_rgba(245,158,11,0.2)]' :
             interventionType === 'Irene' ? 'bg-rose-950/30 border-rose-500/30 text-rose-100' :
             interventionType === 'Mycroft' ? 'bg-blue-950/30 border-blue-500/30 text-blue-100' :
             interventionType === 'Wiggins' ? 'bg-amber-950/30 border-amber-500/30 text-amber-100' :
@@ -126,17 +123,16 @@ export default function InterruptPanel({
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-5">
-          {skillOptions.map((skill) => (
-            <button key={skill.id} onClick={() => setSelectedSkill(skill.id)} className={`py-3 rounded-xl flex flex-col items-center gap-1.5 transition-all border-2 active:scale-95 ${selectedSkill === skill.id ? isMoriarty ? 'bg-fuchsia-900/40 border-fuchsia-500 text-fuchsia-100 shadow-[0_0_15px_rgba(217,70,239,0.3)]' : isIrene ? 'bg-rose-900/40 border-rose-500 text-rose-100 shadow-[0_0_15px_rgba(225,29,72,0.3)]' : 'bg-emerald-900/40 border-emerald-500 text-emerald-100 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-[#2a2420] border-[#3a2f29] text-[#8c7a6b] hover:bg-[#3a2f29] hover:border-[#5c4d43] hover:text-[#d8c8b8]'}`}>
-              {skill.icon}
-              <span className="text-[9px] sm:text-[10px] font-bold tracking-widest">{skill.label}</span>
-            </button>
-          ))}
-        </div>
-
+        {/* ▼ 修正：証拠の任意・必須UI表示 */}
         <div className="mb-5">
-          <p className="text-[10px] font-mono text-[#8c7a6b] mb-2 uppercase tracking-widest flex items-center gap-2">Evidence Link <span className="text-[8px] opacity-60">(Optional)</span></p>
+          <p className="text-[10px] font-mono mb-2 uppercase tracking-widest flex items-center gap-2 text-[#8c7a6b]">
+            Evidence Link 
+            {isEvidenceRequired ? (
+              <span className="text-rose-500 font-bold border border-rose-500/30 px-1.5 py-0.5 rounded shadow-[0_0_5px_rgba(225,29,72,0.3)] animate-pulse">Required (必須)</span>
+            ) : (
+              <span className="text-emerald-500 font-bold border border-emerald-500/30 px-1.5 py-0.5 rounded opacity-70">Optional (任意)</span>
+            )}
+          </p>
           <div className="flex flex-wrap gap-2">
             {collectedEvidences.map((ev) => (
               <button key={ev} onClick={() => setSelectedEvidence(selectedEvidence === ev ? null : ev)} className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all active:scale-95 border ${selectedEvidence === ev ? 'bg-amber-600 text-[#1a1512] border-amber-500 shadow-[0_0_10px_rgba(217,119,6,0.5)]' : 'bg-[#2a2420] text-[#a8988a] border-[#3a2f29] hover:bg-[#3a2f29] hover:text-[#f4ebd8]'}`}>{ev}</button>
@@ -144,9 +140,25 @@ export default function InterruptPanel({
           </div>
         </div>
 
-        <button onClick={() => { if (selectedSkill) onSubmit(selectedSkill, selectedEvidence); }} disabled={!selectedSkill} className={`w-full py-3.5 sm:py-4 disabled:bg-[#2a2420] disabled:text-[#5c4d43] disabled:border disabled:border-[#3a2f29] disabled:cursor-not-allowed text-white font-bold tracking-widest uppercase rounded-full shadow-lg transition-transform flex items-center justify-center gap-2 active:scale-95 text-sm ${isMoriarty ? 'bg-fuchsia-900 hover:bg-fuchsia-800' : isIrene ? 'bg-fuchsia-800 hover:bg-fuchsia-700' : 'bg-rose-800 hover:bg-rose-700'}`}>
-          {uiLabels.actionButton}
-        </button>
+        {/* ▼ 修正：スキルボタンを即時実行ボタンに変更（下の実行ボタンは廃止） */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-2">
+          {skillOptions.map((skill) => (
+            <button 
+              key={skill.id} 
+              onClick={() => {
+                onSubmit(skill.id, selectedEvidence); // 即時実行
+              }} 
+              className={`py-4 rounded-xl flex flex-col items-center gap-2 transition-all border-2 active:scale-95 shadow-lg
+                ${isMoriarty ? 'bg-fuchsia-900/20 border-fuchsia-900/50 hover:bg-fuchsia-900/60 hover:border-fuchsia-400 text-fuchsia-100 hover:shadow-[0_0_15px_rgba(217,70,239,0.4)]' 
+                : isIrene ? 'bg-rose-900/20 border-rose-900/50 hover:bg-rose-900/60 hover:border-rose-400 text-rose-100 hover:shadow-[0_0_15px_rgba(225,29,72,0.4)]' 
+                : 'bg-emerald-900/20 border-emerald-900/50 hover:bg-emerald-900/60 hover:border-emerald-400 text-emerald-100 hover:shadow-[0_0_15px_rgba(16,185,129,0.4)]'}`}
+            >
+              {skill.icon}
+              <span className="text-[9px] sm:text-[10px] font-bold tracking-widest">{skill.label}</span>
+              <span className={`text-[8px] opacity-60 px-2 py-0.5 rounded font-mono ${isMoriarty ? 'bg-fuchsia-950 text-fuchsia-400' : isIrene ? 'bg-rose-950 text-rose-400' : 'bg-emerald-950 text-emerald-400'}`}>TAP TO RUN</span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

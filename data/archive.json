@@ -88,13 +88,13 @@
     },
     {
       "season_id": "SP",
-      "title": "Special: 並行世界の女",
+      "title": "Special Scenario:",
       "years": "Unknown",
       "description": "本編の裏側で交錯する、様々な人物たちの軌跡（サイドストーリー）。",
       "episodes": [
-        { "id": "SP-01", "title": "ワルシャワの残影", "status": "locked", "category": "アイリーン・アドラーの軌跡", "intervention": "Irene", "summary": "ボヘミア王の事件の前日譚。彼女はいかにして王室のスキャンダルを握ったのか。" },
-        { "id": "SP-02", "title": "大陸の火撃ち", "status": "locked", "category": "アイリーン・アドラーの軌跡", "intervention": "Irene", "summary": "大陸へ渡ったアイリーン。彼女を追うモリアーティの手先、モラン大佐との遭遇。" },
-        { "id": "SP-03", "title": "別れの序曲", "status": "locked", "category": "アイリーン・アドラーの軌跡", "intervention": "Irene", "summary": "ライヘンバッハの悲劇を知った彼女の行動。盤面の外からモリアーティの資金網を破壊する。" },
+        { "id": "SP-01", "title": "ワルシャワの残影", "status": "locked", "category": "並行世界の女", "intervention": "Irene", "summary": "ボヘミア王の事件の前日譚。彼女はいかにして王室のスキャンダルを握ったのか。" },
+        { "id": "SP-02", "title": "大陸の火撃ち", "status": "locked", "category": "並行世界の女", "intervention": "Irene", "summary": "大陸へ渡ったアイリーン。彼女を追うモリアーティの手先、モラン大佐との遭遇。" },
+        { "id": "SP-03", "title": "別れの序曲", "status": "locked", "category": "並行世界の女", "intervention": "Irene", "summary": "ライヘンバッハの悲劇を知った彼女の行動。盤面の外からモリアーティの資金網を破壊する。" },
         { "id": "SP-04", "title": "ベイカー街遊撃隊のいちばん長い日", "status": "locked", "category": "ベイカー街遊撃隊の事件簿", "summary": "ホームズの目となり耳となる浮浪児たち。彼らが見つけた、大人たちが気づかない小さな『点』。" },
         { "id": "SP-05", "title": "緋色の追憶", "status": "locked", "category": "ベイカー街遊撃隊の事件簿", "summary": "過去の事件（緋色の研究）の残党が引き起こす騒動。ウィギンズたちの活躍。" },
         { "id": "SP-06", "title": "緋色の毒薬", "status": "locked", "category": "ベイカー街遊撃隊の事件簿", "summary": "街に出回る新たな毒物。ホームズが動けない中、遊撃隊が下町を駆け回り供給源を絶つ。" }

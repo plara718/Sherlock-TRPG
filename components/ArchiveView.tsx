@@ -150,7 +150,7 @@ export default function ArchiveView() {
           <span className="hidden sm:inline text-xs font-bold tracking-widest">TITLE</span>
         </button>
         
-        <h1 className={`text-lg sm:text-xl font-serif font-bold tracking-widest text-center absolute left-1/2 -translate-x-1/2 ${isSeason3 ? 'text-rose-700 drop-shadow-[0_0_10px_rgba(225,29,72,0.8)]' : 'text-[#3a2f29]'}`}>
+        <h1 className={`hidden sm:block text-lg sm:text-xl font-serif font-bold tracking-widest text-center absolute left-1/2 -translate-x-1/2 ${isSeason3 ? 'text-rose-700 drop-shadow-[0_0_10px_rgba(225,29,72,0.8)]' : 'text-[#3a2f29]'}`}>
           {activeTab === 'case' ? 'CHRONOLOGY' : activeTab === 'index' ? 'GREAT INDEX' : activeTab === 'settings' ? 'SYSTEM SETTING' : 'SPIDER WEB'}
         </h1>
 
