@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Lock, FileText, Play, FolderOpen } from 'lucide-react';
+import { Lock, Play, FolderOpen } from 'lucide-react';
 
 // @ts-ignore
 import rawArchiveData from '@/data/archive.json';
@@ -29,16 +29,16 @@ export default function ChronologyTab({
   currentSeason,
   clearedData,
   onPlayEpisode,
-  onShowReport,
   clearedEpisodes,
 }: ChronologyTabProps) {
+  // 初期タブはSeason 1（数値の1）
   const [activeTab, setActiveTab] = useState<number | string>(1);
   const [expandedEp, setExpandedEp] = useState<string | null>(null);
 
   const displaySeason = archiveData.seasons.find((s: any) => s.season_id === activeTab) || archiveData.seasons[0];
   const allEpisodes = archiveData.seasons.flatMap((s: any) => s.episodes);
 
-  // ▼ 特殊エピソード（SPおよび幕間）の解放条件を判定する関数
+  // ▼ 特殊エピソード（SPおよび幕間）の解放条件
   const checkSpecialPlayable = (epId: string) => {
     switch (epId) {
       // 幕間
@@ -72,7 +72,9 @@ export default function ChronologyTab({
       {/* スマホ最適化：折り返し表示（自動ラップ）のシーズン選択ピル */}
       <div className="flex flex-wrap gap-2 sm:gap-3 mb-6">
         {archiveData.seasons.map((s: any) => {
+          // SPタブは常にロック解除（isLocked = false）。数値のSeasonは進行度で判定。
           const isLocked = typeof s.season_id === 'number' && s.season_id > currentSeason;
+          
           return (
             <button
               key={s.season_id}
@@ -87,7 +89,8 @@ export default function ChronologyTab({
                   : 'bg-[#e6d5c3] text-[#5c4d43] border-[#8c7a6b]/30 hover:bg-[#d8c8b8]'
               }`}
             >
-              {s.title.split(':')[0]}
+              {/* "Season 1: 黎明" などのコロンより前だけ表示（SPの場合はそのまま表示） */}
+              {s.title.includes(':') ? s.title.split(':')[0] : s.title}
               {isLocked && <Lock size={14} className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
             </button>
           );
@@ -123,22 +126,16 @@ export default function ChronologyTab({
                     const globalIndex = allEpisodes.findIndex((e: any) => e.id === ep.id);
                     const prevEp = globalIndex > 0 ? allEpisodes[globalIndex - 1] : null;
                     
-                    // 実装状況の判定
                     const isImplemented = ep.status !== 'locked';
-                    
-                    // ▼ 解放条件の判定ロジック
                     let isPlayable = false;
                     
                     if (ep.id.startsWith('SP-') || ep.id.startsWith('Interlude-')) {
-                      // SPおよび幕間は個別の特殊条件で解放
                       isPlayable = isImplemented && checkSpecialPlayable(ep.id);
                     } else if (ep.id === '#39') {
-                      // ▼ 第39話の特別解放条件：第38話クリア ＋ すべてのSPシナリオクリア
                       const is38Cleared = clearedEpisodes.includes('#38');
                       const areAllSpCleared = ['SP-01', 'SP-02', 'SP-03', 'SP-04', 'SP-05', 'SP-06'].every(spId => clearedEpisodes.includes(spId));
                       isPlayable = isImplemented && (!!cData || (is38Cleared && areAllSpCleared));
                     } else {
-                      // 通常の本編は、最初のエピソードか、1つ前のエピソードがクリア済みなら解放
                       const isNextPlayable = globalIndex === 0 || (prevEp && clearedData[prevEp.id]);
                       isPlayable = isImplemented && (!!cData || isNextPlayable);
                     }
@@ -170,9 +167,16 @@ export default function ChronologyTab({
                             <div className={`font-bold text-base leading-tight ${isPlayable ? 'text-[#3a2f29]' : 'text-[#8c7a6b]'}`}>
                               {isPlayable ? ep.title : '??? (LOCKED)'}
                             </div>
+                            
+                            {/* ▼ 追加：あらすじ（summary）を1行でチラ見せ */}
+                            {isPlayable && ep.summary && (
+                              <p className="text-[10px] sm:text-xs text-[#8c7a6b] mt-1.5 line-clamp-1 font-serif opacity-80">
+                                {ep.summary}
+                              </p>
+                            )}
                           </div>
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 shrink-0">
                             {cData ? (
                               <span className={`text-[10px] text-white px-2 py-1 rounded font-bold tracking-widest shadow-sm ${
                                   cData.rank === 'LUCID' || cData.rank === 'CLEARED' ? 'bg-emerald-700' : cData.rank === 'SYMPATHETIC' ? 'bg-blue-700' : 'bg-rose-800'
