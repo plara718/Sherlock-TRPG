@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-// ▼ 新規：choices（選択肢）と next_beat_id（ジャンプ先）を追加
 export type ScenarioBeat = {
   id: string;
   speaker: string;
@@ -28,6 +27,7 @@ export type ScenarioData = {
     type?: 'normal' | 'cutscene' | 'interlude';
     protagonist?: string; 
     intervention?: string;
+    play_mode?: 'holmes' | 'moriarty'; 
   };
   consequence?: { 
     official_record?: string;
@@ -45,12 +45,11 @@ const TETHER_PENALTY_WASTE = -5;
 
 export function useGameLogic(
   scenarioData: ScenarioData, 
-  isReplay: boolean = false,
-  playMode: 'holmes' | 'moriarty' = 'holmes'
+  isReplay: boolean = false
 ) {
   const protagonist = scenarioData.meta.protagonist || 'watson';
   const isIrene = protagonist === 'irene';
-  const isMoriarty = playMode === 'moriarty';
+  const isMoriarty = scenarioData.meta.play_mode === 'moriarty';
   const isInterlude = scenarioData.meta.type === 'interlude';
 
   const initialTether = scenarioData.meta.tether_start || (isMoriarty ? 100 : 50);
@@ -226,7 +225,6 @@ export function useGameLogic(
   const nextBeat = () => {
     if (isStreaming) { skipStream(); return; }
     
-    // 選択肢がある場合は画面タップでの進行をブロック
     if (currentBeat.choices) return;
 
     if (!isResolved && !isInterlude) {
@@ -242,7 +240,6 @@ export function useGameLogic(
       }
     }
 
-    // ▼ 修正点：明示的に string | null 型として定義
     let nextId: string | null = null;
     
     if (currentBeat.next_beat_id) {
