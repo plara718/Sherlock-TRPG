@@ -61,8 +61,8 @@ export function useGameLogic(
   const [currentBeatId, setCurrentBeatId] = useState<string>(initialSaveData?.currentBeatId || beats[0]?.id || '');
   const [chatHistory, setChatHistory] = useState<ScenarioBeat[]>(initialSaveData?.chatHistory || (beats[0] ? [beats[0]] : []));
 
-  const [tether, setTether] = useState(initialSaveData?.tether ?? initialTether);
-  const [displayedText, setDisplayedText] = useState(initialSaveData?.displayedText || '');
+  const [tether, setTether] = useState<number>(initialSaveData?.tether ?? initialTether);
+  const [displayedText, setDisplayedText] = useState<string>(initialSaveData?.displayedText || '');
   const [isStreaming, setIsStreaming] = useState(initialSaveData ? false : false);
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'fail' | 'penalty';
