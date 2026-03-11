@@ -45,7 +45,10 @@ const TETHER_PENALTY_WASTE = -5;
 
 export function useGameLogic(
   scenarioData: ScenarioData, 
-  isReplay: boolean = false
+  isReplay: boolean = false,
+  userTextSpeed: number = 30,
+  initialSaveData: any = null,
+  onSaveGame: (data: any) => void = () => {}
 ) {
   const protagonist = scenarioData.meta.protagonist || 'watson';
   const isIrene = protagonist === 'irene';
@@ -55,12 +58,12 @@ export function useGameLogic(
   const initialTether = scenarioData.meta.tether_start || (isMoriarty ? 100 : 50);
   const beats = scenarioData.beats;
 
-  const [currentBeatId, setCurrentBeatId] = useState<string>(beats[0]?.id || '');
-  const [chatHistory, setChatHistory] = useState<ScenarioBeat[]>(beats[0] ? [beats[0]] : []);
+  const [currentBeatId, setCurrentBeatId] = useState<string>(initialSaveData?.currentBeatId || beats[0]?.id || '');
+  const [chatHistory, setChatHistory] = useState<ScenarioBeat[]>(initialSaveData?.chatHistory || (beats[0] ? [beats[0]] : []));
 
-  const [tether, setTether] = useState(initialTether);
-  const [displayedText, setDisplayedText] = useState('');
-  const [isStreaming, setIsStreaming] = useState(false);
+  const [tether, setTether] = useState(initialSaveData?.tether ?? initialTether);
+  const [displayedText, setDisplayedText] = useState(initialSaveData?.displayedText || '');
+  const [isStreaming, setIsStreaming] = useState(initialSaveData ? false : false);
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'fail' | 'penalty';
     msg: string;
@@ -68,7 +71,7 @@ export function useGameLogic(
   } | null>(null);
 
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
-  const [collectedEvidence, setCollectedEvidence] = useState<string[]>([]);
+  const [collectedEvidence, setCollectedEvidence] = useState<string[]>(initialSaveData?.collectedEvidence || []);
   const [selectedEvidence, setSelectedEvidence] = useState<string | null>(null);
   const [isResolved, setIsResolved] = useState(false);
 
@@ -76,8 +79,8 @@ export function useGameLogic(
   const [endResult, setEndResult] = useState<{ rank: string; points: number; consequenceData: any; } | null>(null);
 
   const textStreamRef = useRef<NodeJS.Timeout | null>(null);
-  const currentTextIndex = useRef(0);
-  const tetherRef = useRef(initialTether);
+  const currentTextIndex = useRef(initialSaveData?.displayedText ? initialSaveData.displayedText.length : 0);
+  const tetherRef = useRef(initialSaveData?.tether ?? initialTether);
 
   const uiLabels = {
     gaugeName: isMoriarty ? 'DOMINATION' : (isIrene ? 'CONTROL' : 'TETHER'),
@@ -94,16 +97,22 @@ export function useGameLogic(
 
   const getTextSpeed = useCallback(() => {
     const current = tetherRef.current;
-    if (current >= 80) return 30;
-    if (current >= 40) return 50;
-    return 15;
-  }, []);
+    if (current >= 80) return userTextSpeed;
+    if (current >= 40) return userTextSpeed * 1.5;
+    return userTextSpeed * 0.5;
+  }, [userTextSpeed]);
 
   const currentBeatIndex = beats.findIndex(b => b.id === currentBeatId);
   const currentBeat = beats[currentBeatIndex];
 
   const startBeat = useCallback(() => {
     if (!currentBeat) return;
+
+    if (initialSaveData && displayedText) {
+      setIsStreaming(false);
+      return;
+    }
+
     setDisplayedText('');
     setFeedback(null);
     setSelectedSkill(null);
@@ -133,7 +142,7 @@ export function useGameLogic(
     };
 
     textStreamRef.current = setTimeout(streamNextChar, getTextSpeed());
-  }, [currentBeat, getTextSpeed]);
+  }, [currentBeat, getTextSpeed, initialSaveData, displayedText]);
 
   const skipStream = useCallback(() => {
     if (isStreaming && currentBeat) {
@@ -153,30 +162,16 @@ export function useGameLogic(
 
   const handleSelectEvidence = (evidence: string) => {
     if (isResolved || currentBeat?.speaker === 'System' || isStreaming) return;
-    setSelectedEvidence((prev) => {
-      const newEv = prev === evidence ? null : evidence;
-      if (selectedSkill) {
-        if (!newEv) setFeedback({ type: 'penalty', msg: `[${selectedSkill}] 視点を選択中。実行には【証拠】もセットしてくれ。` });
-        else setFeedback({ type: 'success', msg: `準備完了。右下の「${uiLabels.actionButton}」を押せ。` });
-      } else {
-        if (newEv) setFeedback({ type: 'success', msg: `証拠 [${newEv}] をセットした。` });
-        else setFeedback(null);
-      }
-      return newEv;
-    });
+    setSelectedEvidence((prev) => prev === evidence ? null : evidence);
   };
 
   const handleInterrupt = (skillName: string) => {
     if (isResolved || currentBeat?.speaker === 'System' || isStreaming) return;
     if (selectedSkill === skillName) {
       setSelectedSkill(null);
-      if (selectedEvidence) setFeedback({ type: 'success', msg: `証拠 [${selectedEvidence}] をセットした。` });
-      else setFeedback(null);
       return;
     }
     setSelectedSkill(skillName);
-    if (!selectedEvidence) setFeedback({ type: 'penalty', msg: `[${skillName}] 視点を選択中。実行には確たる【証拠】のセットが必要だ。` });
-    else setFeedback({ type: 'success', msg: `準備完了。右下の「${uiLabels.actionButton}」を押せ。` });
   };
 
   const evaluatePanelInterrupt = useCallback((skill: string, evidence: string | null) => {
@@ -224,7 +219,6 @@ export function useGameLogic(
 
   const nextBeat = () => {
     if (isStreaming) { skipStream(); return; }
-    
     if (currentBeat.choices) return;
 
     if (!isResolved && !isInterlude) {
@@ -284,6 +278,20 @@ export function useGameLogic(
   };
 
   useEffect(() => { startBeat(); return () => { if (textStreamRef.current) clearTimeout(textStreamRef.current); }; }, [currentBeatId, startBeat]);
+
+  // オートセーブ処理
+  useEffect(() => {
+    if (!isCompleted && currentBeatId && chatHistory.length > 0) {
+      onSaveGame({
+        episodeId: scenarioData.meta.episode_id,
+        currentBeatId,
+        chatHistory,
+        tether,
+        displayedText,
+        collectedEvidence
+      });
+    }
+  }, [currentBeatId, chatHistory, tether, displayedText, collectedEvidence, isCompleted, onSaveGame, scenarioData.meta.episode_id]);
 
   return {
     currentBeat,

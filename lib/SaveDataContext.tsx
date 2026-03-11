@@ -19,6 +19,9 @@ type SaveDataContextType = {
   clearedData: ClearedData;
   unlockedTruths: Record<string, any>;
   currentSeason: number;
+  activeGameData: any;
+  setActiveGameData: React.Dispatch<React.SetStateAction<any>>;
+  clearActiveGameData: () => void;
   mycroftIntel: string[];
   handleStartConnection: () => void;
   handleResetData: () => void;
@@ -30,234 +33,169 @@ type SaveDataContextType = {
   handleReadTerm: (termId: string) => void;
   handleUnlockTruth: (pinId: string, truthData: any, linkCost: number) => void;
   handleLinkFail: (linkCost: number) => void;
+  textSpeed: number;
+  setTextSpeed: (speed: number) => void;
+  reduceEffects: boolean;
+  setReduceEffects: (reduce: boolean) => void;
 };
 
-const SaveDataContext = createContext<SaveDataContextType | null>(null);
+const SaveDataContext = createContext<SaveDataContextType | undefined>(undefined);
 
-export const useSaveData = () => {
-  const ctx = useContext(SaveDataContext);
-  if (!ctx) throw new Error('useSaveData must be used within SaveDataProvider');
-  return ctx;
-};
-
-export const SaveDataProvider = ({ children }: { children: ReactNode }) => {
-  const [view, setView] = useState<'title' | 'game' | 'archive' | 'endroll'>('title');
-  const [hasSaveData, setHasSaveData] = useState(false);
+export function SaveDataProvider({ children }: { children: ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
+  const [view, setView] = useState<'title' | 'game' | 'archive' | 'endroll'>('title');
   const [currentEpisodeId, setCurrentEpisodeId] = useState<string>('#00');
 
-  const [unlockedTerms, setUnlockedTermsState] = useState<string[]>([]);
+  const [unlockedTerms, setUnlockedTerms] = useState<string[]>([]);
   const [readTerms, setReadTerms] = useState<string[]>([]);
-  const [insightPoints, setInsightPoints] = useState<number>(0);
+  const [insightPoints, setInsightPoints] = useState(0);
   const [clearedData, setClearedData] = useState<ClearedData>({});
   const [unlockedTruths, setUnlockedTruths] = useState<Record<string, any>>({});
-  const [currentSeason, setCurrentSeason] = useState<number>(1);
+  const [textSpeed, setTextSpeed] = useState<number>(30);
+  const [reduceEffects, setReduceEffects] = useState<boolean>(false);
+  const [activeGameData, setActiveGameData] = useState<any>(null);
+
+  const currentSeason = 
+    clearedData['#39'] ? 4 : 
+    clearedData['#29'] ? 3 : 
+    clearedData['#13'] ? 2 : 1;
+
   const [mycroftIntel, setMycroftIntel] = useState<string[]>([]);
-
+  
   useEffect(() => {
-    const save = localStorage.getItem('tether_save_data');
-    if (save) setHasSaveData(true);
-    const terms = localStorage.getItem('tether_unlocked_terms');
-    if (terms) setUnlockedTermsState(JSON.parse(terms));
-    const read = localStorage.getItem('tether_read_terms');
-    if (read) setReadTerms(JSON.parse(read));
-    const points = localStorage.getItem('tether_insight_points');
-    if (points) setInsightPoints(parseInt(points, 10));
-    const cleared = localStorage.getItem('tether_cleared_data');
-    if (cleared) setClearedData(JSON.parse(cleared));
-    const truths = localStorage.getItem('tether_unlocked_truths');
-    if (truths) setUnlockedTruths(JSON.parse(truths));
-    const season = localStorage.getItem('tether_current_season');
-    if (season) setCurrentSeason(parseInt(season, 10));
-    const intel = localStorage.getItem('tether_mycroft_intel');
-    if (intel) setMycroftIntel(JSON.parse(intel));
-
-    setIsInitialized(true);
+    try {
+      const savedStr = localStorage.getItem('sherlock_save_v1');
+      if (savedStr) {
+        const data = JSON.parse(savedStr);
+        if (data && typeof data === 'object') {
+            if (data.unlockedTerms) setUnlockedTerms(data.unlockedTerms);
+            if (data.readTerms) setReadTerms(data.readTerms);
+            if (data.insightPoints !== undefined) setInsightPoints(data.insightPoints);
+            if (data.clearedData) setClearedData(data.clearedData);
+            if (data.unlockedTruths) setUnlockedTruths(data.unlockedTruths);
+            if (data.mycroftIntel) setMycroftIntel(data.mycroftIntel);
+            if (data.textSpeed !== undefined) setTextSpeed(data.textSpeed);
+            if (data.reduceEffects !== undefined) setReduceEffects(data.reduceEffects);
+            if (data.activeGameData !== undefined) setActiveGameData(data.activeGameData);
+        }
+      }
+    } catch (e) {
+      console.error("Save data load failed", e);
+    } finally {
+      setIsInitialized(true);
+    }
   }, []);
 
-  const setUnlockedTerms = (terms: string[]) => {
-    setUnlockedTermsState(terms);
-    localStorage.setItem('tether_unlocked_terms', JSON.stringify(terms));
-  };
+  useEffect(() => {
+    if (isInitialized) {
+      localStorage.setItem('sherlock_save_v1', JSON.stringify({ unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths, mycroftIntel, textSpeed, reduceEffects, activeGameData }));
+    }
+  }, [unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths, mycroftIntel, isInitialized, textSpeed, reduceEffects, activeGameData]);
+
+  const hasSaveData = unlockedTerms.length > 0 || Object.keys(clearedData).length > 0;
 
   const handleStartConnection = () => {
-    if (hasSaveData) {
-      setView('archive');
-    } else {
-      localStorage.setItem('tether_save_data', 'true');
-      localStorage.setItem('tether_insight_points', '0');
-      localStorage.setItem('tether_current_season', '1');
-      setHasSaveData(true);
+    if (!hasSaveData) {
+      const initialTerm = glossaryData.terms.find(t => t.id === 'H001');
+      if (initialTerm) setUnlockedTerms([initialTerm.id]);
       setInsightPoints(0);
-      setCurrentSeason(1);
+      setClearedData({});
       setCurrentEpisodeId('#00');
-      setView('game');
     }
+    setView('archive');
   };
 
   const handleResetData = () => {
-    localStorage.clear();
-    setHasSaveData(false);
-    setUnlockedTermsState([]);
+    setUnlockedTerms([]);
     setReadTerms([]);
     setInsightPoints(0);
     setClearedData({});
     setUnlockedTruths({});
-    setCurrentSeason(1);
     setMycroftIntel([]);
     setCurrentEpisodeId('#00');
+    setActiveGameData(null);
     setView('title');
   };
 
   const handleLoadData = (dataStr: string) => {
     try {
-      const decoded = atob(dataStr);
-      const saveData = JSON.parse(decoded);
-      
-      if (typeof saveData !== 'object' || !saveData.unlockedTerms || !saveData.clearedData) return false;
-
-      setUnlockedTermsState(saveData.unlockedTerms || []);
-      setReadTerms(saveData.readTerms || []);
-      setInsightPoints(saveData.insightPoints || 0);
-      setClearedData(saveData.clearedData || {});
-      setUnlockedTruths(saveData.unlockedTruths || {});
-      setCurrentSeason(saveData.currentSeason || 1);
-      setHasSaveData(true);
-
-      localStorage.setItem('tether_save_data', 'true');
-      localStorage.setItem('tether_unlocked_terms', JSON.stringify(saveData.unlockedTerms || []));
-      localStorage.setItem('tether_read_terms', JSON.stringify(saveData.readTerms || []));
-      localStorage.setItem('tether_insight_points', (saveData.insightPoints || 0).toString());
-      localStorage.setItem('tether_cleared_data', JSON.stringify(saveData.clearedData || {}));
-      localStorage.setItem('tether_unlocked_truths', JSON.stringify(saveData.unlockedTruths || {}));
-      localStorage.setItem('tether_current_season', (saveData.currentSeason || 1).toString());
-      
-      return true;
+      const data = JSON.parse(atob(dataStr));
+      if (data && typeof data === 'object') {
+        if (data.unlockedTerms) setUnlockedTerms(data.unlockedTerms);
+        if (data.readTerms) setReadTerms(data.readTerms);
+        if (data.insightPoints !== undefined) setInsightPoints(data.insightPoints);
+        if (data.clearedData) setClearedData(data.clearedData);
+        if (data.unlockedTruths) setUnlockedTruths(data.unlockedTruths);
+        if (data.mycroftIntel) setMycroftIntel(data.mycroftIntel);
+        return true;
+      }
     } catch (e) {
-      console.error("Data load failed", e);
-      return false;
+      console.error("Data import failed", e);
     }
-  };
-
-  const triggerMycroftIntel = (epId: string) => {
-    const mycroftEps = ['#04', '#16', '#24', '#39', '#44', '#50'];
-    if (mycroftEps.includes(epId) && !mycroftIntel.includes(epId)) {
-      const availableTerms = glossaryData.terms.filter(t => !unlockedTerms.includes(t.id));
-      const toUnlock: string[] = [];
-      for(let i=0; i<3 && availableTerms.length > 0; i++) {
-        const idx = Math.floor(Math.random() * availableTerms.length);
-        toUnlock.push(availableTerms[idx].id);
-        availableTerms.splice(idx, 1);
-      }
-      if (toUnlock.length > 0) {
-        const newTerms = [...unlockedTerms, ...toUnlock];
-        setUnlockedTermsState(newTerms);
-        localStorage.setItem('tether_unlocked_terms', JSON.stringify(newTerms));
-        alert(`【Mycroft's Authority】\n兄マイクロフトの権限により、大索引に ${toUnlock.length} 件の極秘データが追加されました。`);
-      }
-      const newIntel = [...mycroftIntel, epId];
-      setMycroftIntel(newIntel);
-      localStorage.setItem('tether_mycroft_intel', JSON.stringify(newIntel));
-    }
+    return false;
   };
 
   const handlePlayEpisode = (epId: string) => {
-    triggerMycroftIntel(epId);
     setCurrentEpisodeId(epId);
     setView('game');
   };
 
   const handleSpendPoint = (amount: number) => {
     if (insightPoints >= amount) {
-      const newPoints = insightPoints - amount;
-      setInsightPoints(newPoints);
-      localStorage.setItem('tether_insight_points', newPoints.toString());
+      setInsightPoints(prev => prev - amount);
       return true;
     }
     return false;
   };
 
+  const clearActiveGameData = () => { setActiveGameData(null); };
+
   const handleEpisodeComplete = (epId: string, rank: string, tether: number, points: number) => {
-    const isAlreadyCleared = !!clearedData[epId];
-    const newData = { ...clearedData, [epId]: { rank, tether } };
-    setClearedData(newData);
-    localStorage.setItem('tether_cleared_data', JSON.stringify(newData));
-
-    const newPoints = insightPoints + points;
-    setInsightPoints(newPoints);
-    localStorage.setItem('tether_insight_points', newPoints.toString());
-
-    if (epId === '#50' && !isAlreadyCleared) {
-      setView('endroll');
-      return; 
+    setActiveGameData(null);
+    if (epId !== 'INTERLUDE' && !epId.includes('Interlude')) {
+      setClearedData(prev => ({ ...prev, [epId]: { rank, tether } }));
+      setInsightPoints(prev => prev + points);
     }
-
-    if (epId === '#13' && !isAlreadyCleared && currentSeason < 2) {
-      setCurrentSeason(2);
-      localStorage.setItem('tether_current_season', '2');
-      alert("【Season 1: 黎明 - CLEAR】\n犯罪界のナポレオンの名前が浮上しました。\n次なる戦い（Season 2: 暗躍）のロックが解除されました。");
-    } else if (epId === '#29' && !isAlreadyCleared && currentSeason < 3) {
-      setCurrentSeason(3);
-      localStorage.setItem('tether_current_season', '3');
-      alert("【Season 2: 暗躍 - CLEAR】\nモリアーティとの全面対決が始まります。\n（Season 3: 決戦）のロックが解除されました。");
-    } else if (epId === '#40' && !isAlreadyCleared && currentSeason < 4) {
-      setCurrentSeason(4);
-      localStorage.setItem('tether_current_season', '4');
-      alert("【Season 3: 決戦 - CLEAR】\nライヘンバッハの滝での死闘を越え、伝説が帰還します。\n（Season 4: エピローグ）のロックが解除されました。");
-    }
-    
     setView('archive');
   };
 
   const handleResearch = () => {
-    const clearedEpIds = Object.keys(clearedData); 
-    const availableTerms = glossaryData.terms.filter(t => !unlockedTerms.includes(t.id) && (t.appearance === 'general' || clearedEpIds.includes(t.appearance) || t.appearance.startsWith('SP-')));
-    if (insightPoints > 0 && availableTerms.length > 0) {
-      const randomTerm = availableTerms[Math.floor(Math.random() * availableTerms.length)];
-      const newUnlocked = [...unlockedTerms, randomTerm.id];
-      setUnlockedTermsState(newUnlocked);
-      localStorage.setItem('tether_unlocked_terms', JSON.stringify(newUnlocked));
-      const newPoints = insightPoints - 1;
-      setInsightPoints(newPoints);
-      localStorage.setItem('tether_insight_points', newPoints.toString());
-    } else if (availableTerms.length === 0) {
-      alert('現時点で解読可能なデータはすべて復元済みです。新たな事件を解決してください。');
-    }
+    if (insightPoints <= 0) return;
+    setInsightPoints(prev => prev - 1);
   };
 
   const handleReadTerm = (termId: string) => {
-    if (!readTerms.includes(termId)) {
-      const newRead = [...readTerms, termId];
-      setReadTerms(newRead);
-      localStorage.setItem('tether_read_terms', JSON.stringify(newRead));
-    }
+    if (!readTerms.includes(termId)) setReadTerms(prev => [...prev, termId]);
   };
 
   const handleUnlockTruth = (pinId: string, truthData: any, linkCost: number) => {
-    const newTruths = { ...unlockedTruths, [pinId]: truthData };
-    setUnlockedTruths(newTruths);
-    localStorage.setItem('tether_unlocked_truths', JSON.stringify(newTruths));
-    const newPoints = insightPoints - linkCost + (truthData.reward_points || 0);
-    setInsightPoints(newPoints);
-    localStorage.setItem('tether_insight_points', newPoints.toString());
+    if (handleSpendPoint(linkCost)) {
+      setUnlockedTruths(prev => ({ ...prev, [pinId]: truthData }));
+    }
   };
 
   const handleLinkFail = (linkCost: number) => {
-    const newPoints = Math.max(0, insightPoints - linkCost);
-    setInsightPoints(newPoints);
-    localStorage.setItem('tether_insight_points', newPoints.toString());
+    handleSpendPoint(linkCost);
   };
 
   return (
     <SaveDataContext.Provider value={{
       view, setView, hasSaveData, isInitialized, currentEpisodeId, setCurrentEpisodeId,
-      unlockedTerms, setUnlockedTerms, readTerms, insightPoints, clearedData,
-      unlockedTruths, currentSeason, mycroftIntel,
+      unlockedTerms, setUnlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths,
+      currentSeason, mycroftIntel,
       handleStartConnection, handleResetData, handleLoadData, handlePlayEpisode,
       handleSpendPoint, handleEpisodeComplete, handleResearch, handleReadTerm,
-      handleUnlockTruth, handleLinkFail
+      handleUnlockTruth, handleLinkFail,
+      textSpeed, setTextSpeed, reduceEffects, setReduceEffects,
+      activeGameData, setActiveGameData, clearActiveGameData
     }}>
       {children}
     </SaveDataContext.Provider>
   );
-};
+}
+
+export function useSaveData() {
+  const context = useContext(SaveDataContext);
+  if (context === undefined) throw new Error('useSaveData must be used within a SaveDataProvider');
+  return context;
+}

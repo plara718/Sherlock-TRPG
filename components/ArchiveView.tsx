@@ -5,13 +5,12 @@ import { BookOpen, Network, Database, Home, Settings, Save, Upload, Trash2, Chec
 import ChronologyTab from './ChronologyTab';
 import OriginGreatIndexTab from './GreatIndexTab';
 import OriginSpiderWebTab from './SpiderWebTab';
-import { useSaveData } from '@/lib/SaveDataContext'; // ▼ Contextをインポート
+import { useSaveData } from '@/lib/SaveDataContext';
 
 const GreatIndexTab = OriginGreatIndexTab as any;
 const SpiderWebTab = OriginSpiderWebTab as any;
 
 export default function ArchiveView() {
-  // ▼ Propsで受け取っていたものをContextから直接取得
   const {
     currentSeason,
     unlockedTerms,
@@ -27,6 +26,8 @@ export default function ArchiveView() {
     handleLinkFail,
     handleLoadData,
     handleResetData,
+    textSpeed, setTextSpeed,
+    reduceEffects, setReduceEffects
   } = useSaveData();
 
   const clearedEpisodes = Object.keys(clearedData);
@@ -64,6 +65,43 @@ export default function ArchiveView() {
   const renderSettings = () => (
     <div className="p-4 sm:p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="max-w-md mx-auto space-y-6">
+        <div className="bg-[#fffcf7] p-5 rounded-xl border border-[#8c7a6b]/30 shadow-sm">
+          <h3 className="text-[#3a2f29] font-bold font-serif border-b border-[#8c7a6b]/20 pb-2 mb-4 flex items-center gap-2">
+            <Settings size={18} className="text-[#8c7a6b]" /> GAME SETTINGS
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-bold text-[#5c4d43] mb-2 tracking-widest">TEXT SPEED (文字速度)</p>
+              <div className="flex gap-2">
+                {[
+                  { label: 'FAST', value: 15 },
+                  { label: 'NORMAL', value: 30 },
+                  { label: 'SLOW', value: 60 }
+                ].map(speed => (
+                  <button
+                    key={speed.label}
+                    onClick={() => setTextSpeed(speed.value)}
+                    className={`flex-1 py-2 text-[10px] sm:text-xs font-bold rounded-lg border transition-all ${textSpeed === speed.value ? 'bg-[#5c4d43] text-[#f4ebd8] border-[#5c4d43] shadow-md' : 'bg-[#e6d5c3]/30 text-[#8c7a6b] border-[#8c7a6b]/30 hover:bg-[#e6d5c3]'}`}
+                  >
+                    {speed.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <div>
+              <p className="text-xs font-bold text-[#5c4d43] mb-2 tracking-widest mt-4 border-t border-[#8c7a6b]/10 pt-4">REDUCE SCREEN EFFECTS (画面揺れ・点滅の軽減)</p>
+              <button
+                onClick={() => setReduceEffects(!reduceEffects)}
+                className={`w-full py-2.5 text-xs font-bold rounded-lg border transition-all flex items-center justify-center gap-2 ${reduceEffects ? 'bg-emerald-700/10 text-emerald-700 border-emerald-700/30' : 'bg-[#e6d5c3]/30 text-[#8c7a6b] border-[#8c7a6b]/30 hover:bg-[#e6d5c3]'}`}
+              >
+                {reduceEffects ? <CheckCircle2 size={16} /> : <div className="w-4 h-4 border-2 border-[#8c7a6b]/50 rounded-full" />}
+                {reduceEffects ? 'REDUCED (軽減ON)' : 'NORMAL (標準)'}
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-[#fffcf7] p-5 rounded-xl border border-[#8c7a6b]/30 shadow-sm">
           <h3 className="text-[#3a2f29] font-bold font-serif border-b border-[#8c7a6b]/20 pb-2 mb-4 flex items-center gap-2">
             <Save size={18} className="text-[#8c7a6b]" /> DATA EXPORT

@@ -57,25 +57,27 @@ export default function GameView() {
       </div>
     );
   }
-  return <GameContent scenarioData={scenarioData} />;
+  return <GameContent scenarioData={scenarioData} initialSaveData={ctx.activeGameData && ctx.activeGameData.episodeId === ctx.currentEpisodeId ? ctx.activeGameData : null} />;
 }
 
-function GameContent({ scenarioData }: { scenarioData: any }) {
+function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, initialSaveData: any }) {
   const ctx = useSaveData(); 
   const episodeId = ctx.currentEpisodeId;
-  const onBack = () => ctx.setView('archive');
+  const onBack = () => {
+    // 途中で帰る場合はオートセーブデータはそのまま維持される
+    ctx.setView('archive');
+  };
 
   const protagonist = scenarioData.meta?.protagonist || 'watson';
   const [activeGlossary, setActiveGlossary] = useState<{ word: string; desc: string; } | null>(null);
   const [isInterruptMode, setIsInterruptMode] = useState(false);
   const [screenEffect, setScreenEffect] = useState<'none' | 'flash' | 'shake' | 'glass-shatter'>('none');
   const [cutin, setCutin] = useState<{type: 'success' | 'fail' | 'penalty', msg: string, isCritical?: boolean} | null>(null);
-  
-  // ▼ 新規：証拠獲得ポップアップ用のステート
   const [acquiredEvidencePopup, setAcquiredEvidencePopup] = useState<string | null>(null);
 
   const [isWigginsActive, setIsWigginsActive] = useState(false);
   const [isSanityZero, setIsSanityZero] = useState(false);
+  const [showBacklog, setShowBacklog] = useState(false);
   const isReplay = Boolean(ctx.clearedData[episodeId]);
 
   const {
@@ -83,7 +85,7 @@ function GameContent({ scenarioData }: { scenarioData: any }) {
     nextBeat, handleChoice, skipStream, chatHistory, collectedEvidence, selectedEvidence,
     collectEvidence, handleSelectEvidence, selectedSkill, isCompleted, endResult,
     uiLabels, isMoriarty, isIrene
-  } = useGameLogic(scenarioData as ScenarioData, isReplay);
+  } = useGameLogic(scenarioData as ScenarioData, isReplay, ctx.textSpeed, initialSaveData, ctx.setActiveGameData);
 
   const rawIntervention = scenarioData.meta?.intervention;
   const interventionType = ['Irene', 'Mycroft', 'Wiggins'].includes(rawIntervention as string) ? (rawIntervention as 'Irene' | 'Mycroft' | 'Wiggins') : null;
@@ -98,18 +100,17 @@ function GameContent({ scenarioData }: { scenarioData: any }) {
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const lastActionTimeRef = useRef<number>(Date.now());
 
-  // 判定結果のカットイン処理
   useEffect(() => {
     if (feedback) {
       setCutin({ type: feedback.type, msg: feedback.msg, isCritical: feedback.isCriticalSuccess });
-      setScreenEffect(feedback.isCriticalSuccess ? 'glass-shatter' : feedback.type === 'success' ? 'flash' : 'shake');
+      if (!ctx.reduceEffects) setScreenEffect(feedback.isCriticalSuccess ? 'glass-shatter' : feedback.type === 'success' ? 'flash' : 'shake');
       const timer = setTimeout(() => {
         setScreenEffect('none');
         setCutin(null);
       }, 1800);
       return () => clearTimeout(timer);
     }
-  }, [feedback]);
+  }, [feedback, ctx.reduceEffects]);
 
   useEffect(() => {
     setIsInterruptMode(currentBeat?.text.includes('[<NOISE>]') && !isStreaming);
@@ -127,12 +128,11 @@ function GameContent({ scenarioData }: { scenarioData: any }) {
     }
   };
 
-  // ▼ 新規：証拠獲得処理にポップアップ演出を追加
   const handleCollectEvidence = (word: string) => {
     if (!collectedEvidence.includes(word)) {
       collectEvidence(word);
       setAcquiredEvidencePopup(word);
-      setTimeout(() => setAcquiredEvidencePopup(null), 2000); // 2秒で消える
+      setTimeout(() => setAcquiredEvidencePopup(null), 2000);
     }
   };
 
@@ -171,7 +171,6 @@ function GameContent({ scenarioData }: { scenarioData: any }) {
   return (
     <div className={`w-full max-w-2xl mx-auto relative flex flex-col h-[100dvh] touch-manipulation overscroll-none transition-transform duration-75 select-none ${screenEffect === 'shake' ? '-translate-x-2' : ''} ${isSanityZero ? 'bg-[#1a0f0f]' : 'bg-[#f4ebd8]'}`}>
       
-      {/* 画面エフェクト */}
       {screenEffect === 'flash' && <div className="absolute inset-0 bg-white z-[60] animate-out fade-out duration-500 pointer-events-none mix-blend-overlay" />}
       {screenEffect === 'shake' && <div className="absolute inset-0 bg-rose-900/20 z-[60] animate-out fade-out duration-500 pointer-events-none" />}
       {screenEffect === 'glass-shatter' && (
@@ -181,7 +180,6 @@ function GameContent({ scenarioData }: { scenarioData: any }) {
         </div>
       )}
 
-      {/* ▼ 新規：証拠獲得ポップアップ演出 */}
       {acquiredEvidencePopup && (
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 z-[70] pointer-events-none flex flex-col items-center animate-in slide-in-from-bottom-10 fade-in duration-300">
           <div className="bg-amber-500 text-black font-black px-6 py-2 rounded-full shadow-[0_10px_30px_rgba(245,158,11,0.5)] border-2 border-amber-200 flex items-center gap-2 text-sm sm:text-base tracking-widest">
@@ -193,7 +191,6 @@ function GameContent({ scenarioData }: { scenarioData: any }) {
         </div>
       )}
 
-      {/* 判定結果カットイン */}
       {cutin && (
         <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none overflow-hidden">
           <div className="absolute inset-0 bg-black/40 animate-in fade-in duration-200" />
@@ -214,20 +211,54 @@ function GameContent({ scenarioData }: { scenarioData: any }) {
 
       {isSanityZero && !isCompleted && (
         <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden mix-blend-multiply opacity-50 flex flex-col">
-           <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(225,29,72,0.1)_2px,rgba(225,29,72,0.1)_4px)] animate-[pulse_0.1s_infinite]" />
-           <div className="absolute top-[20%] w-full bg-rose-600/20 border-y-2 border-rose-600 text-rose-500 font-mono font-bold text-center py-2 tracking-[0.3em] animate-[pulse_1.5s_infinite] shadow-[0_0_20px_rgba(225,29,72,0.5)]">
+           <div className={`absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(225,29,72,0.1)_2px,rgba(225,29,72,0.1)_4px)] ${ctx.reduceEffects ? '' : 'animate-[pulse_0.1s_infinite]'}`} />
+           <div className={`absolute top-[20%] w-full bg-rose-600/20 border-y-2 border-rose-600 text-rose-500 font-mono font-bold text-center py-2 tracking-[0.3em] shadow-[0_0_20px_rgba(225,29,72,0.5)] ${ctx.reduceEffects ? '' : 'animate-[pulse_1.5s_infinite]'}`}>
              <AlertTriangle className="inline-block mr-2 w-5 h-5 mb-1" /> WARNING: SANITY COMPROMISED <AlertTriangle className="inline-block ml-2 w-5 h-5 mb-1" />
            </div>
         </div>
       )}
 
+      {/* ▼ 新規：バックログモーダル */}
+      {showBacklog && (
+        <div className="absolute inset-0 z-[120] bg-black/80 flex flex-col animate-in fade-in duration-200">
+          <div className={`p-4 border-b flex justify-between items-center shrink-0 ${isMoriarty ? 'bg-[#1a0f15] border-fuchsia-900/50' : 'bg-[#fffcf7] border-[#8c7a6b]/30'}`}>
+            <h2 className={`font-mono text-sm tracking-widest font-bold ${isMoriarty ? 'text-fuchsia-500' : 'text-[#3a2f29]'}`}>COMMUNICATION LOG</h2>
+            <button onClick={() => setShowBacklog(false)} className={`p-2 rounded-full transition-colors ${isMoriarty ? 'bg-fuchsia-900/30 text-fuchsia-400 hover:bg-fuchsia-900/50' : 'bg-[#e6d5c3]/50 text-[#8c7a6b] hover:bg-[#e6d5c3]'}`}>
+              <AlertTriangle className="rotate-180" size={18} />
+            </button>
+          </div>
+          <div className={`flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar ${isMoriarty ? 'bg-[#120a10]' : 'bg-[#fdfbf7]'}`}>
+            {chatHistory.map((beat: any, idx: number) => (
+              <ChatLog key={`log-${idx}`} speaker={beat.speaker} text={renderText(beat.text)} feedback={null} isMetaNotice={beat.speaker === 'System' && beat.text.startsWith('【')} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <header className={`shrink-0 border-b flex items-center justify-between p-3 sm:p-4 z-10 shadow-sm relative ${isSanityZero ? 'bg-rose-950/20 border-rose-900/50' : isMoriarty ? 'bg-[#1a0f15]/80 border-fuchsia-900/30' : isIrene ? 'bg-[#1a0f12]/80 border-rose-900/30' : 'bg-[#f4ebd8]/80 border-[#8c7a6b]/20 backdrop-blur-md'}`}>
+        <div className="flex flex-col">
+          <span className={`text-[9px] font-mono tracking-widest uppercase ${isSanityZero ? 'text-rose-800' : isMoriarty ? 'text-fuchsia-800' : isIrene ? 'text-rose-800' : 'text-[#8c7a6b]'}`}>Active File</span>
+          <h1 className={`text-xs sm:text-sm font-bold font-serif tracking-widest ${isSanityZero ? 'text-rose-700' : isMoriarty ? 'text-fuchsia-600' : isIrene ? 'text-rose-600' : 'text-[#3a2f29]'}`}>
+            {scenarioData.meta?.title || 'UNKNOWN RECORD'}
+          </h1>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => setShowBacklog(true)} className={`px-3 py-1.5 text-[10px] sm:text-xs font-bold tracking-widest rounded-full transition-transform active:scale-95 shadow-sm border ${isSanityZero ? 'bg-rose-950 text-rose-700 border-rose-900/50' : isMoriarty ? 'bg-fuchsia-950 text-fuchsia-600 border-fuchsia-900/50' : 'bg-[#e6d5c3] text-[#8c7a6b] border-[#8c7a6b]/30'}`}>
+            LOG
+          </button>
+          {isReplay && <span className={`text-[10px] font-bold px-2 py-1 rounded border ${isSanityZero ? 'bg-rose-950 text-rose-700 border-rose-900/50' : isMoriarty ? 'bg-fuchsia-950 text-fuchsia-600 border-fuchsia-900/50' : 'bg-[#e6d5c3] text-[#8c7a6b] border-[#8c7a6b]/30'}`}>REPLAY</span>}
+          <button onClick={onBack} className={`px-3 py-1.5 text-[10px] sm:text-xs font-bold tracking-widest rounded-full transition-transform active:scale-95 shadow-sm ${isSanityZero ? 'bg-rose-900 hover:bg-rose-800 text-rose-100' : isMoriarty ? 'bg-fuchsia-900 hover:bg-fuchsia-800 text-fuchsia-100' : 'bg-[#e6d5c3] hover:bg-[#d8c8b8] text-[#5c4d43]'}`}>
+            SUSPEND
+          </button>
+        </div>
+      </header>
+
       <TetherBar tether={tether} onArchiveClick={onBack} protagonist={protagonist} gaugeName={uiLabels.gaugeName} />
 
-      {/* ▼ 修正：連打ガード（0.5秒クールタイム）の強化 */}
       <div 
         className={`flex-1 flex flex-col relative overflow-hidden cursor-pointer transition-colors duration-1000 ${isSanityZero ? 'bg-[#1a0f0f]' : 'bg-[#f4ebd8]'}`} 
         onClick={() => { 
-          if (!isScrollingRef.current && (Date.now() - lastActionTimeRef.current > 500)) { // ★クールタイムを500ms(0.5秒)に延長
+          if (!isScrollingRef.current && (Date.now() - lastActionTimeRef.current > 500)) { 
             lastActionTimeRef.current = Date.now(); 
             isStreaming ? skipStream() : nextBeat(); 
           } 
@@ -245,7 +276,7 @@ function GameContent({ scenarioData }: { scenarioData: any }) {
             const isMetaNotice = beat.speaker === 'System' && cleanText.startsWith('【');
 
             return (
-              <div key={idx} className={isSanityZero && isCurrent ? 'animate-[shake_0.5s_infinite]' : ''}>
+              <div key={idx} className={isSanityZero && isCurrent ? (ctx.reduceEffects ? '' : 'animate-[shake_0.5s_infinite]') : ''}>
                 <ChatLog speaker={beat.speaker} text={renderText(cleanText)} feedback={isCurrent ? feedback : null} isMetaNotice={isMetaNotice} />
               </div>
             );
@@ -261,7 +292,6 @@ function GameContent({ scenarioData }: { scenarioData: any }) {
         )}
       </div>
 
-      {/* ▼ 修正：獲得した証拠が光るエフェクト */}
       {!isInterruptMode && collectedEvidence.length > 0 && (
         <div className={`p-3 flex flex-wrap gap-2 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.1)] overflow-x-auto custom-scrollbar border-t z-20 relative ${isSanityZero ? 'bg-[#2a0f15] border-rose-900/50' : 'bg-[#2a2420] border-[#3a2f29]'}`}>
           <span className={`text-[10px] font-mono flex items-center mr-1 tracking-widest uppercase ${isSanityZero ? 'text-rose-500' : 'text-[#8c7a6b]'}`}>EVIDENCE:</span>
@@ -277,7 +307,6 @@ function GameContent({ scenarioData }: { scenarioData: any }) {
         </div>
       )}
 
-      {/* ▼ 修正：選択肢出現時の暗転カットイン演出 */}
       <div onClick={(e) => e.stopPropagation()} className="shrink-0 relative z-30 pb-[env(safe-area-inset-bottom)] bg-[#f4ebd8]">
         {currentBeat?.choices && !isStreaming && (
           <div className="absolute bottom-full left-0 w-full h-[100dvh] bg-black/60 pointer-events-none animate-in fade-in duration-700 z-0" />
