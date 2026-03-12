@@ -16,10 +16,13 @@
 
   --border-base: #8c7a6b;
   --border-dark: #3a2f29;
+
+  --accent-main: #d97706; /* amber-600 */
+  --accent-muted: #f59e0b; /* amber-500 */
 }
 
 [data-theme='moriarty'] {
-  /* Moriarty Mode */
+  /* Moriarty Mode - アンチ・極限スマホUI */
   --bg-base: #0a0a0a;
   --bg-panel: #141414;
   --bg-dark: #000000;
@@ -32,6 +35,9 @@
 
   --border-base: #444444;
   --border-dark: #222222;
+
+  --accent-main: #8b0000; /* 血のような深い真紅 */
+  --accent-muted: #b91c1c; /* red-700 */
 }
 
 body {

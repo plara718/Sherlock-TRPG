@@ -19,6 +19,8 @@ const config: Config = {
         'theme-text-light-muted': 'var(--text-light-muted)',
         'theme-border-base': 'var(--border-base)',
         'theme-border-dark': 'var(--border-dark)',
+        'theme-accent-main': 'var(--accent-main)',
+        'theme-accent-muted': 'var(--accent-muted)',
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

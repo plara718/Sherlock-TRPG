@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldAlert, Fingerprint, BrainCircuit, HeartHandshake, HelpCircle, Sparkles, Mail, Users, Network } from 'lucide-react';
+import { ShieldAlert, Fingerprint, BrainCircuit, HeartHandshake, HelpCircle, Sparkles, Mail, Users, Network, Calculator, Eye, EyeOff } from 'lucide-react';
 
 type InterruptPanelProps = {
   collectedEvidences: string[];
@@ -15,7 +15,7 @@ type InterruptPanelProps = {
   protagonist?: string;
   uiLabels: { gaugeName: string; actionButton: string };
   isMoriarty?: boolean;
-  isEvidenceRequired?: boolean; // ▼ 新規追加
+  isEvidenceRequired?: boolean;
 };
 
 export default function InterruptPanel({
@@ -45,11 +45,12 @@ export default function InterruptPanel({
     return () => clearInterval(timer);
   }, [timeLeft, onTimeUp]);
 
+  // ▼ モリアーティモード専用スキルを仕様書通りに反映
   const skillOptions = isMoriarty
     ? [
-        { id: 'LINK', label: 'LINK (結合)', icon: <Network size={16} /> },
-        { id: 'SCOPE', label: 'SCOPE (俯瞰)', icon: <BrainCircuit size={16} /> },
-        { id: 'ANALYZE', label: 'ANALYZE (解体)', icon: <Fingerprint size={16} /> }
+        { id: 'CALCULUS', label: 'CALCULUS (計算)', icon: <Calculator size={16} /> },
+        { id: 'AESTHETIC', label: 'AESTHETIC (美学)', icon: <Eye size={16} /> },
+        { id: 'SHADOW', label: 'SHADOW (暗躍)', icon: <EyeOff size={16} /> }
       ]
     : isIrene
       ? [
@@ -79,19 +80,19 @@ export default function InterruptPanel({
   };
 
   return (
-    <div className={`p-4 sm:p-6 border-t-2 shadow-[0_-10px_30px_rgba(0,0,0,0.2)] animate-in slide-in-from-bottom-full duration-300 relative select-none pb-[calc(1rem+env(safe-area-inset-bottom))] ${isMoriarty ? 'bg-[#1a0f15] border-fuchsia-900/50' : isIrene ? 'bg-[#1a0f12] border-rose-900/50' : 'bg-[#1a1512] border-rose-900/50'}`}>
-      <div className="absolute inset-0 pointer-events-none opacity-10 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')]" />
+    <div className="p-4 sm:p-6 border-t-2 shadow-[0_-10px_30px_rgba(0,0,0,0.2)] animate-in slide-in-from-bottom-full duration-300 relative select-none pb-[calc(1rem+env(safe-area-inset-bottom))] bg-theme-bg-dark border-theme-border-base/50">
+      <div className="absolute inset-0 pointer-events-none opacity-5 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')]" />
       
       <div className="max-w-xl mx-auto relative z-10">
         <div className="flex justify-between items-end mb-4">
           <div className="flex items-center gap-2">
-            <ShieldAlert className={isMoriarty ? 'text-fuchsia-500 animate-pulse' : 'text-rose-500 animate-pulse'} />
+            <ShieldAlert className="text-theme-accent-main animate-pulse" />
             <div>
-              <p className={`text-[10px] font-mono tracking-widest uppercase ${isMoriarty ? 'text-fuchsia-400' : 'text-rose-400'}`}>System Warning</p>
-              <h3 className="text-white font-bold text-sm sm:text-base tracking-widest">LOGIC INTERRUPT REQUIRED</h3>
+              <p className="text-[10px] font-mono tracking-widest uppercase text-theme-accent-muted">System Warning</p>
+              <h3 className="text-theme-text-light font-bold text-sm sm:text-base tracking-widest">LOGIC INTERRUPT REQUIRED</h3>
             </div>
           </div>
-          <div className={`text-3xl font-black font-mono tabular-nums tracking-tighter ${timeLeft <= 5 ? 'text-rose-500 animate-[shake_0.5s_infinite]' : 'text-white'}`}>
+          <div className={`text-3xl font-black font-mono tabular-nums tracking-tighter ${timeLeft <= 5 ? 'text-theme-accent-main animate-[shake_0.5s_infinite]' : 'text-theme-text-light'}`}>
             00:{timeLeft.toString().padStart(2, '0')}
           </div>
         </div>
@@ -99,7 +100,7 @@ export default function InterruptPanel({
         {hintText && !showHint && !isMetaHint && (
           <div className="mb-4">
             {renderInterventionButton() || (
-              <button onClick={() => setShowHint(true)} className="w-full bg-[#2a2420] hover:bg-[#3a2f29] text-[#8c7a6b] hover:text-[#d8c8b8] border border-[#8c7a6b]/30 py-2.5 rounded-lg text-xs font-bold tracking-widest transition-colors flex items-center justify-center gap-2">
+              <button onClick={() => setShowHint(true)} className="w-full bg-theme-bg-dark-panel hover:bg-theme-bg-panel text-theme-text-muted hover:text-theme-text-light border border-theme-border-base/30 py-2.5 rounded-lg text-xs font-bold tracking-widest transition-colors flex items-center justify-center gap-2">
                 <HelpCircle size={14} /> HINT (推論の補助を要求)
               </button>
             )}
@@ -108,11 +109,11 @@ export default function InterruptPanel({
 
         {(showHint || isMetaHint) && hintText && (
           <div className={`mb-4 p-3 sm:p-4 rounded-lg border text-sm font-serif leading-relaxed animate-in fade-in slide-in-from-top-2 shadow-inner ${
-            isMetaHint ? 'bg-amber-500/20 border-amber-500/50 text-amber-50 font-sans font-bold shadow-[0_0_15px_rgba(245,158,11,0.2)]' :
+            isMetaHint ? 'bg-theme-accent-main text-white font-sans font-bold shadow-lg' :
             interventionType === 'Irene' ? 'bg-rose-950/30 border-rose-500/30 text-rose-100' :
             interventionType === 'Mycroft' ? 'bg-blue-950/30 border-blue-500/30 text-blue-100' :
             interventionType === 'Wiggins' ? 'bg-amber-950/30 border-amber-500/30 text-amber-100' :
-            'bg-[#2a2420] border-[#8c7a6b]/30 text-[#d8c8b8]'
+            'bg-theme-bg-dark-panel border-theme-border-base/30 text-theme-text-light-muted'
           }`}>
             {!isMetaHint && (
               <span className="font-bold mr-2 text-[10px] tracking-widest uppercase opacity-70">
@@ -123,39 +124,34 @@ export default function InterruptPanel({
           </div>
         )}
 
-        {/* ▼ 修正：証拠の任意・必須UI表示 */}
         <div className="mb-5">
-          <p className="text-[10px] font-mono mb-2 uppercase tracking-widest flex items-center gap-2 text-[#8c7a6b]">
+          <p className="text-[10px] font-mono mb-2 uppercase tracking-widest flex items-center gap-2 text-theme-text-muted">
             Evidence Link 
             {isEvidenceRequired ? (
-              <span className="text-rose-500 font-bold border border-rose-500/30 px-1.5 py-0.5 rounded shadow-[0_0_5px_rgba(225,29,72,0.3)] animate-pulse">Required (必須)</span>
+              <span className="text-theme-accent-main font-bold border border-theme-accent-main/30 px-1.5 py-0.5 rounded shadow-sm animate-pulse">Required (必須)</span>
             ) : (
               <span className="text-emerald-500 font-bold border border-emerald-500/30 px-1.5 py-0.5 rounded opacity-70">Optional (任意)</span>
             )}
           </p>
           <div className="flex flex-wrap gap-2">
             {collectedEvidences.map((ev) => (
-              <button key={ev} onClick={() => setSelectedEvidence(selectedEvidence === ev ? null : ev)} className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all active:scale-95 border ${selectedEvidence === ev ? 'bg-amber-600 text-[#1a1512] border-amber-500 shadow-[0_0_10px_rgba(217,119,6,0.5)]' : 'bg-[#2a2420] text-[#a8988a] border-[#3a2f29] hover:bg-[#3a2f29] hover:text-[#f4ebd8]'}`}>{ev}</button>
+              <button key={ev} onClick={() => setSelectedEvidence(selectedEvidence === ev ? null : ev)} className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all active:scale-95 border ${selectedEvidence === ev ? 'bg-theme-accent-main text-white border-theme-accent-main shadow-md' : 'bg-theme-bg-dark-panel text-theme-text-muted border-theme-border-dark hover:bg-theme-bg-panel hover:text-theme-text-light'}`}>{ev}</button>
             ))}
           </div>
         </div>
 
-        {/* ▼ 修正：スキルボタンを即時実行ボタンに変更（下の実行ボタンは廃止） */}
         <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-2">
           {skillOptions.map((skill) => (
             <button 
               key={skill.id} 
               onClick={() => {
-                onSubmit(skill.id, selectedEvidence); // 即時実行
+                onSubmit(skill.id, selectedEvidence);
               }} 
-              className={`py-4 rounded-xl flex flex-col items-center gap-2 transition-all border-2 active:scale-95 shadow-lg
-                ${isMoriarty ? 'bg-fuchsia-900/20 border-fuchsia-900/50 hover:bg-fuchsia-900/60 hover:border-fuchsia-400 text-fuchsia-100 hover:shadow-[0_0_15px_rgba(217,70,239,0.4)]' 
-                : isIrene ? 'bg-rose-900/20 border-rose-900/50 hover:bg-rose-900/60 hover:border-rose-400 text-rose-100 hover:shadow-[0_0_15px_rgba(225,29,72,0.4)]' 
-                : 'bg-emerald-900/20 border-emerald-900/50 hover:bg-emerald-900/60 hover:border-emerald-400 text-emerald-100 hover:shadow-[0_0_15px_rgba(16,185,129,0.4)]'}`}
+              className="py-4 rounded-xl flex flex-col items-center gap-2 transition-all border-2 active:scale-95 shadow-lg bg-theme-bg-panel/20 border-theme-border-base/50 hover:bg-theme-bg-panel hover:border-theme-accent-main text-theme-text-light"
             >
               {skill.icon}
               <span className="text-[9px] sm:text-[10px] font-bold tracking-widest">{skill.label}</span>
-              <span className={`text-[8px] opacity-60 px-2 py-0.5 rounded font-mono ${isMoriarty ? 'bg-fuchsia-950 text-fuchsia-400' : isIrene ? 'bg-rose-950 text-rose-400' : 'bg-emerald-950 text-emerald-400'}`}>TAP TO RUN</span>
+              <span className="text-[8px] opacity-60 px-2 py-0.5 rounded font-mono bg-theme-bg-dark text-theme-text-muted border border-theme-border-dark">TAP TO RUN</span>
             </button>
           ))}
         </div>
