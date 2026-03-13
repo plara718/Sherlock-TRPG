@@ -82,6 +82,9 @@ export function useGameLogic(
   const currentTextIndex = useRef(initialSaveData?.displayedText ? initialSaveData.displayedText.length : 0);
   const tetherRef = useRef(initialSaveData?.tether ?? initialTether);
   const targetTextRef = useRef<string>('');
+  
+  // ▼ 追加：選択肢の連打増殖を防ぐためのロック用Ref
+  const isProcessingChoiceRef = useRef(false);
 
   const uiLabels = {
     gaugeName: isMoriarty ? 'DOMINATION' : (isIrene ? 'CONTROL' : 'TETHER'),
@@ -229,10 +232,18 @@ export function useGameLogic(
   }, [currentBeat, isResolved, getTextSpeed, updateTether, uiLabels.gaugeName]);
 
   const handleChoice = (nextId: string) => {
-    if (isStreaming) return;
+    // ▼ 修正：ストリーミング中、または既に選択処理中の場合はブロック
+    if (isStreaming || isProcessingChoiceRef.current) return;
+    
+    isProcessingChoiceRef.current = true;
     setCurrentBeatId(nextId);
     const nextB = beats.find(b => b.id === nextId);
     if (nextB) setChatHistory(prev => [...prev, nextB]);
+
+    // 0.3秒後にロック解除
+    setTimeout(() => {
+      isProcessingChoiceRef.current = false;
+    }, 300);
   };
 
   const nextBeat = () => {
@@ -297,7 +308,6 @@ export function useGameLogic(
 
   useEffect(() => { startBeat(); return () => { if (textStreamRef.current) clearTimeout(textStreamRef.current); }; }, [currentBeatId, startBeat]);
 
-  // ▼ 修正1：1文字ごとの過剰なオートセーブを防止し、ストリーミング完了時（!isStreaming）のみ保存を実行する
   useEffect(() => {
     if (!isCompleted && currentBeatId && chatHistory.length > 0 && !isStreaming) {
       onSaveGame({

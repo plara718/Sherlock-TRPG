@@ -44,4 +44,9 @@ body {
   background-color: var(--bg-base);
   color: var(--text-base);
   transition: background-color 0.5s ease, color 0.5s ease;
+  
+  /* ▼ 追加: スマホ長押しメニュー・テキスト選択の完全無効化 */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }

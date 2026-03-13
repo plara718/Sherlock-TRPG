@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ShieldAlert, Fingerprint, BrainCircuit, HeartHandshake, HelpCircle, Sparkles, Mail, Users, Network, Calculator, Eye, EyeOff } from 'lucide-react';
 
 type InterruptPanelProps = {
@@ -39,13 +39,18 @@ export default function InterruptPanel({
   const isIrene = protagonist === 'irene';
   const isMetaHint = hintText?.startsWith('【');
 
+  // ▼ 修正1：親の再描画によるタイマーの不具合を防ぐため、最新のonTimeUpをRefで保持
+  const savedOnTimeUp = useRef(onTimeUp);
   useEffect(() => {
-    if (timeLeft <= 0) { onTimeUp(); return; }
+    savedOnTimeUp.current = onTimeUp;
+  }, [onTimeUp]);
+
+  useEffect(() => {
+    if (timeLeft <= 0) { savedOnTimeUp.current(); return; }
     const timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
     return () => clearInterval(timer);
-  }, [timeLeft, onTimeUp]);
+  }, [timeLeft]);
 
-  // ▼ モリアーティモード専用スキルを仕様書通りに反映
   const skillOptions = isMoriarty
     ? [
         { id: 'CALCULUS', label: 'CALCULUS (計算)', icon: <Calculator size={16} /> },

@@ -78,7 +78,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   const [isSanityZero, setIsSanityZero] = useState(false);
   const [showBacklog, setShowBacklog] = useState(false);
   
-  // ▼ 追加：ボタン誤爆防止用のクールタイムステート
   const [interactionCooldown, setInteractionCooldown] = useState(false);
   const isReplay = Boolean(ctx.clearedData[episodeId]);
 
@@ -97,7 +96,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   useEffect(() => { setInterventionUsed(false); setIsSanityZero(false); }, [episodeId]);
   useEffect(() => { setIsSanityZero(tether <= 0 && !isCompleted && !(scenarioData.meta?.type === 'interlude' || scenarioData.meta?.episode_id?.includes('Interlude'))); }, [tether, isCompleted, scenarioData]);
 
-  // ▼ 追加：ストリーミング完了後、0.6秒間は選択肢や証拠品のタップを無効化する
   useEffect(() => {
     if (!isStreaming) {
       setInteractionCooldown(true);
@@ -274,10 +272,15 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
       <div 
         className="flex-1 flex flex-col relative overflow-hidden cursor-pointer transition-colors duration-1000 bg-theme-bg-base" 
         onClick={() => { 
+          if (isInterruptMode) return; 
+          
           if (!isScrollingRef.current && (Date.now() - lastActionTimeRef.current > 500)) { 
             lastActionTimeRef.current = Date.now(); 
             isStreaming ? skipStream() : nextBeat(); 
           } 
+          
+          // ▼ 修正2: 画面をタップしてテキストを進めた時は、自動追従をオンに戻す
+          isScrollingRef.current = false;
         }} 
         onTouchStart={(e) => { touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }} 
         onTouchMove={(e) => { if (touchStartRef.current && (Math.abs(e.touches[0].clientX - touchStartRef.current.x) > 10 || Math.abs(e.touches[0].clientY - touchStartRef.current.y) > 10)) isScrollingRef.current = true; }}
@@ -289,7 +292,9 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
           className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar relative z-20"
           onScroll={(e) => {
             const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-            isScrollingRef.current = scrollHeight - scrollTop - clientHeight > 50;
+            // ▼ 修正2: ログを一番下までスクロールした時も、自動追従をオンに戻す
+            const isAtBottom = scrollHeight - scrollTop - clientHeight <= 50;
+            isScrollingRef.current = !isAtBottom;
           }}
         >
           {chatHistory.map((beat: any, idx: number) => {
@@ -345,7 +350,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             <p className="text-[10px] font-mono text-theme-accent-main mb-1 text-center tracking-[0.3em] uppercase animate-pulse flex items-center justify-center gap-2">
               <span className="w-10 h-px bg-theme-accent-main opacity-50" /> LOGIC BRANCH <span className="w-10 h-px bg-theme-accent-main opacity-50" />
             </p>
-            {/* ▼ 修正：選択肢ボタンにクールタイムを適用し、連打による誤爆を防止 */}
             {currentBeat.choices.map((choice: any, idx: number) => (
               <button 
                 key={idx} 
