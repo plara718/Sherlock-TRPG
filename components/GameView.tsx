@@ -77,6 +77,9 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   const [isWigginsActive, setIsWigginsActive] = useState(false);
   const [isSanityZero, setIsSanityZero] = useState(false);
   const [showBacklog, setShowBacklog] = useState(false);
+  
+  // ▼ 追加：ボタン誤爆防止用のクールタイムステート
+  const [interactionCooldown, setInteractionCooldown] = useState(false);
   const isReplay = Boolean(ctx.clearedData[episodeId]);
 
   const {
@@ -94,7 +97,17 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   useEffect(() => { setInterventionUsed(false); setIsSanityZero(false); }, [episodeId]);
   useEffect(() => { setIsSanityZero(tether <= 0 && !isCompleted && !(scenarioData.meta?.type === 'interlude' || scenarioData.meta?.episode_id?.includes('Interlude'))); }, [tether, isCompleted, scenarioData]);
 
+  // ▼ 追加：ストリーミング完了後、0.6秒間は選択肢や証拠品のタップを無効化する
+  useEffect(() => {
+    if (!isStreaming) {
+      setInteractionCooldown(true);
+      const timer = setTimeout(() => setInteractionCooldown(false), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [isStreaming]);
+
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const lastActionTimeRef = useRef<number>(Date.now());
@@ -117,7 +130,11 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
     setIsWigginsActive(false);
   }, [currentBeat, isStreaming]);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [displayedText, chatHistory.length, collectedEvidence, isInterruptMode]);
+  useEffect(() => { 
+    if (!isScrollingRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: isStreaming ? 'auto' : 'smooth' }); 
+    }
+  }, [displayedText, chatHistory.length, collectedEvidence, isInterruptMode, isStreaming]);
 
   const handleGlossaryClick = (term: any) => {
     if (ctx.unlockedTerms.includes(term.id)) {
@@ -262,16 +279,28 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             isStreaming ? skipStream() : nextBeat(); 
           } 
         }} 
-        onTouchStart={(e) => { isScrollingRef.current = false; touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }} 
+        onTouchStart={(e) => { touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }} 
         onTouchMove={(e) => { if (touchStartRef.current && (Math.abs(e.touches[0].clientX - touchStartRef.current.x) > 10 || Math.abs(e.touches[0].clientY - touchStartRef.current.y) > 10)) isScrollingRef.current = true; }}
       >
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-theme-text-base opacity-[0.03] to-transparent" />
         
-        <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar relative z-20">
+        <div 
+          ref={scrollContainerRef}
+          className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar relative z-20"
+          onScroll={(e) => {
+            const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+            isScrollingRef.current = scrollHeight - scrollTop - clientHeight > 50;
+          }}
+        >
           {chatHistory.map((beat: any, idx: number) => {
             const isCurrent = idx === chatHistory.length - 1;
             const textToShow = isCurrent ? displayedText : beat.text;
-            const cleanText = (textToShow || "").replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '');
+            let cleanText = (textToShow || "").replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '');
+
+            if (isCurrent && isStreaming) {
+              cleanText = cleanText.replace(/\{([^}]*)$/, '$1');
+            }
+
             const isMetaNotice = beat.speaker === 'System' && cleanText.startsWith('【');
 
             return (
@@ -295,10 +324,10 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
         <div className="p-3 flex flex-wrap gap-2 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.1)] overflow-x-auto custom-scrollbar border-t z-20 relative bg-theme-bg-dark-panel border-theme-border-dark">
           <span className="text-[10px] font-mono flex items-center mr-1 tracking-widest uppercase text-theme-text-muted">EVIDENCE:</span>
           {collectedEvidence.map((ev) => (
-            <button key={ev} onClick={(e) => { e.stopPropagation(); handleSelectEvidence(ev); }} disabled={isStreaming} 
-              className={`whitespace-nowrap text-[10px] sm:text-xs px-2.5 py-1.5 rounded-full font-bold transition-all active:scale-95 z-20 relative 
+            <button key={ev} onClick={(e) => { e.stopPropagation(); handleSelectEvidence(ev); }} disabled={isStreaming || interactionCooldown} 
+              className={`whitespace-nowrap text-[10px] sm:text-xs px-2.5 py-1.5 rounded-full font-bold transition-all z-20 relative 
               ${acquiredEvidencePopup === ev ? 'ring-4 ring-theme-accent-main ring-offset-2 ring-offset-theme-bg-dark bg-theme-accent-main text-white scale-110 shadow-lg z-30 duration-300' : ''} 
-              ${selectedEvidence === ev ? 'bg-theme-accent-main text-white shadow-md' : 'bg-theme-bg-panel text-theme-text-muted hover:bg-theme-border-base hover:text-theme-text-light'} disabled:opacity-50 disabled:cursor-not-allowed`}
+              ${selectedEvidence === ev ? 'bg-theme-accent-main text-white shadow-md' : 'bg-theme-bg-panel text-theme-text-muted hover:bg-theme-border-base hover:text-theme-text-light'} ${interactionCooldown ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
             >
               {ev}
             </button>
@@ -316,8 +345,16 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             <p className="text-[10px] font-mono text-theme-accent-main mb-1 text-center tracking-[0.3em] uppercase animate-pulse flex items-center justify-center gap-2">
               <span className="w-10 h-px bg-theme-accent-main opacity-50" /> LOGIC BRANCH <span className="w-10 h-px bg-theme-accent-main opacity-50" />
             </p>
+            {/* ▼ 修正：選択肢ボタンにクールタイムを適用し、連打による誤爆を防止 */}
             {currentBeat.choices.map((choice: any, idx: number) => (
-              <button key={idx} onClick={() => handleChoice(choice.next_beat_id)} className="w-full py-3.5 sm:py-4 bg-theme-bg-dark-panel hover:bg-theme-bg-panel border border-theme-border-base/50 text-theme-text-light font-bold font-serif tracking-widest rounded-lg shadow-md transition-all active:scale-95 text-sm">{choice.label}</button>
+              <button 
+                key={idx} 
+                disabled={interactionCooldown}
+                onClick={() => handleChoice(choice.next_beat_id)} 
+                className={`w-full py-3.5 sm:py-4 bg-theme-bg-dark-panel border border-theme-border-base/50 text-theme-text-light font-bold font-serif tracking-widest rounded-lg shadow-md transition-all text-sm ${interactionCooldown ? 'opacity-50 cursor-not-allowed' : 'hover:bg-theme-bg-panel active:scale-95'}`}
+              >
+                {choice.label}
+              </button>
             ))}
           </div>
         ) : isInterruptMode ? (

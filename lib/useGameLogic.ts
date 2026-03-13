@@ -81,6 +81,7 @@ export function useGameLogic(
   const textStreamRef = useRef<NodeJS.Timeout | null>(null);
   const currentTextIndex = useRef(initialSaveData?.displayedText ? initialSaveData.displayedText.length : 0);
   const tetherRef = useRef(initialSaveData?.tether ?? initialTether);
+  const targetTextRef = useRef<string>('');
 
   const uiLabels = {
     gaugeName: isMoriarty ? 'DOMINATION' : (isIrene ? 'CONTROL' : 'TETHER'),
@@ -110,6 +111,7 @@ export function useGameLogic(
 
     if (initialSaveData && displayedText) {
       setIsStreaming(false);
+      targetTextRef.current = displayedText;
       return;
     }
 
@@ -119,6 +121,7 @@ export function useGameLogic(
     setSelectedEvidence(null);
     setIsResolved(false);
     currentTextIndex.current = 0;
+    targetTextRef.current = currentBeat.text;
 
     if (textStreamRef.current) clearTimeout(textStreamRef.current);
 
@@ -131,11 +134,11 @@ export function useGameLogic(
     setIsStreaming(true);
 
     const streamNextChar = () => {
-      if (currentTextIndex.current >= currentBeat.text.length) {
+      if (currentTextIndex.current >= targetTextRef.current.length) {
         setIsStreaming(false);
         return;
       }
-      const nextChar = currentBeat.text[currentTextIndex.current];
+      const nextChar = targetTextRef.current[currentTextIndex.current];
       setDisplayedText((prev) => prev + nextChar);
       currentTextIndex.current++;
       textStreamRef.current = setTimeout(streamNextChar, getTextSpeed());
@@ -147,7 +150,8 @@ export function useGameLogic(
   const skipStream = useCallback(() => {
     if (isStreaming && currentBeat) {
       if (textStreamRef.current) clearTimeout(textStreamRef.current);
-      setDisplayedText(currentBeat.text);
+      setDisplayedText(targetTextRef.current);
+      currentTextIndex.current = targetTextRef.current.length;
       setIsStreaming(false);
     }
   }, [isStreaming, currentBeat]);
@@ -195,11 +199,25 @@ export function useGameLogic(
       if (currentBeat.interrupt.correction_text) {
         setIsStreaming(true);
         const correctionText = '\n\n' + currentBeat.interrupt.correction_text;
-        let correctionIndex = 0;
+        targetTextRef.current += correctionText;
+
+        setChatHistory(prev => {
+          const newHistory = [...prev];
+          const lastIndex = newHistory.length - 1;
+          if (lastIndex >= 0) {
+            newHistory[lastIndex] = { ...newHistory[lastIndex], text: targetTextRef.current };
+          }
+          return newHistory;
+        });
+
         const streamCorrection = () => {
-          if (correctionIndex >= correctionText.length) { setIsStreaming(false); return; }
-          setDisplayedText((prev) => prev + correctionText[correctionIndex]);
-          correctionIndex++;
+          if (currentTextIndex.current >= targetTextRef.current.length) { 
+            setIsStreaming(false); 
+            return; 
+          }
+          const nextChar = targetTextRef.current[currentTextIndex.current];
+          setDisplayedText((prev) => prev + nextChar);
+          currentTextIndex.current++;
           textStreamRef.current = setTimeout(streamCorrection, getTextSpeed());
         };
         textStreamRef.current = setTimeout(streamCorrection, getTextSpeed());
@@ -279,9 +297,9 @@ export function useGameLogic(
 
   useEffect(() => { startBeat(); return () => { if (textStreamRef.current) clearTimeout(textStreamRef.current); }; }, [currentBeatId, startBeat]);
 
-  // オートセーブ処理
+  // ▼ 修正1：1文字ごとの過剰なオートセーブを防止し、ストリーミング完了時（!isStreaming）のみ保存を実行する
   useEffect(() => {
-    if (!isCompleted && currentBeatId && chatHistory.length > 0) {
+    if (!isCompleted && currentBeatId && chatHistory.length > 0 && !isStreaming) {
       onSaveGame({
         episodeId: scenarioData.meta.episode_id,
         currentBeatId,
@@ -291,7 +309,7 @@ export function useGameLogic(
         collectedEvidence
       });
     }
-  }, [currentBeatId, chatHistory, tether, displayedText, collectedEvidence, isCompleted, onSaveGame, scenarioData.meta.episode_id]);
+  }, [currentBeatId, chatHistory.length, tether, collectedEvidence.length, isCompleted, isStreaming, onSaveGame, scenarioData.meta.episode_id, displayedText]);
 
   return {
     currentBeat,
