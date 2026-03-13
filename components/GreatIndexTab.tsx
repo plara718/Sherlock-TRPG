@@ -10,13 +10,13 @@ const ALPHABETS = [
   'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 ];
 
-// ▼ 新規追加：大分類カテゴリの定義と、キーワードによる振り分けルール
+// ▼ 新規追加：大分類カテゴリの定義と、キーワードによる振り分けルール（強化版）
 const MAIN_CATEGORIES = [
   'ALL',
-  '人物 (容疑者/依頼人/協力者)',
+  '人物 (容疑者/被害者/関係者)',
   '組織・派閥',
   '地理・場所',
-  '事件・記録',
+  '事件・証拠・凶器',
   '科学・知識・歴史',
   'その他'
 ];
@@ -24,21 +24,41 @@ const MAIN_CATEGORIES = [
 const getCategoryGroup = (categoryString: string): string => {
   if (!categoryString) return 'その他';
   
-  if (categoryString.includes('人物') || categoryString.includes('依頼人') || categoryString.includes('容疑者') || categoryString.includes('協力者')) {
-    return '人物 (容疑者/依頼人/協力者)';
+  const cat = categoryString;
+  // 1. 人物系
+  if (cat.includes('人物') || cat.includes('依頼人') || cat.includes('容疑者') || 
+      cat.includes('協力者') || cat.includes('犯罪者') || cat.includes('被害者') || 
+      cat.includes('貴族') || cat.includes('警察') || cat.includes('医師') || 
+      cat.includes('家政婦') || cat.includes('執事') || cat.includes('証言者') || 
+      cat.includes('探偵') || cat.includes('著者') || cat.includes('乗組員') || 
+      cat.includes('科学者') || cat.includes('関係者') || cat.includes('偽名') || cat.includes('肉屋') || cat.includes('動物') || cat.includes('数学者') || cat.includes('人物集団')) {
+    return '人物 (容疑者/被害者/関係者)';
   }
-  if (categoryString.includes('組織') || categoryString.includes('結社') || categoryString.includes('マフィア')) {
+  // 2. 組織系
+  if (cat.includes('組織') || cat.includes('結社') || cat.includes('マフィア') || cat.includes('宗教') || cat.includes('企業')) {
     return '組織・派閥';
   }
-  if (categoryString.includes('地名') || categoryString.includes('場所') || categoryString.includes('国家')) {
+  // 3. 場所・地理系
+  if (cat.includes('地名') || cat.includes('場所') || cat.includes('国家') || cat.includes('地理') || cat.includes('環境') || cat.includes('拠点')) {
     return '地理・場所';
   }
-  if (categoryString.includes('事件') || categoryString.includes('未解決事件') || categoryString.includes('悲劇')) {
-    return '事件・記録';
-  }
-  if (categoryString.includes('書籍') || categoryString.includes('科学') || categoryString.includes('歴史') || categoryString.includes('言及')) {
+  // 4. 科学・知識・歴史系
+  if (cat.includes('科学') || cat.includes('知識') || cat.includes('歴史') || 
+      cat.includes('言及') || cat.includes('学問') || cat.includes('法医学') || 
+      cat.includes('研究') || cat.includes('文献') || cat.includes('概念') || 
+      cat.includes('技術') || cat.includes('技能') || cat.includes('生物') || 
+      cat.includes('思想') || cat.includes('オカルト')) {
     return '科学・知識・歴史';
   }
+  // 5. 事件・証拠系
+  if (cat.includes('事件') || cat.includes('悲劇') || cat.includes('証拠') || 
+      cat.includes('凶器') || cat.includes('アイテム') || cat.includes('暗号') || 
+      cat.includes('動機') || cat.includes('偽装') || cat.includes('交通') || 
+      cat.includes('船舶') || cat.includes('物証') || cat.includes('薬物') || 
+      cat.includes('記録') || cat.includes('犯罪類型') || cat.includes('アーカイブ') || cat.includes('奇譚') || cat.includes('傷害') || cat.includes('観察') || cat.includes('トリック') || cat.includes('奇行')) {
+    return '事件・証拠・凶器';
+  }
+
   return 'その他';
 };
 
@@ -67,7 +87,6 @@ const TermCard = memo(function TermCard({
             <div className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-sm border ${isGlitch ? 'bg-rose-950/50 border-rose-800 text-rose-500' : 'bg-[#fffcf7] border-[#8c7a6b]/30 text-[#5c4d43]'}`}>
               FILE No. {term.id}
             </div>
-            {/* ▼ 修正：カードの表示も大分類に合わせた（元のカテゴリも（）で表示） */}
             <div className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-sm border ${isGlitch ? 'border-rose-800 text-rose-500' : 'border-[#8c7a6b]/20 text-[#8c7a6b]'}`}>
               {isUnlocked ? `${getCategoryGroup(term.category)} (${term.category})` : '???'}
             </div>
@@ -165,8 +184,13 @@ export default function GreatIndexTab() {
   const isSeason3Phase3 = clearedEpIds.includes('#38') || clearedEpIds.includes('#39');
   const isPostReichenbach = clearedEpIds.includes('#40');
   
+  // ▼ 修正：appearanceが設定されていない場合でも安全に読み込めるように修正
   const availableTerms = glossaryData.terms.filter(
-    (t) => !unlockedTerms.includes(t.id) && (t.appearance === 'general' || clearedEpIds.includes(t.appearance) || t.appearance.startsWith('SP-'))
+    (t: any) => {
+      if (unlockedTerms.includes(t.id)) return false;
+      const app = t.appearance || 'general';
+      return app === 'general' || clearedEpIds.includes(app) || app.startsWith('SP-');
+    }
   );
 
   const executeGacha = () => {
@@ -196,13 +220,12 @@ export default function GreatIndexTab() {
     if (searchQuery.trim() !== '') {
       const isUnlocked = unlockedTerms.includes(term.id);
       if (!isUnlocked) return false;
-      // ▼ 検索時も大分類フィルタを適用
       if (selectedCategory !== 'ALL' && getCategoryGroup(term.category) !== selectedCategory) return false;
 
       const q = searchQuery.toLowerCase();
       const matchJa = term.ja?.toLowerCase().includes(q);
       const matchEn = term.en?.toLowerCase().includes(q);
-      const matchDetails = term.details?.toLowerCase().includes(q);
+      const matchDetails = term.description?.toLowerCase().includes(q);
       return matchJa || matchEn || matchDetails;
     }
 
@@ -212,7 +235,6 @@ export default function GreatIndexTab() {
       if (!term.id.startsWith(selectedLetter)) return false;
     }
 
-    // ▼ 通常時も大分類フィルタを適用
     if (selectedCategory !== 'ALL' && getCategoryGroup(term.category) !== selectedCategory) {
       return false;
     }
@@ -287,7 +309,7 @@ export default function GreatIndexTab() {
                   FILE No.{newlyUnlockedTerm.id} / {getCategoryGroup(newlyUnlockedTerm.category)}
                 </span>
                 <p className="text-sm font-serif text-[#5c4d43] leading-relaxed line-clamp-4">
-                  {newlyUnlockedTerm.details}
+                  {newlyUnlockedTerm.description}
                 </p>
               </div>
 
@@ -350,7 +372,6 @@ export default function GreatIndexTab() {
           )}
         </div>
 
-        {/* ▼ 修正：固定の大分類タブを表示 */}
         <div className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 custom-scrollbar snap-x">
           {MAIN_CATEGORIES.map((cat) => (
             <button
@@ -390,14 +411,14 @@ export default function GreatIndexTab() {
             const isRead = readTerms.includes(term.id);
             const isExpanded = expandedTermId === term.id;
             
-            let overrideJa = term.ja, overrideEn = term.en, overrideDetails = term.details, overrideCritique = term.critique, isGlitch = false;
+            let overrideJa = term.ja, overrideEn = term.en, overrideDetails = term.description, overrideCritique = term.critique, isGlitch = false;
 
             if (term.overrides && Array.isArray(term.overrides)) {
               term.overrides.forEach((ov: any) => {
                 if (clearedEpIds.includes(ov.condition)) {
                   if (ov.ja) overrideJa = ov.ja;
                   if (ov.en) overrideEn = ov.en;
-                  if (ov.details) overrideDetails = ov.details;
+                  if (ov.description) overrideDetails = ov.description;
                   if (ov.critique) overrideCritique = ov.critique;
                   if (ov.glitch) isGlitch = true;
                 }

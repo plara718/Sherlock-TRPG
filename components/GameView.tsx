@@ -166,19 +166,30 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
       } else { elements.push(part); }
     });
 
-    glossaryData.terms.forEach((term) => {
-      const newElements: (string | React.JSX.Element)[] = [];
-      elements.forEach((el) => {
-        if (typeof el !== 'string') { newElements.push(el); return; }
-        const gParts = el.split(term.trigger_word);
-        gParts.forEach((gPart, j) => {
-          newElements.push(gPart);
-          if (j < gParts.length - 1) {
-            newElements.push(<span key={`g-${term.id}-${j}`} onClick={(e) => { e.stopPropagation(); handleGlossaryClick(term); }} className={`underline decoration-dotted cursor-help transition-colors font-bold z-10 relative ${isSanityZero ? 'text-rose-600 hover:text-rose-400' : 'text-theme-accent-main hover:opacity-80'}`}>{term.trigger_word}</span>);
-          }
+    // ▼ 修正: term.trigger_words (配列) に対応させる処理
+    glossaryData.terms.forEach((term: any) => {
+      // jsonにtrigger_wordsがない古いデータが混ざっていてもエラーにならないようにフォールバック
+      const words = term.trigger_words || (term.trigger_word ? [term.trigger_word] : []);
+      
+      words.forEach((word: string) => {
+        if (!word) return;
+        const newElements: (string | React.JSX.Element)[] = [];
+        elements.forEach((el) => {
+          if (typeof el !== 'string') { newElements.push(el); return; }
+          const gParts = el.split(word);
+          gParts.forEach((gPart, j) => {
+            newElements.push(gPart);
+            if (j < gParts.length - 1) {
+              newElements.push(
+                <span key={`g-${term.id}-${word}-${j}`} onClick={(e) => { e.stopPropagation(); handleGlossaryClick(term); }} className={`underline decoration-dotted cursor-help transition-colors font-bold z-10 relative ${isSanityZero ? 'text-rose-600 hover:text-rose-400' : 'text-theme-accent-main hover:opacity-80'}`}>
+                  {word}
+                </span>
+              );
+            }
+          });
         });
+        elements = newElements;
       });
-      elements = newElements;
     });
     return elements;
   };
@@ -279,7 +290,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             isStreaming ? skipStream() : nextBeat(); 
           } 
           
-          // ▼ 修正2: 画面をタップしてテキストを進めた時は、自動追従をオンに戻す
           isScrollingRef.current = false;
         }} 
         onTouchStart={(e) => { touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }} 
@@ -292,7 +302,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
           className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar relative z-20"
           onScroll={(e) => {
             const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-            // ▼ 修正2: ログを一番下までスクロールした時も、自動追従をオンに戻す
             const isAtBottom = scrollHeight - scrollTop - clientHeight <= 50;
             isScrollingRef.current = !isAtBottom;
           }}
