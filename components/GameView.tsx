@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import TetherBar from '@/components/TetherBar';
 import Controls from '@/components/Controls';
 import GlossaryToast from '@/components/GlossaryToast';
@@ -10,6 +10,13 @@ import { useGameLogic, ScenarioData } from '@/lib/useGameLogic';
 import { FileText, ArrowRight, Eye, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import glossaryData from '@/data/glossary.json';
 import { useSaveData } from '@/lib/SaveDataContext';
+
+// ▼ 最適化1：大索引のトリガーリストをコンポーネントの外で「事前構築・ソート」し、毎フレームの計算負荷をゼロにする
+const PRECOMPILED_GLOSSARY = glossaryData.terms.flatMap((term: any) => {
+  const words = term.trigger_words || (term.trigger_word ? [term.trigger_word] : []);
+  return words.filter(Boolean).map((word: string) => ({ word, term }));
+}).sort((a, b) => b.word.length - a.word.length);
+
 
 export default function GameView() {
   const ctx = useSaveData();
@@ -72,7 +79,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   const [isInterruptMode, setIsInterruptMode] = useState(false);
   const [screenEffect, setScreenEffect] = useState<'none' | 'flash' | 'shake' | 'glass-shatter'>('none');
   
-  // ▼ 修正2: 証拠品ポップアップを配列（キュー）で管理し、スタック表示できるように変更
   const [evidencePopups, setEvidencePopups] = useState<{id: number, word: string}[]>([]);
   const popupIdCounter = useRef(0);
 
@@ -138,66 +144,61 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
     }
   }, [displayedText, chatHistory.length, collectedEvidence, isInterruptMode, isStreaming]);
 
-  const handleGlossaryClick = (term: any) => {
+  const handleGlossaryClick = useCallback((term: any) => {
     if (ctx.unlockedTerms.includes(term.id)) {
       setActiveGlossary({ word: term.ja, desc: "このデータは既に大索引に登録されています。詳細はアーカイブで確認してください。" });
     } else {
       ctx.setUnlockedTerms([...ctx.unlockedTerms, term.id]);
       setActiveGlossary({ word: term.ja, desc: "【NEW】大索引に新規データが登録されました！ 事件解決後、アーカイブから詳細を解読できます。" });
     }
-  };
+  }, [ctx]);
 
-  const handleCollectEvidence = (word: string) => {
+  const handleCollectEvidence = useCallback((word: string) => {
     if (!collectedEvidence.includes(word)) {
       collectEvidence(word);
       const newId = popupIdCounter.current++;
       setEvidencePopups(prev => [...prev, { id: newId, word }]);
-      // 一定時間後に自身をキューから削除
       setTimeout(() => {
         setEvidencePopups(prev => prev.filter(p => p.id !== newId));
       }, 2500);
     }
-  };
+  }, [collectedEvidence, collectEvidence]);
 
-  const renderText = (text: string) => {
+  // ▼ 最適化2：renderText を useCallback で包み、不要な再生成を防ぐ
+  // 第2引数(skipGlossary)が true の時（タイピング中）は、大索引リンク化の重い処理を完全にバイパスする
+  const renderText = useCallback((text: string, skipGlossary: boolean = false) => {
     if (!text) return "";
     let elements: (string | React.JSX.Element)[] = [];
     const parts = text.split(/(\{.*?\})/g);
     
-    // 1. 証拠品の処理
     parts.forEach((part, i) => {
       if (part.startsWith('{') && part.endsWith('}')) {
         const word = part.slice(1, -1);
         const isCollected = collectedEvidence.includes(word);
         const wigginsStyle = (isWigginsActive && !isCollected) ? 'ring-2 ring-theme-accent-muted ring-offset-1 bg-amber-200 animate-pulse' : '';
         elements.push(
-          <span key={`ev-${i}`} onClick={(e) => { e.stopPropagation(); handleCollectEvidence(word); }} className={`font-bold cursor-pointer px-1.5 mx-0.5 rounded transition-all shadow-sm inline-flex items-center z-10 relative ${wigginsStyle} ${isCollected ? 'bg-theme-bg-panel text-theme-text-muted cursor-default' : isSanityZero ? 'text-rose-900 bg-rose-500/30 hover:bg-rose-500/50 border border-rose-600/50 active:scale-95 animate-pulse' : 'text-theme-text-base bg-theme-accent-main hover:opacity-80 border border-theme-border-base/50 active:scale-95 text-white'}`}>{word}</span>
+          <span key={`ev-${word}-${i}`} onClick={(e) => { e.stopPropagation(); handleCollectEvidence(word); }} className={`font-bold cursor-pointer px-1.5 mx-0.5 rounded transition-all shadow-sm inline-flex items-center z-10 relative ${wigginsStyle} ${isCollected ? 'bg-theme-bg-panel text-theme-text-muted cursor-default' : isSanityZero ? 'text-rose-900 bg-rose-500/30 hover:bg-rose-500/50 border border-rose-600/50 active:scale-95 animate-pulse' : 'text-theme-text-base bg-theme-accent-main hover:opacity-80 border border-theme-border-base/50 active:scale-95 text-white'}`}>{word}</span>
         );
-      } else { elements.push(part); }
+      } else { 
+        elements.push(part); 
+      }
     });
 
-    // ▼ 修正1: トリガーワードのリストを作成し、文字数が長い順（降順）にソートする
-    const triggerList: { word: string, term: any }[] = [];
-    glossaryData.terms.forEach((term: any) => {
-      const words = term.trigger_words || (term.trigger_word ? [term.trigger_word] : []);
-      words.forEach((w: string) => {
-        if (w) triggerList.push({ word: w, term });
-      });
-    });
-    triggerList.sort((a, b) => b.word.length - a.word.length);
+    // タイピング中は重い辞書リンク化処理をスキップし、60FPSを維持
+    if (skipGlossary) return elements;
 
-    // 2. 用語のハイライト処理（長いものから順に置換）
-    triggerList.forEach(({ word, term }) => {
+    // 最適化済みの辞書リストでリンク化
+    PRECOMPILED_GLOSSARY.forEach(({ word, term }) => {
       const newElements: (string | React.JSX.Element)[] = [];
-      elements.forEach((el) => {
+      elements.forEach((el, elIndex) => {
         if (typeof el !== 'string') { newElements.push(el); return; }
         const gParts = el.split(word);
         gParts.forEach((gPart, j) => {
           newElements.push(gPart);
           if (j < gParts.length - 1) {
-            // keyにランダム値を入れてReactのレンダリング警告を防ぐ（一過性の表示のため許容）
+            // 最適化3：ランダムキーを排除し、Reactの差分検出を高速化
             newElements.push(
-              <span key={`g-${term.id}-${word}-${j}-${Math.random()}`} onClick={(e) => { e.stopPropagation(); handleGlossaryClick(term); }} className={`underline decoration-dotted cursor-help transition-colors font-bold z-10 relative ${isSanityZero ? 'text-rose-600 hover:text-rose-400' : 'text-theme-accent-main hover:opacity-80'}`}>
+              <span key={`g-${term.id}-${elIndex}-${j}`} onClick={(e) => { e.stopPropagation(); handleGlossaryClick(term); }} className={`underline decoration-dotted cursor-help transition-colors font-bold z-10 relative ${isSanityZero ? 'text-rose-600 hover:text-rose-400' : 'text-theme-accent-main hover:opacity-80'}`}>
                 {word}
               </span>
             );
@@ -206,9 +207,9 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
       });
       elements = newElements;
     });
-
+    
     return elements;
-  };
+  }, [collectedEvidence, isWigginsActive, isSanityZero, handleCollectEvidence, handleGlossaryClick]);
 
   return (
     <div data-theme={isMoriarty ? 'moriarty' : 'holmes'} className={`w-full max-w-2xl mx-auto relative flex flex-col h-[100dvh] supports-[height:100svh]:h-[100svh] touch-manipulation overscroll-none transition-transform duration-75 select-none ${screenEffect === 'shake' ? '-translate-x-2' : ''} bg-theme-bg-base`}>
@@ -222,7 +223,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
         </div>
       )}
 
-      {/* ▼ 修正2: ポップアップのスタック表示 */}
       {evidencePopups.length > 0 && (
         <div className="absolute top-[20%] left-1/2 -translate-x-1/2 z-[70] pointer-events-none flex flex-col items-center gap-2">
           {evidencePopups.map((popup) => (
@@ -337,10 +337,11 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             }
 
             const isMetaNotice = beat.speaker === 'System' && cleanText.startsWith('【');
-
+            
+            // ▼ 最適化適用：現在タイピング中の行だけ `skipGlossary=true` を渡して重い処理をバイパスする
             return (
               <div key={idx} className={isSanityZero && isCurrent ? (ctx.reduceEffects ? '' : 'animate-[shake_0.5s_infinite]') : ''}>
-                <ChatLog speaker={beat.speaker} text={renderText(cleanText)} feedback={isCurrent ? feedback : null} isMetaNotice={isMetaNotice} />
+                <ChatLog speaker={beat.speaker} text={renderText(cleanText, isCurrent && isStreaming)} feedback={isCurrent ? feedback : null} isMetaNotice={isMetaNotice} />
               </div>
             );
           })}
