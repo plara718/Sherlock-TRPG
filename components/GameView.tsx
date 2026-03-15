@@ -71,8 +71,12 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   const [activeGlossary, setActiveGlossary] = useState<{ word: string; desc: string; } | null>(null);
   const [isInterruptMode, setIsInterruptMode] = useState(false);
   const [screenEffect, setScreenEffect] = useState<'none' | 'flash' | 'shake' | 'glass-shatter'>('none');
+  
+  // ▼ 修正2: 証拠品ポップアップを配列（キュー）で管理し、スタック表示できるように変更
+  const [evidencePopups, setEvidencePopups] = useState<{id: number, word: string}[]>([]);
+  const popupIdCounter = useRef(0);
+
   const [cutin, setCutin] = useState<{type: 'success' | 'fail' | 'penalty', msg: string, isCritical?: boolean} | null>(null);
-  const [acquiredEvidencePopup, setAcquiredEvidencePopup] = useState<string | null>(null);
 
   const [isWigginsActive, setIsWigginsActive] = useState(false);
   const [isSanityZero, setIsSanityZero] = useState(false);
@@ -146,8 +150,12 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   const handleCollectEvidence = (word: string) => {
     if (!collectedEvidence.includes(word)) {
       collectEvidence(word);
-      setAcquiredEvidencePopup(word);
-      setTimeout(() => setAcquiredEvidencePopup(null), 2000);
+      const newId = popupIdCounter.current++;
+      setEvidencePopups(prev => [...prev, { id: newId, word }]);
+      // 一定時間後に自身をキューから削除
+      setTimeout(() => {
+        setEvidencePopups(prev => prev.filter(p => p.id !== newId));
+      }, 2500);
     }
   };
 
@@ -155,6 +163,8 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
     if (!text) return "";
     let elements: (string | React.JSX.Element)[] = [];
     const parts = text.split(/(\{.*?\})/g);
+    
+    // 1. 証拠品の処理
     parts.forEach((part, i) => {
       if (part.startsWith('{') && part.endsWith('}')) {
         const word = part.slice(1, -1);
@@ -166,31 +176,37 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
       } else { elements.push(part); }
     });
 
-    // ▼ 修正: term.trigger_words (配列) に対応させる処理
+    // ▼ 修正1: トリガーワードのリストを作成し、文字数が長い順（降順）にソートする
+    const triggerList: { word: string, term: any }[] = [];
     glossaryData.terms.forEach((term: any) => {
-      // jsonにtrigger_wordsがない古いデータが混ざっていてもエラーにならないようにフォールバック
       const words = term.trigger_words || (term.trigger_word ? [term.trigger_word] : []);
-      
-      words.forEach((word: string) => {
-        if (!word) return;
-        const newElements: (string | React.JSX.Element)[] = [];
-        elements.forEach((el) => {
-          if (typeof el !== 'string') { newElements.push(el); return; }
-          const gParts = el.split(word);
-          gParts.forEach((gPart, j) => {
-            newElements.push(gPart);
-            if (j < gParts.length - 1) {
-              newElements.push(
-                <span key={`g-${term.id}-${word}-${j}`} onClick={(e) => { e.stopPropagation(); handleGlossaryClick(term); }} className={`underline decoration-dotted cursor-help transition-colors font-bold z-10 relative ${isSanityZero ? 'text-rose-600 hover:text-rose-400' : 'text-theme-accent-main hover:opacity-80'}`}>
-                  {word}
-                </span>
-              );
-            }
-          });
-        });
-        elements = newElements;
+      words.forEach((w: string) => {
+        if (w) triggerList.push({ word: w, term });
       });
     });
+    triggerList.sort((a, b) => b.word.length - a.word.length);
+
+    // 2. 用語のハイライト処理（長いものから順に置換）
+    triggerList.forEach(({ word, term }) => {
+      const newElements: (string | React.JSX.Element)[] = [];
+      elements.forEach((el) => {
+        if (typeof el !== 'string') { newElements.push(el); return; }
+        const gParts = el.split(word);
+        gParts.forEach((gPart, j) => {
+          newElements.push(gPart);
+          if (j < gParts.length - 1) {
+            // keyにランダム値を入れてReactのレンダリング警告を防ぐ（一過性の表示のため許容）
+            newElements.push(
+              <span key={`g-${term.id}-${word}-${j}-${Math.random()}`} onClick={(e) => { e.stopPropagation(); handleGlossaryClick(term); }} className={`underline decoration-dotted cursor-help transition-colors font-bold z-10 relative ${isSanityZero ? 'text-rose-600 hover:text-rose-400' : 'text-theme-accent-main hover:opacity-80'}`}>
+                {word}
+              </span>
+            );
+          }
+        });
+      });
+      elements = newElements;
+    });
+
     return elements;
   };
 
@@ -206,14 +222,19 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
         </div>
       )}
 
-      {acquiredEvidencePopup && (
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 z-[70] pointer-events-none flex flex-col items-center animate-in slide-in-from-bottom-10 fade-in duration-300">
-          <div className="bg-theme-accent-main text-white font-black px-6 py-2 rounded-full shadow-lg border-2 border-theme-border-base flex items-center gap-2 text-sm sm:text-base tracking-widest">
-            <FileText size={18} /> EVIDENCE ACQUIRED
-          </div>
-          <div className="mt-2 bg-theme-bg-dark text-theme-text-light px-4 py-1.5 rounded-lg border border-theme-accent-main shadow-lg text-sm sm:text-base font-bold font-serif max-w-[80vw] truncate">
-            {acquiredEvidencePopup}
-          </div>
+      {/* ▼ 修正2: ポップアップのスタック表示 */}
+      {evidencePopups.length > 0 && (
+        <div className="absolute top-[20%] left-1/2 -translate-x-1/2 z-[70] pointer-events-none flex flex-col items-center gap-2">
+          {evidencePopups.map((popup) => (
+            <div key={popup.id} className="animate-in slide-in-from-bottom-5 fade-in duration-300 flex flex-col items-center">
+              <div className="bg-theme-accent-main text-white font-black px-6 py-2 rounded-full shadow-lg border-2 border-theme-border-base flex items-center gap-2 text-sm sm:text-base tracking-widest">
+                <FileText size={18} /> EVIDENCE ACQUIRED
+              </div>
+              <div className="mt-1 bg-theme-bg-dark text-theme-text-light px-4 py-1.5 rounded-lg border border-theme-accent-main shadow-lg text-sm sm:text-base font-bold font-serif max-w-[80vw] truncate">
+                {popup.word}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -340,7 +361,7 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
           {collectedEvidence.map((ev) => (
             <button key={ev} onClick={(e) => { e.stopPropagation(); handleSelectEvidence(ev); }} disabled={isStreaming || interactionCooldown} 
               className={`whitespace-nowrap text-[10px] sm:text-xs px-2.5 py-1.5 rounded-full font-bold transition-all z-20 relative 
-              ${acquiredEvidencePopup === ev ? 'ring-4 ring-theme-accent-main ring-offset-2 ring-offset-theme-bg-dark bg-theme-accent-main text-white scale-110 shadow-lg z-30 duration-300' : ''} 
+              ${evidencePopups.some(p => p.word === ev) ? 'ring-4 ring-theme-accent-main ring-offset-2 ring-offset-theme-bg-dark bg-theme-accent-main text-white scale-110 shadow-lg z-30 duration-300' : ''} 
               ${selectedEvidence === ev ? 'bg-theme-accent-main text-white shadow-md' : 'bg-theme-bg-panel text-theme-text-muted hover:bg-theme-border-base hover:text-theme-text-light'} ${interactionCooldown ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
             >
               {ev}
