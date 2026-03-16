@@ -98,7 +98,8 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
 
   const rawIntervention = scenarioData.meta?.intervention;
   const interventionType = ['Irene', 'Mycroft', 'Wiggins'].includes(rawIntervention as string) ? (rawIntervention as 'Irene' | 'Mycroft' | 'Wiggins') : null;
-  const isInterventionAvailable = interventionType === 'Irene' ? (ctx.unlockedTerms.includes('I007') && !isIrene && !isMoriarty) : interventionType === 'Mycroft' ? (!isIrene && !isMoriarty) : interventionType === 'Wiggins' ? (ctx.unlockedTerms.includes('W040') && !isIrene && !isMoriarty) : false;
+  // ▼ 修正箇所1：I007 -> A013, W040 -> B004
+  const isInterventionAvailable = interventionType === 'Irene' ? (ctx.unlockedTerms.includes('A013') && !isIrene && !isMoriarty) : interventionType === 'Mycroft' ? (!isIrene && !isMoriarty) : interventionType === 'Wiggins' ? (ctx.unlockedTerms.includes('B004') && !isIrene && !isMoriarty) : false;
   const [interventionUsed, setInterventionUsed] = useState(false);
 
   useEffect(() => { setInterventionUsed(false); setIsSanityZero(false); }, [episodeId]);
@@ -136,7 +137,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
     setIsWigginsActive(false);
   }, [currentBeat, isStreaming]);
 
-  // 自動スクロール
   useEffect(() => { 
     if (!isScrollingRef.current) {
       bottomRef.current?.scrollIntoView({ behavior: isStreaming ? 'auto' : 'smooth' }); 
@@ -324,11 +324,9 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             isScrollingRef.current = !isAtBottom;
           }}
         >
-          {/* ▼ 修正：最新のUI描画ロジック。最後の要素の表示文字数を制限してストリーミングを再現 */}
           {chatHistory.map((beat: any, idx: number) => {
             const isCurrent = idx === chatHistory.length - 1;
             
-            // ストリーミング中なら指定文字数でカット
             let textToShow = beat.text;
             if (isCurrent && isStreaming) {
               textToShow = textToShow.substring(0, streamedLength);
@@ -336,7 +334,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             
             let cleanText = (textToShow || "").replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '');
 
-            // 中途半端な証拠品タグを隠す
             if (isCurrent && isStreaming) {
               cleanText = cleanText.replace(/\{([^}]*)$/, '$1');
             }
@@ -353,7 +350,8 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
           <div ref={bottomRef} className="h-20" />
         </div>
 
-        {!isStreaming && currentBeat?.text.match(/\{.*?\}/g)?.some(match => !collectedEvidence.includes(match.slice(1, -1))) && !isInterruptMode && !isWigginsActive && ctx.unlockedTerms.includes('W040') && (
+        {/* ▼ 修正箇所2：W040 -> B004 */}
+        {!isStreaming && currentBeat?.text.match(/\{.*?\}/g)?.some((match: string) => !collectedEvidence.includes(match.slice(1, -1))) && !isInterruptMode && !isWigginsActive && ctx.unlockedTerms.includes('B004') && (
           <div className="absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-6 z-20 animate-in fade-in zoom-in duration-300">
              <button onClick={(e) => { e.stopPropagation(); if (ctx.insightPoints >= 1 && !isWigginsActive && ctx.handleSpendPoint(1)) setIsWigginsActive(true); }} disabled={ctx.insightPoints < 1} className="bg-amber-700 hover:bg-amber-600 disabled:bg-[#d8c8b8] disabled:text-[#8c7a6b] disabled:cursor-not-allowed text-white text-[10px] sm:text-xs font-bold px-4 py-3 rounded-full shadow-lg flex items-center gap-1.5 transition-transform active:scale-95"><Eye size={16} /> WIGGINS EYE (1pt)</button>
           </div>
