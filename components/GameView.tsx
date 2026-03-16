@@ -11,12 +11,10 @@ import { FileText, ArrowRight, Eye, AlertTriangle, CheckCircle2 } from 'lucide-r
 import glossaryData from '@/data/glossary.json';
 import { useSaveData } from '@/lib/SaveDataContext';
 
-// ▼ 最適化1：大索引のトリガーリストをコンポーネントの外で「事前構築・ソート」し、毎フレームの計算負荷をゼロにする
 const PRECOMPILED_GLOSSARY = glossaryData.terms.flatMap((term: any) => {
   const words = term.trigger_words || (term.trigger_word ? [term.trigger_word] : []);
   return words.filter(Boolean).map((word: string) => ({ word, term }));
 }).sort((a, b) => b.word.length - a.word.length);
-
 
 export default function GameView() {
   const ctx = useSaveData();
@@ -92,7 +90,7 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   const isReplay = Boolean(ctx.clearedData[episodeId]);
 
   const {
-    currentBeat, displayedText, isStreaming, tether, feedback, handleInterrupt, evaluatePanelInterrupt,
+    currentBeat, isStreaming, streamedLength, tether, feedback, handleInterrupt, evaluatePanelInterrupt,
     nextBeat, handleChoice, skipStream, chatHistory, collectedEvidence, selectedEvidence,
     collectEvidence, handleSelectEvidence, selectedSkill, isCompleted, endResult,
     uiLabels, isMoriarty, isIrene
@@ -138,11 +136,12 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
     setIsWigginsActive(false);
   }, [currentBeat, isStreaming]);
 
+  // 自動スクロール
   useEffect(() => { 
     if (!isScrollingRef.current) {
       bottomRef.current?.scrollIntoView({ behavior: isStreaming ? 'auto' : 'smooth' }); 
     }
-  }, [displayedText, chatHistory.length, collectedEvidence, isInterruptMode, isStreaming]);
+  }, [streamedLength, chatHistory.length, collectedEvidence, isInterruptMode, isStreaming]);
 
   const handleGlossaryClick = useCallback((term: any) => {
     if (ctx.unlockedTerms.includes(term.id)) {
@@ -164,8 +163,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
     }
   }, [collectedEvidence, collectEvidence]);
 
-  // ▼ 最適化2：renderText を useCallback で包み、不要な再生成を防ぐ
-  // 第2引数(skipGlossary)が true の時（タイピング中）は、大索引リンク化の重い処理を完全にバイパスする
   const renderText = useCallback((text: string, skipGlossary: boolean = false) => {
     if (!text) return "";
     let elements: (string | React.JSX.Element)[] = [];
@@ -184,10 +181,8 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
       }
     });
 
-    // タイピング中は重い辞書リンク化処理をスキップし、60FPSを維持
     if (skipGlossary) return elements;
 
-    // 最適化済みの辞書リストでリンク化
     PRECOMPILED_GLOSSARY.forEach(({ word, term }) => {
       const newElements: (string | React.JSX.Element)[] = [];
       elements.forEach((el, elIndex) => {
@@ -196,7 +191,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
         gParts.forEach((gPart, j) => {
           newElements.push(gPart);
           if (j < gParts.length - 1) {
-            // 最適化3：ランダムキーを排除し、Reactの差分検出を高速化
             newElements.push(
               <span key={`g-${term.id}-${elIndex}-${j}`} onClick={(e) => { e.stopPropagation(); handleGlossaryClick(term); }} className={`underline decoration-dotted cursor-help transition-colors font-bold z-10 relative ${isSanityZero ? 'text-rose-600 hover:text-rose-400' : 'text-theme-accent-main hover:opacity-80'}`}>
                 {word}
@@ -274,9 +268,14 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar bg-theme-bg-base pb-[env(safe-area-inset-bottom)]">
-            {chatHistory.map((beat: any, idx: number) => (
-              <ChatLog key={`log-${idx}`} speaker={beat.speaker} text={renderText(beat.text)} feedback={null} isMetaNotice={beat.speaker === 'System' && beat.text.startsWith('【')} />
-            ))}
+            {chatHistory.map((beat: any, idx: number) => {
+              let textToShow = beat.text;
+              let cleanText = (textToShow || "").replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '');
+              const isMetaNotice = beat.speaker === 'System' && cleanText.startsWith('【');
+              return (
+                <ChatLog key={`log-${beat.id || idx}`} speaker={beat.speaker} text={renderText(cleanText)} feedback={null} isMetaNotice={isMetaNotice} />
+              );
+            })}
           </div>
         </div>
       )}
@@ -305,12 +304,10 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
         className="flex-1 flex flex-col relative overflow-hidden cursor-pointer transition-colors duration-1000 bg-theme-bg-base" 
         onClick={() => { 
           if (isInterruptMode) return; 
-          
           if (!isScrollingRef.current && (Date.now() - lastActionTimeRef.current > 500)) { 
             lastActionTimeRef.current = Date.now(); 
             isStreaming ? skipStream() : nextBeat(); 
           } 
-          
           isScrollingRef.current = false;
         }} 
         onTouchStart={(e) => { touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }} 
@@ -327,25 +324,32 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             isScrollingRef.current = !isAtBottom;
           }}
         >
+          {/* ▼ 修正：最新のUI描画ロジック。最後の要素の表示文字数を制限してストリーミングを再現 */}
           {chatHistory.map((beat: any, idx: number) => {
             const isCurrent = idx === chatHistory.length - 1;
-            const textToShow = isCurrent ? displayedText : beat.text;
+            
+            // ストリーミング中なら指定文字数でカット
+            let textToShow = beat.text;
+            if (isCurrent && isStreaming) {
+              textToShow = textToShow.substring(0, streamedLength);
+            }
+            
             let cleanText = (textToShow || "").replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '');
 
+            // 中途半端な証拠品タグを隠す
             if (isCurrent && isStreaming) {
               cleanText = cleanText.replace(/\{([^}]*)$/, '$1');
             }
 
             const isMetaNotice = beat.speaker === 'System' && cleanText.startsWith('【');
-            
-            // ▼ 最適化適用：現在タイピング中の行だけ `skipGlossary=true` を渡して重い処理をバイパスする
+
             return (
-              <div key={idx} className={isSanityZero && isCurrent ? (ctx.reduceEffects ? '' : 'animate-[shake_0.5s_infinite]') : ''}>
+              <div key={beat.id || idx} className={isSanityZero && isCurrent ? (ctx.reduceEffects ? '' : 'animate-[shake_0.5s_infinite]') : ''}>
                 <ChatLog speaker={beat.speaker} text={renderText(cleanText, isCurrent && isStreaming)} feedback={isCurrent ? feedback : null} isMetaNotice={isMetaNotice} />
               </div>
             );
           })}
-          {isStreaming && currentBeat.speaker !== 'System' && <div className="inline-block w-2.5 h-5 ml-1 animate-pulse align-middle bg-theme-text-base" />}
+          {isStreaming && chatHistory[chatHistory.length-1]?.speaker !== 'System' && <div className="inline-block w-2.5 h-5 ml-1 animate-pulse align-middle bg-theme-text-base" />}
           <div ref={bottomRef} className="h-20" />
         </div>
 
@@ -395,7 +399,7 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
         ) : isInterruptMode ? (
           <InterruptPanel collectedEvidences={collectedEvidence} hintText={currentBeat?.interrupt?.hint} interventionType={interventionType} isInterventionAvailable={isInterventionAvailable} interventionUsed={interventionUsed} onUseIntervention={() => setInterventionUsed(true)} onSubmit={(skill, evidence) => { evaluatePanelInterrupt(skill, evidence); setIsInterruptMode(false); }} onTimeUp={() => { handleInterrupt('TIMEOUT'); setIsInterruptMode(false); }} protagonist={protagonist} isMoriarty={isMoriarty} uiLabels={uiLabels} isEvidenceRequired={!!currentBeat?.interrupt?.required_evidence} />
         ) : (
-          <Controls isStreaming={isStreaming && currentBeat.speaker !== 'System'} selectedSkill={selectedSkill} onNext={() => { const now = Date.now(); if (now - lastActionTimeRef.current > 500) { nextBeat(); lastActionTimeRef.current = now; } }} onInterrupt={handleInterrupt} />
+          <Controls isStreaming={isStreaming && chatHistory[chatHistory.length-1]?.speaker !== 'System'} selectedSkill={selectedSkill} onNext={() => { const now = Date.now(); if (now - lastActionTimeRef.current > 500) { nextBeat(); lastActionTimeRef.current = now; } }} onInterrupt={handleInterrupt} />
         )}
       </div>
 

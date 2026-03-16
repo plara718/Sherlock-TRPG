@@ -50,7 +50,6 @@ export function useGameLogic(
   initialSaveData: any = null,
   onSaveGame: (data: any) => void = () => {}
 ) {
-  // === メタ情報の初期化 ===
   const protagonist = scenarioData.meta.protagonist || 'watson';
   const isIrene = protagonist === 'irene';
   const isMoriarty = scenarioData.meta.play_mode === 'moriarty';
@@ -62,41 +61,31 @@ export function useGameLogic(
     actionButton: isMoriarty ? 'REWRITE EQUATION' : (isIrene ? 'COUNTER' : 'TETHER THE GENIUS'),
   };
 
-  // === 状態管理 (State) ===
+  // 1. 状態管理（シナリオの進行度とチャットログを完全に分離）
   const [currentBeatId, setCurrentBeatId] = useState<string>(initialSaveData?.currentBeatId || beats[0]?.id || '');
-  const [chatHistory, setChatHistory] = useState<ScenarioBeat[]>(initialSaveData?.chatHistory || (beats[0] ? [beats[0]] : []));
+  const [chatHistory, setChatHistory] = useState<ScenarioBeat[]>(initialSaveData?.chatHistory || []);
   const [tether, setTether] = useState<number>(initialSaveData?.tether ?? (scenarioData.meta.tether_start || (isMoriarty ? 100 : 50)));
   
-  // テキストストリーミング関連の状態
-  const [displayedText, setDisplayedText] = useState<string>(initialSaveData?.displayedText || '');
+  // 2. ストリーミング専用ステート（「最後の吹き出し」の何文字目まで表示したかだけを管理）
+  const [streamedLength, setStreamedLength] = useState<number>(initialSaveData?.streamedLength ?? 0);
   const [isStreaming, setIsStreaming] = useState(false);
   
-  // プレイヤーのアクション関連の状態
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
   const [selectedEvidence, setSelectedEvidence] = useState<string | null>(null);
   const [collectedEvidence, setCollectedEvidence] = useState<string[]>(initialSaveData?.collectedEvidence || []);
   const [isResolved, setIsResolved] = useState(false);
   
-  // 演出・結果関連の状態
   const [feedback, setFeedback] = useState<{ type: 'success' | 'fail' | 'penalty'; msg: string; isCriticalSuccess?: boolean; } | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
   const [endResult, setEndResult] = useState<{ rank: string; points: number; consequenceData: any; } | null>(null);
 
-  // === 参照管理 (Refs) - タイマーや即時参照が必要な値 ===
-  const textStreamRef = useRef<NodeJS.Timeout | null>(null);
-  const currentTextIndex = useRef(0);
-  const targetTextRef = useRef<string>('');
   const tetherRef = useRef(tether);
   const isProcessingChoiceRef = useRef(false);
-  const hasLoadedRef = useRef(false); 
-  
-  // ▼ 修正：親からの無限再描画ループを防ぐため、初期データをRefに隔離
-  const initialSaveDataRef = useRef(initialSaveData);
+  const hasLoadedRef = useRef(false);
 
-  const currentBeatIndex = beats.findIndex(b => b.id === currentBeatId);
-  const currentBeat = beats[currentBeatIndex];
+  // 現在のシナリオビート（UI判定用）
+  const currentBeat = beats.find(b => b.id === currentBeatId) || beats[0];
 
-  // === ヘルパー関数 ===
   const updateTether = useCallback((amount: number) => {
     setTether(prev => {
       const newValue = Math.max(0, Math.min(100, prev + amount));
@@ -112,92 +101,61 @@ export function useGameLogic(
     return userTextSpeed * 0.5;
   }, [userTextSpeed]);
 
-  const updateLatestHistory = useCallback((fullText: string) => {
-    setChatHistory(prev => {
-      const newHistory = [...prev];
-      if (newHistory.length > 0) {
-        newHistory[newHistory.length - 1] = { ...newHistory[newHistory.length - 1], text: fullText };
-      }
-      return newHistory;
-    });
+  // ▼ コアロジック：新しい吹き出しを下に追加する関数
+  const pushBeatToHistory = useCallback((beat: ScenarioBeat, isInstant: boolean = false) => {
+    setChatHistory(prev => [...prev, beat]);
+    if (isInstant || beat.speaker === 'System' || beat.type === 'instruction') {
+      setStreamedLength(beat.text.length);
+      setIsStreaming(false);
+    } else {
+      setStreamedLength(0);
+      setIsStreaming(true);
+    }
   }, []);
 
-  // === コア・ストリーミング処理 ===
-  const streamNextChar = useCallback(() => {
-    if (textStreamRef.current) clearTimeout(textStreamRef.current);
-
-    if (currentTextIndex.current >= targetTextRef.current.length) {
-      setIsStreaming(false);
-      return;
-    }
-
-    setDisplayedText(targetTextRef.current.substring(0, currentTextIndex.current + 1));
-    currentTextIndex.current++;
-    textStreamRef.current = setTimeout(streamNextChar, getTextSpeed());
-  }, [getTextSpeed]);
-
-  const appendTextAndStream = useCallback((additionalText: string) => {
-    targetTextRef.current += additionalText;
-    updateLatestHistory(targetTextRef.current);
-    setIsStreaming(true);
-    streamNextChar();
-  }, [updateLatestHistory, streamNextChar]);
-
-  const skipStream = useCallback(() => {
-    if (!isStreaming) return;
-    if (textStreamRef.current) clearTimeout(textStreamRef.current);
-    
-    setDisplayedText(targetTextRef.current);
-    currentTextIndex.current = targetTextRef.current.length;
-    setIsStreaming(false);
-  }, [isStreaming]);
-
-  // === ビート初期化処理 ===
-  const startBeat = useCallback(() => {
-    if (!currentBeat) return;
-    if (textStreamRef.current) clearTimeout(textStreamRef.current);
-
-    // セーブデータからの復帰時処理（初回のみ）
-    if (initialSaveDataRef.current && !hasLoadedRef.current) {
+  // 初期ロード・および次ビートへの進行時の処理
+  useEffect(() => {
+    if (initialSaveData && !hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      if (initialSaveDataRef.current.displayedText) {
-        targetTextRef.current = initialSaveDataRef.current.displayedText;
-        currentTextIndex.current = initialSaveDataRef.current.displayedText.length;
-        setDisplayedText(initialSaveDataRef.current.displayedText);
+      if (initialSaveData.chatHistory && initialSaveData.chatHistory.length > 0) {
+        setChatHistory(initialSaveData.chatHistory);
+        setStreamedLength(initialSaveData.streamedLength ?? initialSaveData.chatHistory[initialSaveData.chatHistory.length - 1].text.length);
         setIsStreaming(false);
         return;
       }
     }
     hasLoadedRef.current = true;
 
-    // ステートの初期化
-    setDisplayedText('');
-    setFeedback(null);
-    setSelectedSkill(null);
-    setSelectedEvidence(null);
-    setIsResolved(false);
-    
-    currentTextIndex.current = 0;
-    targetTextRef.current = currentBeat.text;
-
-    // ナレーションや指示文は即時全表示
-    if (currentBeat.speaker === 'System' || currentBeat.type === 'instruction') {
-      setDisplayedText(currentBeat.text);
-      currentTextIndex.current = currentBeat.text.length;
-      setIsStreaming(false);
-    } else {
-      setIsStreaming(true);
-      streamNextChar();
+    // まだ履歴が空なら最初のビートを追加
+    if (chatHistory.length === 0 && beats.length > 0) {
+      pushBeatToHistory(beats[0]);
     }
-  }, [currentBeat, streamNextChar]); // ▼ 修正：initialSaveDataを依存配列から除外しループを防止
+  }, []); // 初回のみ
 
-  // ビートが変わった時に初期化処理を走らせる
+  // ストリーミングのタイマー処理（現在表示中の最後の吹き出しの文字数を増やす）
   useEffect(() => {
-    startBeat();
-    return () => { if (textStreamRef.current) clearTimeout(textStreamRef.current); };
-  }, [currentBeatId, startBeat]);
+    if (!isStreaming || chatHistory.length === 0) return;
+    
+    const lastBeat = chatHistory[chatHistory.length - 1];
+    if (streamedLength >= lastBeat.text.length) {
+      setIsStreaming(false);
+      return;
+    }
+    
+    const timer = setTimeout(() => {
+      setStreamedLength(prev => prev + 1);
+    }, getTextSpeed());
+    
+    return () => clearTimeout(timer);
+  }, [isStreaming, streamedLength, chatHistory, getTextSpeed]);
 
-  // === プレイヤーアクション処理 ===
+  const skipStream = useCallback(() => {
+    if (!isStreaming || chatHistory.length === 0) return;
+    const lastBeat = chatHistory[chatHistory.length - 1];
+    setStreamedLength(lastBeat.text.length);
+    setIsStreaming(false);
+  }, [isStreaming, chatHistory]);
+
   const collectEvidence = (evidence: string) => {
     setCollectedEvidence(prev => {
       if (prev.includes(evidence)) return prev;
@@ -216,7 +174,7 @@ export function useGameLogic(
     setSelectedSkill(prev => prev === skillName ? null : skillName);
   };
 
-  // === 割り込み・スキル判定処理 ===
+  // ▼ スキル判定ロジック（結果は「新しい吹き出し」として追加）
   const evaluatePanelInterrupt = useCallback((skill: string, evidence: string | null) => {
     if (isResolved || !currentBeat?.interrupt) return;
     setIsResolved(true);
@@ -227,7 +185,7 @@ export function useGameLogic(
       const failMsg = currentBeat.interrupt.fail_msg || "時間切れ";
       setFeedback({ type: 'fail', msg: `${failMsg}（${uiLabels.gaugeName} -15）` });
       updateTether(TETHER_PENALTY_MISS);
-      appendTextAndStream(`\n\n【System: 介入失敗 - ${failMsg}】`);
+      pushBeatToHistory({ id: `sys-timeout-${Date.now()}`, speaker: 'System', text: `【介入失敗 - ${failMsg}】`, type: 'system' }, true);
       return;
     }
 
@@ -239,33 +197,37 @@ export function useGameLogic(
       updateTether(TETHER_REWARD_SUCCESS);
       
       if (currentBeat.interrupt.correction_text) {
-        appendTextAndStream(`\n\n${currentBeat.interrupt.correction_text}`);
+        // ▼ 成功時：元のテキストは改竄せず、新しい吹き出しとして追加セリフを流す
+        pushBeatToHistory({ id: `corr-${Date.now()}`, speaker: currentBeat.speaker, text: currentBeat.interrupt.correction_text, type: 'normal' });
       }
     } else {
       setFeedback({ type: 'penalty', msg: `[${skill}] そのアプローチでは状況を打開できない。（${uiLabels.gaugeName} -15）` });
       updateTether(TETHER_PENALTY_FAIL);
-      appendTextAndStream(`\n\n【System: 介入失敗 - 選択したアプローチ[${skill}]は棄却されました】`);
+      pushBeatToHistory({ id: `sys-fail-${Date.now()}`, speaker: 'System', text: `【介入失敗 - 選択したアプローチ[${skill}]は棄却されました】`, type: 'system' }, true);
     }
-  }, [currentBeat, isResolved, updateTether, uiLabels.gaugeName, appendTextAndStream]);
+  }, [currentBeat, isResolved, updateTether, uiLabels.gaugeName, pushBeatToHistory]);
 
-  // === 進行処理 ===
   const handleChoice = (nextId: string) => {
     if (isStreaming || isProcessingChoiceRef.current) return;
-    
     isProcessingChoiceRef.current = true;
+    
     setCurrentBeatId(nextId);
     const nextB = beats.find(b => b.id === nextId);
-    if (nextB) setChatHistory(prev => [...prev, nextB]);
-
+    if (nextB) {
+      setIsResolved(false);
+      setSelectedSkill(null);
+      setSelectedEvidence(null);
+      pushBeatToHistory(nextB);
+    }
     setTimeout(() => { isProcessingChoiceRef.current = false; }, 300);
   };
 
   const nextBeat = () => {
     if (isStreaming) { skipStream(); return; }
-    if (currentBeat.choices) return;
+    if (currentBeat?.choices) return;
 
     if (!isResolved && !isInterlude) {
-      if (currentBeat.interrupt) {
+      if (currentBeat?.interrupt) {
         evaluatePanelInterrupt('TIMEOUT', null);
         return;
       } else if (selectedSkill) {
@@ -276,15 +238,23 @@ export function useGameLogic(
       }
     }
 
-    let nextId: string | null = currentBeat.next_beat_id || null;
-    if (!nextId && currentBeatIndex < beats.length - 1) {
-      nextId = beats[currentBeatIndex + 1].id;
+    let nextId: string | null = currentBeat?.next_beat_id || null;
+    if (!nextId) {
+      const idx = beats.findIndex(b => b.id === currentBeatId);
+      if (idx !== -1 && idx < beats.length - 1) {
+        nextId = beats[idx + 1].id;
+      }
     }
 
     if (nextId) {
       setCurrentBeatId(nextId);
       const nextB = beats.find(b => b.id === nextId);
-      if (nextB) setChatHistory(prev => [...prev, nextB]);
+      if (nextB) {
+        setIsResolved(false);
+        setSelectedSkill(null);
+        setSelectedEvidence(null);
+        pushBeatToHistory(nextB);
+      }
     } else {
       if (scenarioData.meta.type === 'cutscene') {
         setEndResult(null); 
@@ -316,24 +286,27 @@ export function useGameLogic(
     }
   };
 
-  // === オートセーブ処理 ===
   useEffect(() => {
     if (!isCompleted && currentBeatId && chatHistory.length > 0 && !isStreaming) {
       onSaveGame({
         episodeId: scenarioData.meta.episode_id,
         currentBeatId,
         chatHistory,
+        streamedLength,
         tether,
-        displayedText,
         collectedEvidence
       });
     }
-  }, [currentBeatId, chatHistory.length, tether, collectedEvidence.length, isCompleted, isStreaming, onSaveGame, scenarioData.meta.episode_id, displayedText]);
+  }, [currentBeatId, chatHistory.length, tether, collectedEvidence.length, isCompleted, isStreaming, streamedLength, onSaveGame, scenarioData.meta.episode_id]);
+
+  // ▼ GameView側でのエラー回避のため、ダミーとして displayedText を返す（UI側で履歴から算出するため実質不使用）
+  const displayedText = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].text.substring(0, streamedLength) : '';
 
   return {
     currentBeat,
     displayedText,
     isStreaming,
+    streamedLength, // UI表示用にエクスポート
     tether,
     feedback,
     handleInterrupt,
