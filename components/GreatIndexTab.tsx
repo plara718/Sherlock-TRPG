@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, memo, useCallback, useRef } from 'react';
-import { Lock, Search, AlertTriangle, X, Database, Paperclip, Link as LinkIcon } from 'lucide-react';
+import React, { useState, memo, useCallback, useRef, useEffect } from 'react';
+import { Lock, Search, AlertTriangle, X, Database, Paperclip, Link as LinkIcon, Info, ChevronLeft } from 'lucide-react';
 import glossaryData from '@/data/glossary.json';
 import { useSaveData } from '@/lib/SaveDataContext';
 
@@ -10,7 +10,6 @@ const ALPHABETS = [
   'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 ];
 
-// ▼ 新規追加：大分類カテゴリの定義と、キーワードによる振り分けルール（強化版）
 const MAIN_CATEGORIES = [
   'ALL',
   '人物 (容疑者/被害者/関係者)',
@@ -23,42 +22,22 @@ const MAIN_CATEGORIES = [
 
 const getCategoryGroup = (categoryString: string): string => {
   if (!categoryString) return 'その他';
-  
   const cat = categoryString;
-  // 1. 人物系
-  if (cat.includes('人物') || cat.includes('依頼人') || cat.includes('容疑者') || 
-      cat.includes('協力者') || cat.includes('犯罪者') || cat.includes('被害者') || 
-      cat.includes('貴族') || cat.includes('警察') || cat.includes('医師') || 
-      cat.includes('家政婦') || cat.includes('執事') || cat.includes('証言者') || 
-      cat.includes('探偵') || cat.includes('著者') || cat.includes('乗組員') || 
-      cat.includes('科学者') || cat.includes('関係者') || cat.includes('偽名') || cat.includes('肉屋') || cat.includes('動物') || cat.includes('数学者') || cat.includes('人物集団')) {
+  if (cat.includes('人物') || cat.includes('依頼人') || cat.includes('容疑者') || cat.includes('協力者') || cat.includes('犯罪者') || cat.includes('被害者') || cat.includes('貴族') || cat.includes('警察') || cat.includes('医師') || cat.includes('家政婦') || cat.includes('執事') || cat.includes('証言者') || cat.includes('探偵') || cat.includes('著者') || cat.includes('乗組員') || cat.includes('科学者') || cat.includes('関係者') || cat.includes('偽名') || cat.includes('肉屋') || cat.includes('動物') || cat.includes('数学者') || cat.includes('人物集団') || cat.includes('復讐者') || cat.includes('情報屋')) {
     return '人物 (容疑者/被害者/関係者)';
   }
-  // 2. 組織系
-  if (cat.includes('組織') || cat.includes('結社') || cat.includes('マフィア') || cat.includes('宗教') || cat.includes('企業')) {
+  if (cat.includes('組織') || cat.includes('結社') || cat.includes('マフィア') || cat.includes('宗教') || cat.includes('企業') || cat.includes('製造元')) {
     return '組織・派閥';
   }
-  // 3. 場所・地理系
-  if (cat.includes('地名') || cat.includes('場所') || cat.includes('国家') || cat.includes('地理') || cat.includes('環境') || cat.includes('拠点')) {
+  if (cat.includes('地名') || cat.includes('場所') || cat.includes('国家') || cat.includes('地理') || cat.includes('環境') || cat.includes('拠点') || cat.includes('逃亡先')) {
     return '地理・場所';
   }
-  // 4. 科学・知識・歴史系
-  if (cat.includes('科学') || cat.includes('知識') || cat.includes('歴史') || 
-      cat.includes('言及') || cat.includes('学問') || cat.includes('法医学') || 
-      cat.includes('研究') || cat.includes('文献') || cat.includes('概念') || 
-      cat.includes('技術') || cat.includes('技能') || cat.includes('生物') || 
-      cat.includes('思想') || cat.includes('オカルト')) {
+  if (cat.includes('科学') || cat.includes('知識') || cat.includes('歴史') || cat.includes('言及') || cat.includes('学問') || cat.includes('法医学') || cat.includes('研究') || cat.includes('文献') || cat.includes('概念') || cat.includes('技術') || cat.includes('技能') || cat.includes('生物') || cat.includes('思想') || cat.includes('オカルト') || cat.includes('植物') || cat.includes('動物')) {
     return '科学・知識・歴史';
   }
-  // 5. 事件・証拠系
-  if (cat.includes('事件') || cat.includes('悲劇') || cat.includes('証拠') || 
-      cat.includes('凶器') || cat.includes('アイテム') || cat.includes('暗号') || 
-      cat.includes('動機') || cat.includes('偽装') || cat.includes('交通') || 
-      cat.includes('船舶') || cat.includes('物証') || cat.includes('薬物') || 
-      cat.includes('記録') || cat.includes('犯罪類型') || cat.includes('アーカイブ') || cat.includes('奇譚') || cat.includes('傷害') || cat.includes('観察') || cat.includes('トリック') || cat.includes('奇行')) {
+  if (cat.includes('事件') || cat.includes('悲劇') || cat.includes('証拠') || cat.includes('凶器') || cat.includes('アイテム') || cat.includes('暗号') || cat.includes('動機') || cat.includes('偽装') || cat.includes('交通') || cat.includes('船舶') || cat.includes('物証') || cat.includes('薬物') || cat.includes('記録') || cat.includes('犯罪類型') || cat.includes('アーカイブ') || cat.includes('奇譚') || cat.includes('傷害') || cat.includes('観察') || cat.includes('トリック') || cat.includes('奇行') || cat.includes('習慣') || cat.includes('嗜好品') || cat.includes('インフラ') || cat.includes('事象') || cat.includes('機械') || cat.includes('挑戦状') || cat.includes('情念')) {
     return '事件・証拠・凶器';
   }
-
   return 'その他';
 };
 
@@ -69,19 +48,15 @@ const TermCard = memo(function TermCard({
 
   return (
     <div id={`term-${term.id}`} className={`relative rounded-sm border-2 ${isUnlocked ? isGlitch ? 'bg-[#1a0f0f] border-rose-900/80 shadow-[0_0_15px_rgba(225,29,72,0.3)]' : 'bg-[#fdfbf7] border-[#8c7a6b]/40 shadow-[2px_4px_8px_rgba(0,0,0,0.05)]' : 'bg-[#e6d5c3]/30 border-dashed border-[#8c7a6b]/30 opacity-70'} overflow-visible transition-all duration-300 mt-2`}>
-      
       {isUnlocked && !isGlitch && (
         <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 w-16 h-5 bg-[#e6d5c3]/90 shadow-sm border border-[#8c7a6b]/10 -rotate-1 z-10" />
       )}
-
       <div onClick={onToggle} className={`relative p-4 sm:p-5 flex items-start justify-between ${isUnlocked ? 'cursor-pointer hover:bg-[#f4ebd8]/30' : 'cursor-not-allowed'}`}>
-        
         {isNew && (
           <div className="absolute top-3 right-12 border-2 border-rose-600/60 text-rose-600/60 font-mono text-[10px] font-bold px-1.5 py-0.5 rotate-[15deg] rounded-sm tracking-widest pointer-events-none mix-blend-multiply">
             UNREAD
           </div>
         )}
-
         <div className="flex-1 pr-4">
           <div className="flex items-center gap-2 mb-2">
             <div className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-sm border ${isGlitch ? 'bg-rose-950/50 border-rose-800 text-rose-500' : 'bg-[#fffcf7] border-[#8c7a6b]/30 text-[#5c4d43]'}`}>
@@ -104,11 +79,9 @@ const TermCard = memo(function TermCard({
 
       {isUnlocked && isExpanded && (
         <div className={`p-5 sm:p-6 border-t-2 border-dashed animate-in slide-in-from-top-2 relative ${isGlitch ? 'border-rose-900/50 bg-black/40' : 'border-[#8c7a6b]/20 bg-gradient-to-b from-[#fcf8f2] to-[#f4ebd8]/30'}`}>
-          
           <div className={`font-serif text-sm leading-loose whitespace-pre-wrap ${isGlitch ? 'text-rose-500 font-bold' : 'text-[#3a2f29]'}`}>
             {overrideDetails}
           </div>
-
           {overrideCritique && (
             <div className={`relative mt-8 p-4 rounded-sm shadow-md rotate-1 ${isGlitch ? 'bg-rose-950/80 border border-rose-900/50' : 'bg-[#fffcf7] border border-[#8c7a6b]/20'}`}>
               <div className="absolute -top-3 left-4 text-slate-400 rotate-[-15deg]">
@@ -122,7 +95,6 @@ const TermCard = memo(function TermCard({
               </p>
             </div>
           )}
-
           {term.links && term.links.length > 0 && (
             <div className="mt-8 pt-4 border-t border-[#8c7a6b]/20">
               <p className="text-[10px] font-mono font-bold mb-3 tracking-widest text-[#8c7a6b] flex items-center gap-1">
@@ -132,9 +104,7 @@ const TermCard = memo(function TermCard({
                 {term.links.map((linkId: string) => {
                   const targetTerm = allTerms.find((t: any) => t.id === linkId);
                   if (!targetTerm) return null;
-                  
                   const isTargetUnlocked = unlockedTerms.includes(linkId);
-                  
                   return (
                     <button
                       key={linkId}
@@ -169,11 +139,15 @@ export default function GreatIndexTab() {
   const [selectedLetter, setSelectedLetter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  
+  const [history, setHistory] = useState<string[]>([]);
 
   const [isDecrypting, setIsDecrypting] = useState(false);
   const [newlyUnlockedTerm, setNewlyUnlockedTerm] = useState<any | null>(null);
   const [showPopup, setShowPopup] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
+  const decryptTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   const unlockedCount = unlockedTerms.length;
@@ -184,7 +158,6 @@ export default function GreatIndexTab() {
   const isSeason3Phase3 = clearedEpIds.includes('#38') || clearedEpIds.includes('#39');
   const isPostReichenbach = clearedEpIds.includes('#40');
   
-  // ▼ 修正：appearanceが設定されていない場合でも安全に読み込めるように修正
   const availableTerms = glossaryData.terms.filter(
     (t: any) => {
       if (unlockedTerms.includes(t.id)) return false;
@@ -192,6 +165,41 @@ export default function GreatIndexTab() {
       return app === 'general' || clearedEpIds.includes(app) || app.startsWith('SP-');
     }
   );
+
+  useEffect(() => {
+    const hasSeenTutorial = localStorage.getItem('hasSeenGreatIndexTutorial');
+    if (!hasSeenTutorial) {
+      setShowTutorial(true);
+    }
+  }, []);
+
+  // スパイダーウェブ等からの直接ジャンプ命令をリッスン
+  useEffect(() => {
+    const handleOpenIndexTerm = (e: any) => {
+      const { termId } = e.detail;
+      setSearchQuery('');
+      setSelectedLetter('ALL');
+      setSelectedCategory('ALL');
+      setExpandedTermId(termId);
+      
+      if (!readTerms.includes(termId)) handleReadTerm(termId);
+
+      setTimeout(() => {
+        const element = document.getElementById(`term-${termId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 300);
+    };
+
+    window.addEventListener('OPEN_INDEX_TERM', handleOpenIndexTerm);
+    return () => window.removeEventListener('OPEN_INDEX_TERM', handleOpenIndexTerm);
+  }, [readTerms, handleReadTerm]);
+
+  const handleCloseTutorial = () => {
+    localStorage.setItem('hasSeenGreatIndexTutorial', 'true');
+    setShowTutorial(false);
+  };
 
   const executeGacha = () => {
     if (insightPoints <= 0 || availableTerms.length === 0) return;
@@ -202,11 +210,20 @@ export default function GreatIndexTab() {
     setIsDecrypting(true);
     setNewlyUnlockedTerm(randomTerm);
 
-    setTimeout(() => {
+    decryptTimeoutRef.current = setTimeout(() => {
       setIsDecrypting(false);
       setShowPopup(true);
       setUnlockedTerms([...unlockedTerms, randomTerm.id]);
     }, 1500);
+  };
+
+  const skipDecryption = () => {
+    if (decryptTimeoutRef.current) {
+      clearTimeout(decryptTimeoutRef.current);
+    }
+    setIsDecrypting(false);
+    setShowPopup(true);
+    setUnlockedTerms([...unlockedTerms, newlyUnlockedTerm.id]);
   };
 
   const closePopup = () => {
@@ -228,17 +245,14 @@ export default function GreatIndexTab() {
       const matchDetails = term.description?.toLowerCase().includes(q);
       return matchJa || matchEn || matchDetails;
     }
-
     if (selectedLetter === 'NEW') {
       if (!(unlockedTerms.includes(term.id) && !readTerms.includes(term.id))) return false;
     } else if (selectedLetter !== 'ALL') {
       if (!term.id.startsWith(selectedLetter)) return false;
     }
-
     if (selectedCategory !== 'ALL' && getCategoryGroup(term.category) !== selectedCategory) {
       return false;
     }
-
     return true;
   });
 
@@ -259,6 +273,9 @@ export default function GreatIndexTab() {
   }, [handleReadTerm]);
 
   const handleLinkClick = useCallback((targetId: string) => {
+    if (expandedTermId) {
+      setHistory(prev => [...prev, expandedTermId]);
+    }
     setSearchQuery(''); 
     setSelectedLetter('ALL');
     setSelectedCategory('ALL');
@@ -271,13 +288,59 @@ export default function GreatIndexTab() {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }, 100);
-  }, [readTerms, handleReadTerm]);
+  }, [expandedTermId, readTerms, handleReadTerm]);
+
+  const handleGoBack = () => {
+    if (history.length === 0) return;
+    const newHistory = [...history];
+    const prevId = newHistory.pop()!;
+    setHistory(newHistory);
+    
+    setSearchQuery('');
+    setSelectedLetter('ALL');
+    setSelectedCategory('ALL');
+    setExpandedTermId(prevId);
+    
+    setTimeout(() => {
+      const element = document.getElementById(`term-${prevId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+  };
 
   return (
     <div className="animate-in fade-in duration-300 relative min-h-screen">
-      
+      {showTutorial && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1a1512]/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-[#fdfbf7] border-2 border-[#8c7a6b] p-6 rounded-sm shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-500 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#8c7a6b] to-[#3a2f29]" />
+            <div className="flex items-center gap-3 mb-4 mt-2">
+              <Database className="w-6 h-6 text-[#3a2f29]" />
+              <h2 className="text-xl font-bold text-[#3a2f29] font-serif tracking-widest">大索引 - THE GREAT INDEX</h2>
+            </div>
+            <div className="space-y-4 text-[#5c4d43] text-sm leading-relaxed mb-6 font-serif">
+              <p>ここは私の脳内を体系化したデータベースだ。事件を通じて得た情報や、かつて記録した犯罪史のアーカイブが収められている。</p>
+              <ul className="list-disc pl-5 space-y-2">
+                <li><strong className="text-[#3a2f29]">アンロック:</strong> シナリオを進めたり、「解析」を行うことで新たな項目が解放される。</li>
+                <li><strong className="text-[#3a2f29]">関連リンク:</strong> 項目の下部にあるリンクから、関連する事象へと飛ぶことができる。点と点を繋ぎ合わせたまえ。</li>
+              </ul>
+              <p className="text-[#8c7a6b] italic mt-4 border-l-2 border-[#8c7a6b]/30 pl-3">
+                「知識とは整理されて初めて武器となるのだよ、ワトスン君」
+              </p>
+            </div>
+            <button onClick={handleCloseTutorial} className="w-full py-3 bg-[#3a2f29] hover:bg-[#1a1512] text-[#f4ebd8] font-bold tracking-widest text-sm transition-transform active:scale-95 shadow-md flex items-center justify-center rounded-sm">
+              理解した
+            </button>
+          </div>
+        </div>
+      )}
+
       {isDecrypting && (
-        <div className="fixed inset-0 z-50 bg-[#0a0a0a] flex flex-col items-center justify-center overflow-hidden">
+        <div 
+          className="fixed inset-0 z-50 bg-[#0a0a0a] flex flex-col items-center justify-center overflow-hidden cursor-pointer"
+          onClick={skipDecryption}
+        >
           <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(16,185,129,0.1)_2px,rgba(16,185,129,0.1)_4px)] animate-[pulse_0.1s_infinite]" />
           <Database className="w-16 h-16 text-emerald-500 mb-6 animate-spin-slow opacity-80" />
           <h2 className="font-mono text-2xl md:text-4xl text-emerald-400 font-bold tracking-[0.5em] animate-pulse drop-shadow-[0_0_10px_rgba(16,185,129,0.8)]">
@@ -286,6 +349,9 @@ export default function GreatIndexTab() {
           <p className="mt-4 font-mono text-emerald-600/60 text-xs tracking-widest">
             EXTRACTING DATA FROM THE INDEX
           </p>
+          <div className="absolute bottom-24 font-mono text-emerald-500/80 text-sm tracking-widest animate-pulse">
+            - CLICK TO SKIP -
+          </div>
           <div className="absolute bottom-10 w-full text-center font-mono text-[10px] text-emerald-800/40 break-all px-4 overflow-hidden h-20 opacity-50">
             {Array.from({length: 200}).map(() => Math.random().toString(36).substring(2, 3)).join('')}
           </div>
@@ -302,7 +368,6 @@ export default function GreatIndexTab() {
               </p>
               <h3 className="text-2xl font-serif font-bold text-[#3a2f29] mb-1">{newlyUnlockedTerm.ja}</h3>
               <p className="text-xs font-mono text-[#8c7a6b] mb-6">{newlyUnlockedTerm.en}</p>
-              
               <div className="bg-[#e6d5c3]/20 p-4 rounded-sm border border-dashed border-[#8c7a6b]/30 mb-6 text-left relative">
                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-10 h-3 bg-[#e6d5c3]/80 rotate-2" />
                 <span className="text-[9px] text-[#8c7a6b] font-bold px-1.5 py-0.5 rounded-sm border border-[#8c7a6b]/30 mb-2 inline-block">
@@ -312,7 +377,6 @@ export default function GreatIndexTab() {
                   {newlyUnlockedTerm.description}
                 </p>
               </div>
-
               <button onClick={closePopup} className="w-full py-3 bg-[#3a2f29] hover:bg-[#1a1512] text-[#f4ebd8] rounded-sm font-bold tracking-widest text-sm transition-transform active:scale-95 shadow-md flex items-center justify-center gap-2">
                 CLOSE & READ MORE <X size={16} />
               </button>
@@ -323,14 +387,18 @@ export default function GreatIndexTab() {
 
       <div className={`flex items-end justify-between mb-4 border-b-2 pb-4 ${isSeason3Phase3 && !isPostReichenbach ? 'border-rose-900/50' : 'border-[#3a2f29]'}`}>
         <div>
-          <p className={`text-xs sm:text-sm font-mono tracking-widest ${isSeason3Phase3 && !isPostReichenbach ? 'text-rose-600 animate-pulse' : 'text-[#8c7a6b]'}`}>
-            {isSeason3Phase3 && !isPostReichenbach ? 'SYSTEM ALERT - FATAL ERROR' : '大索引 - 網羅的犯罪アーカイブ'}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className={`text-xs sm:text-sm font-mono tracking-widest ${isSeason3Phase3 && !isPostReichenbach ? 'text-rose-600 animate-pulse' : 'text-[#8c7a6b]'}`}>
+              {isSeason3Phase3 && !isPostReichenbach ? 'SYSTEM ALERT - FATAL ERROR' : '大索引 - 網羅的犯罪アーカイブ'}
+            </p>
+            <button onClick={() => setShowTutorial(true)} className="text-[#8c7a6b] hover:text-[#3a2f29] transition-colors p-1" title="使い方を見る">
+              <Info className="w-4 h-4" />
+            </button>
+          </div>
           <h2 className={`text-2xl font-bold font-serif mt-1 tracking-wider ${isSeason3Phase3 && !isPostReichenbach ? 'text-rose-700' : 'text-[#3a2f29]'}`}>
             THE GREAT INDEX
           </h2>
         </div>
-        
         <div className="text-right flex flex-col items-end">
           <p className="text-[10px] font-mono text-[#8c7a6b] uppercase tracking-widest mb-1">
             Data Restored
@@ -338,7 +406,6 @@ export default function GreatIndexTab() {
           <p className="text-xl font-bold text-amber-600 font-mono mb-3">
             {unlockPercentage}% <span className="text-sm text-[#8c7a6b]">({unlockedCount}/{totalCount})</span>
           </p>
-
           {availableTerms.length > 0 ? (
             <button
               onClick={executeGacha}
@@ -354,6 +421,18 @@ export default function GreatIndexTab() {
           )}
         </div>
       </div>
+
+      {/* ▼ 戻るボタン（履歴がある時のみ表示） */}
+      {history.length > 0 && (
+        <div className="mb-4">
+          <button
+            onClick={handleGoBack}
+            className="flex items-center gap-1 text-xs font-serif font-bold text-[#3a2f29] hover:text-amber-700 transition-colors bg-[#e6d5c3]/30 px-3 py-1.5 rounded-sm border border-[#8c7a6b]/30 hover:bg-[#d8c8b8] shadow-sm w-max"
+          >
+            <ChevronLeft size={16} /> 直前のファイルに戻る
+          </button>
+        </div>
+      )}
 
       <div className="mb-4 space-y-3">
         <div className="relative">

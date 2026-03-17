@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Network, Lock, HelpCircle, X, AlertCircle, ChevronLeft, ChevronRight, Flame, Clock } from 'lucide-react';
+import { Network, Lock, HelpCircle, X, AlertCircle, ChevronLeft, ChevronRight, Flame, Clock, Info } from 'lucide-react';
 import spiderDataS1 from '@/data/spider_web_s1.json';
 import spiderDataS2 from '@/data/spider_web_s2.json';
 import spiderDataS3 from '@/data/spider_web_s3.json';
@@ -25,7 +25,6 @@ export default function SpiderWebTab({
 }: SpiderWebTabProps) {
   
   const [currentSeason, setCurrentSeason] = useState<1 | 2 | 3 | 4>(() => {
-    // #40（最後の事件：後編）をクリアしていればSeason 4が解放
     const hasSeason4 = Object.keys(clearedData).includes('#40');
     const hasSeason3 = Object.keys(clearedData).some(id => {
       const epNum = parseInt(id.replace('#', ''), 10);
@@ -46,19 +45,30 @@ export default function SpiderWebTab({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<any[]>([]);
+  
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const currentSpiderData = currentSeason === 1 ? spiderDataS1 : currentSeason === 2 ? spiderDataS2 : spiderDataS3;
 
-  // ▼ シーズン3のフェーズ3（最終決戦）への到達判定
   const isS3Phase3 = currentSeason === 3 && 
     clearedData['#38'] && 
     ['SP-01', 'SP-02', 'SP-03', 'SP-04', 'SP-05', 'SP-06'].every(sp => clearedData[sp]);
 
-  // ▼ シーズン4（終末時計）の進行度計算
   const s4Episodes = ['#41', '#42', '#43', '#44', '#45', '#46', '#47', '#48', '#49', '#50'];
   const s4ClearedCount = s4Episodes.filter(ep => clearedData[ep]).length;
-  // 1894年から始まり、1エピソードクリアごとに2年進み、最終的に1914年（第一次大戦）に到達する
   const currentYear = 1894 + (s4ClearedCount * 2);
+
+  useEffect(() => {
+    const hasSeenTutorial = localStorage.getItem('hasSeenSpiderWebTutorial');
+    if (!hasSeenTutorial) {
+      setShowTutorial(true);
+    }
+  }, []);
+
+  const handleCloseTutorial = () => {
+    localStorage.setItem('hasSeenSpiderWebTutorial', 'true');
+    setShowTutorial(false);
+  };
 
   useEffect(() => {
     const hasClearedEp6 = Object.keys(clearedData).includes('#06');
@@ -68,7 +78,6 @@ export default function SpiderWebTab({
     }
   }, [clearedData]);
 
-  // バグ（ノイズ）エフェクト生成
   useEffect(() => {
     if (currentSeason === 3 && !isS3Phase3) {
       const interval = setInterval(() => {
@@ -87,7 +96,6 @@ export default function SpiderWebTab({
     }
   }, [currentSeason, isS3Phase3]);
 
-  // ノードの配置計算
   useEffect(() => {
     if (!containerRef.current || isS3Phase3 || currentSeason === 4) return;
     const { clientWidth, clientHeight } = containerRef.current;
@@ -119,21 +127,36 @@ export default function SpiderWebTab({
     setNodes(newNodes);
   }, [clearedData, unlockedTerms, currentSpiderData, currentSeason, isS3Phase3]);
 
-  const handleTutorialNext = () => {
-    if (tutorialStep === 1) {
-      setTutorialStep(2);
-    } else {
-      setTutorialStep(0);
-      localStorage.setItem('tether_spider_tutorial_done', 'true');
-    }
-  };
-
   const selectedNode = nodes.find((n) => n.id === selectedPinId);
 
   return (
     <div className="relative w-full h-full flex flex-col animate-in fade-in duration-300">
-      
-      {/* ヘッダー領域 */}
+      {showTutorial && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1a1512]/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-[#fdfbf7] border-2 border-[#8c7a6b] p-6 rounded-sm shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-500 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-700 to-[#3a2f29]" />
+            <div className="flex items-center gap-3 mb-4 mt-2">
+              <Network className="w-6 h-6 text-amber-700" />
+              <h2 className="text-xl font-bold text-[#3a2f29] font-serif tracking-widest">思考の網 - SPIDER WEB</h2>
+            </div>
+            <div className="space-y-4 text-[#5c4d43] text-sm leading-relaxed mb-6 font-serif">
+              <p>ここは独立した事件たちがどのように背後の巨大な悪意（システム）へと接続されているかを俯瞰する相関図だ。</p>
+              <ul className="list-disc pl-5 space-y-2">
+                <li><strong className="text-[#3a2f29]">ノードの解放:</strong> 大索引での情報の蓄積や、シナリオのクリア状況に応じて新たな繋がりが見えてくる。</li>
+                <li><strong className="text-[#3a2f29]">シーズンの切替:</strong> 上部の矢印で年代ごとの相関図を切り替えられる。</li>
+                <li><strong className="text-[#3a2f29]">詳細の確認:</strong> 結ばれたノードをクリックすると、その結節点の詳細な考察が読めるはずだ。</li>
+              </ul>
+              <p className="text-[#8c7a6b] italic mt-4 border-l-2 border-[#8c7a6b]/30 pl-3">
+                「見えない糸を辿りたまえ。すべての犯罪は中心の蜘蛛へと繋がっている」
+              </p>
+            </div>
+            <button onClick={handleCloseTutorial} className="w-full py-3 bg-[#3a2f29] hover:bg-[#1a1512] text-[#f4ebd8] font-bold tracking-widest text-sm transition-transform active:scale-95 shadow-md flex items-center justify-center rounded-sm">
+              探索を開始する
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className={`flex items-end justify-between mb-4 border-b pb-2 shrink-0 ${currentSeason === 4 ? 'border-zinc-700/50' : 'border-[#8c7a6b]/30'}`}>
         <div className="flex items-center gap-3">
           <div>
@@ -155,16 +178,16 @@ export default function SpiderWebTab({
               >
                 <ChevronRight size={14} />
               </button>
+              <button onClick={() => setShowTutorial(true)} className={`ml-2 p-1 rounded-full transition-colors ${currentSeason === 4 ? 'text-zinc-500 hover:text-zinc-300' : 'text-[#8c7a6b] hover:text-amber-600'}`} title="使い方を見る">
+                <Info size={14} />
+              </button>
             </div>
             <h2 className={`text-xl sm:text-2xl font-bold font-serif mt-1 flex items-center gap-2 ${currentSeason === 4 ? 'text-zinc-300' : 'text-[#3a2f29]'}`}>
               {currentSeason === 4 ? <Clock size={24} className="text-zinc-500" /> : <Network size={24} className={currentSeason === 3 ? 'text-rose-700' : 'text-amber-700'} />}
               {currentSeason === 4 ? 'DOOMSDAY CLOCK' : 'THE SPIDER WEB'}
             </h2>
           </div>
-          <button 
-            onClick={() => setShowHelp(true)}
-            className={`mb-1 transition-colors ${currentSeason === 4 ? 'text-zinc-600 hover:text-zinc-300' : 'text-[#8c7a6b] hover:text-amber-600'}`}
-          >
+          <button onClick={() => setShowHelp(true)} className={`mb-1 transition-colors ${currentSeason === 4 ? 'text-zinc-600 hover:text-zinc-300' : 'text-[#8c7a6b] hover:text-amber-600'}`}>
             <HelpCircle size={20} />
           </button>
         </div>
@@ -178,7 +201,6 @@ export default function SpiderWebTab({
         </div>
       </div>
 
-      {/* ヘルプモーダル */}
       {showHelp && (
         <div className="absolute inset-0 z-50 bg-[#2a2420]/80 flex items-center justify-center p-4 animate-in fade-in backdrop-blur-sm">
           <div className={`border-2 p-6 rounded-xl shadow-2xl max-w-md w-full relative ${currentSeason === 4 ? 'bg-zinc-900 border-zinc-700 text-zinc-300' : 'bg-[#f4ebd8] border-[#8c7a6b] text-[#3a2f29]'}`}>
@@ -205,7 +227,6 @@ export default function SpiderWebTab({
         </div>
       )}
 
-      {/* メイン描画エリア */}
       <div
         ref={containerRef}
         className={`flex-1 rounded-xl border relative overflow-hidden shadow-inner ${
@@ -213,40 +234,24 @@ export default function SpiderWebTab({
         }`}
         onClick={() => { if (tutorialStep === 0) setSelectedPinId(null); }}
       >
-        {/* ▼ フェーズ4（終末時計）の描画 ▼ */}
         {currentSeason === 4 ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center animate-in fade-in duration-1000">
             <div className="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-700/20 via-zinc-950 to-black" />
-            
             <div className="relative w-64 h-64 sm:w-80 sm:h-80 flex items-center justify-center mt-4">
-              {/* 文字盤の外枠 */}
               <div className="absolute inset-0 rounded-full border-4 border-zinc-800 shadow-[0_0_40px_rgba(39,39,42,0.8)]" />
               <div className="absolute inset-2 rounded-full border border-zinc-800/50" />
-              
-              {/* 時計の目盛り */}
               {Array.from({ length: 60 }).map((_, i) => (
                 <div key={i} className="absolute inset-0" style={{ transform: `rotate(${i * 6}deg)` }}>
                   <div className={`mx-auto ${i % 5 === 0 ? 'w-1 h-4 bg-zinc-600 mt-2' : 'w-0.5 h-2 bg-zinc-800 mt-2'}`} />
                 </div>
               ))}
-
-              {/* 時計の針（-120度から0度へ動く） */}
               <div className="absolute inset-0 flex justify-center drop-shadow-[0_0_10px_rgba(212,212,216,0.3)]">
-                <div 
-                  className="w-1.5 h-1/2 bg-zinc-400 origin-bottom rounded-t-full transition-transform duration-[2000ms] ease-out"
-                  style={{ transform: `rotate(${(s4ClearedCount / 10) * 120 - 120}deg)` }}
-                />
+                <div className="w-1.5 h-1/2 bg-zinc-400 origin-bottom rounded-t-full transition-transform duration-[2000ms] ease-out" style={{ transform: `rotate(${(s4ClearedCount / 10) * 120 - 120}deg)` }} />
               </div>
-              
-              {/* 中心点 */}
               <div className="w-6 h-6 bg-zinc-900 border-2 border-zinc-500 rounded-full z-10 shadow-md" />
-
-              {/* 年号表示 */}
               <div className="absolute bottom-10 flex flex-col items-center animate-in fade-in zoom-in duration-1000 delay-500">
                 <span className="text-zinc-600 font-mono text-[10px] tracking-[0.3em] uppercase mb-1">Current Year</span>
-                <span className={`text-4xl font-serif font-black tracking-widest transition-colors duration-1000 ${currentYear >= 1914 ? 'text-rose-900' : 'text-zinc-300'}`}>
-                  {currentYear}
-                </span>
+                <span className={`text-4xl font-serif font-black tracking-widest transition-colors duration-1000 ${currentYear >= 1914 ? 'text-rose-900' : 'text-zinc-300'}`}>{currentYear}</span>
                 {currentYear >= 1914 && (
                   <span className="mt-2 text-xs font-mono text-rose-900/80 tracking-widest border border-rose-900/30 px-2 py-1 rounded bg-rose-950/20">
                     HIS LAST BOW
@@ -256,7 +261,6 @@ export default function SpiderWebTab({
             </div>
           </div>
         ) : isS3Phase3 ? (
-          /* ▼ フェーズ3（最終決戦）の描画 ▼ */
           <div className="absolute inset-0 bg-black z-10 flex flex-col items-center justify-center animate-in fade-in duration-1000">
             <svg className="absolute inset-0 w-full h-full">
               <line x1="25%" y1="45%" x2="75%" y2="45%" stroke="#e11d48" strokeWidth="4" className="animate-[pulse_1.5s_ease-in-out_infinite] shadow-[0_0_20px_rgba(225,29,72,1)]" />
@@ -276,15 +280,12 @@ export default function SpiderWebTab({
             </div>
           </div>
         ) : (
-          /* ▼ 通常＆フェーズ1/2の描画 ▼ */
           <>
             <div className={`absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] ${currentSeason === 3 ? 'from-rose-900/30' : 'from-amber-700/20'} via-[#2a2420] to-black`} />
-            
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
               <div className={`w-[80%] h-[80%] border rounded-full absolute ${currentSeason === 3 ? 'border-rose-900/40' : 'border-[#8c7a6b]/30'}`} />
               <div className={`w-[50%] h-[50%] border rounded-full absolute ${currentSeason === 3 ? 'border-rose-900/40' : 'border-[#8c7a6b]/30'}`} />
             </div>
-
             {currentSeason === 3 && (
               <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
                 {fakeLines.map((line, i) => (
@@ -292,7 +293,6 @@ export default function SpiderWebTab({
                 ))}
               </svg>
             )}
-
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
               {nodes.map((node) => {
                 if (!node.isCleared || !containerRef.current) return null;
@@ -311,13 +311,11 @@ export default function SpiderWebTab({
                 );
               })}
             </svg>
-
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center pointer-events-none">
               <div className={`w-12 h-12 bg-[#1a1512] border-2 rounded-full flex items-center justify-center ${currentSeason === 3 ? 'border-rose-700 shadow-[0_0_30px_rgba(225,29,72,0.4)]' : 'border-amber-700 shadow-[0_0_20px_rgba(180,83,9,0.3)]'}`}>
                 <span className={`${currentSeason === 3 ? 'text-rose-500' : 'text-amber-500'} font-serif font-bold text-lg`}>M.C.</span>
               </div>
             </div>
-
             {nodes.map((node) => {
               if (!node.isCleared) return null;
               const isSelected = selectedPinId === node.id;
@@ -354,7 +352,6 @@ export default function SpiderWebTab({
           </>
         )}
 
-        {/* ノード詳細パネル */}
         {selectedNode && !isS3Phase3 && currentSeason !== 4 && (
           <div className={`absolute bottom-4 left-4 right-4 bg-[#f4ebd8]/95 border-l-4 p-4 rounded-xl shadow-2xl z-30 backdrop-blur-md animate-in slide-in-from-bottom-4 ${
               currentSeason === 3 ? (selectedNode.isTruthUnlocked ? 'border-rose-900' : 'border-rose-500') : (selectedNode.isTruthUnlocked ? 'border-amber-600' : 'border-[#8c7a6b]')
@@ -384,10 +381,28 @@ export default function SpiderWebTab({
                   <span className="text-[10px] font-mono uppercase tracking-widest">{currentSeason === 3 ? 'Active Infrastructure' : 'Encrypted Query'}</span>
                 </div>
                 <p className="text-sm text-[#5c4d43] italic mb-3 font-serif">{selectedNode.question}</p>
-                <div className={`flex items-center justify-end gap-1 text-[9px] font-mono py-1.5 px-2 rounded-full w-fit ml-auto border ${currentSeason === 3 ? 'text-rose-600 bg-rose-100 border-rose-200' : 'text-amber-700 bg-amber-600/10 border-amber-600/20'}`}>
-                  <AlertCircle size={12} />
-                  {currentSeason === 3 ? `[${selectedNode.destroyed_by}] をクリアしてインフラを破壊せよ` : `大索引で [${selectedNode.required_index_id}] を解読せよ`}
+                
+                {/* ▼ 「大索引を開く」ボタンを追加 ▼ */}
+                <div className="mt-3 pt-3 border-t border-[#8c7a6b]/20 flex justify-between items-center">
+                  <div className={`flex items-center gap-1 text-[9px] font-mono py-1.5 px-2 rounded-full border ${currentSeason === 3 ? 'text-rose-600 bg-rose-100 border-rose-200' : 'text-amber-700 bg-amber-600/10 border-amber-600/20'}`}>
+                    <AlertCircle size={12} />
+                    {currentSeason === 3 ? `[${selectedNode.destroyed_by}] をクリアしてインフラを破壊せよ` : `大索引で [${selectedNode.required_index_id}] を解読せよ`}
+                  </div>
+                  {currentSeason !== 3 && (
+                    <button
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent('SWITCH_TAB', { detail: { tab: 'index' } }));
+                        setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent('OPEN_INDEX_TERM', { detail: { termId: selectedNode.required_index_id } }));
+                        }, 100);
+                      }}
+                      className="flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 bg-[#3a2f29] hover:bg-[#1a1512] text-[#f4ebd8] rounded-sm transition-colors shadow-md active:scale-95"
+                    >
+                      大索引を開く <ChevronRight size={14} />
+                    </button>
+                  )}
                 </div>
+
               </div>
             ) : (
               <div className={`p-4 rounded-lg border animate-in fade-in ${currentSeason === 3 ? 'bg-black/5 border-rose-900/30' : 'bg-amber-600/10 border-amber-600/20'}`}>
