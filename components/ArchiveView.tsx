@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // useEffectを追加
 import { BookOpen, Network, Database, Home, Settings, Save, Upload, Trash2, CheckCircle2 } from 'lucide-react';
 import ChronologyTab from './ChronologyTab';
 import OriginGreatIndexTab from './GreatIndexTab';
@@ -37,6 +37,17 @@ export default function ArchiveView() {
   const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [showCopySuccess, setShowCopySuccess] = useState(false);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
+
+  // ▼ 追加：他のコンポーネント（SpiderWeb等）からのタブ切り替え命令を受信する
+  useEffect(() => {
+    const handleSwitchTab = (e: any) => {
+      if (e.detail && e.detail.tab) {
+        setActiveTab(e.detail.tab);
+      }
+    };
+    window.addEventListener('SWITCH_TAB', handleSwitchTab);
+    return () => window.removeEventListener('SWITCH_TAB', handleSwitchTab);
+  }, []);
 
   const isPostReichenbach = currentSeason >= 4 || clearedEpisodes.includes('#40');
   const isSeason3 = currentSeason === 3 && !isPostReichenbach;
