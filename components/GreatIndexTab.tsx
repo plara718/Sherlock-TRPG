@@ -5,8 +5,9 @@ import { Lock, Search, AlertTriangle, X, Database, Paperclip, Link as LinkIcon, 
 import glossaryData from '@/data/glossary.json';
 import { useSaveData } from '@/lib/SaveDataContext';
 
+// ▼ 修正: 'OPENED' タブを 'NEW' と 'ALL' の間に追加
 const ALPHABETS = [
-  'NEW', 'ALL', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+  'NEW', 'OPENED', 'ALL', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
   'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 ];
 
@@ -141,6 +142,7 @@ export default function GreatIndexTab() {
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   
   const [history, setHistory] = useState<string[]>([]);
+  const [justReadTermIds, setJustReadTermIds] = useState<string[]>([]);
 
   const [isDecrypting, setIsDecrypting] = useState(false);
   const [newlyUnlockedTerm, setNewlyUnlockedTerm] = useState<any | null>(null);
@@ -173,7 +175,6 @@ export default function GreatIndexTab() {
     }
   }, []);
 
-  // スパイダーウェブ等からの直接ジャンプ命令をリッスン
   useEffect(() => {
     const handleOpenIndexTerm = (e: any) => {
       const { termId } = e.detail;
@@ -245,11 +246,16 @@ export default function GreatIndexTab() {
       const matchDetails = term.description?.toLowerCase().includes(q);
       return matchJa || matchEn || matchDetails;
     }
+
+    // ▼ 修正: NEW, OPENED, ALL の分岐
     if (selectedLetter === 'NEW') {
-      if (!(unlockedTerms.includes(term.id) && !readTerms.includes(term.id))) return false;
+      if (!(unlockedTerms.includes(term.id) && (!readTerms.includes(term.id) || justReadTermIds.includes(term.id)))) return false;
+    } else if (selectedLetter === 'OPENED') {
+      if (!unlockedTerms.includes(term.id)) return false; // OPENED: 解放済みの項目のみ表示
     } else if (selectedLetter !== 'ALL') {
-      if (!term.id.startsWith(selectedLetter)) return false;
+      if (!term.id.startsWith(selectedLetter)) return false; // A-Z: 全表示から絞り込み
     }
+    
     if (selectedCategory !== 'ALL' && getCategoryGroup(term.category) !== selectedCategory) {
       return false;
     }
@@ -257,7 +263,7 @@ export default function GreatIndexTab() {
   });
 
   const hasNewInLetter = useCallback((letter: string) => {
-    if (letter === 'NEW') return false; 
+    if (letter === 'NEW' || letter === 'OPENED') return false; 
     return glossaryData.terms.some((term) => {
       if (letter !== 'ALL' && !term.id.startsWith(letter)) return false;
       if (selectedCategory !== 'ALL' && getCategoryGroup(term.category) !== selectedCategory) return false;
@@ -268,7 +274,10 @@ export default function GreatIndexTab() {
   const handleToggleTerm = useCallback((termId: string, isUnlocked: boolean, isRead: boolean) => {
     if (isUnlocked) {
       setExpandedTermId(prev => prev === termId ? null : termId);
-      if (!isRead) handleReadTerm(termId);
+      if (!isRead) {
+        setJustReadTermIds(prev => [...prev, termId]);
+        handleReadTerm(termId);
+      }
     }
   }, [handleReadTerm]);
 
@@ -279,6 +288,7 @@ export default function GreatIndexTab() {
     setSearchQuery(''); 
     setSelectedLetter('ALL');
     setSelectedCategory('ALL');
+    setJustReadTermIds([]); 
     setExpandedTermId(targetId);
     if (!readTerms.includes(targetId)) handleReadTerm(targetId);
     
@@ -299,6 +309,7 @@ export default function GreatIndexTab() {
     setSearchQuery('');
     setSelectedLetter('ALL');
     setSelectedCategory('ALL');
+    setJustReadTermIds([]); 
     setExpandedTermId(prevId);
     
     setTimeout(() => {
@@ -422,7 +433,6 @@ export default function GreatIndexTab() {
         </div>
       </div>
 
-      {/* ▼ 戻るボタン（履歴がある時のみ表示） */}
       {history.length > 0 && (
         <div className="mb-4">
           <button
@@ -468,13 +478,31 @@ export default function GreatIndexTab() {
         {ALPHABETS.map((letter) => {
           const showNewBadge = hasNewInLetter(letter);
           const isSelected = selectedLetter === letter;
+          // ▼ 修正: NEWとOPENEDのタブ判定
+          const isSpecialTab = letter === 'NEW' || letter === 'OPENED';
           const isNewTab = letter === 'NEW';
           
           return (
             <button
               key={letter}
-              onClick={() => { setSelectedLetter(letter); setExpandedTermId(null); setSearchQuery(''); }}
-              className={`snap-start relative px-3 py-1.5 font-mono font-bold text-xs sm:text-sm rounded-sm transition-colors flex-shrink-0 border-2 ${isSelected ? isNewTab ? 'bg-rose-700 text-white border-rose-700 shadow-md' : 'bg-[#3a2f29] text-[#f4ebd8] border-[#3a2f29] shadow-md' : isNewTab ? 'bg-rose-100 text-rose-700 border-rose-200 hover:bg-rose-200' : 'bg-[#e6d5c3]/30 text-[#5c4d43] border-[#8c7a6b]/30 hover:bg-[#d8c8b8]'}`}
+              onClick={() => { 
+                setSelectedLetter(letter); 
+                setExpandedTermId(null); 
+                setSearchQuery(''); 
+                if (letter !== 'NEW') setJustReadTermIds([]);
+              }}
+              className={`snap-start relative px-3 py-1.5 font-mono font-bold text-xs sm:text-sm rounded-sm transition-colors flex-shrink-0 border-2 
+                ${isSelected 
+                  ? isNewTab 
+                    ? 'bg-rose-700 text-white border-rose-700 shadow-md' 
+                    : letter === 'OPENED'
+                      ? 'bg-emerald-700 text-white border-emerald-700 shadow-md'
+                      : 'bg-[#3a2f29] text-[#f4ebd8] border-[#3a2f29] shadow-md' 
+                  : isNewTab 
+                    ? 'bg-rose-100 text-rose-700 border-rose-200 hover:bg-rose-200' 
+                    : letter === 'OPENED'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                      : 'bg-[#e6d5c3]/30 text-[#5c4d43] border-[#8c7a6b]/30 hover:bg-[#d8c8b8]'}`}
             >
               {letter}
               {showNewBadge && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse shadow-sm border border-[#f4ebd8]" />}
