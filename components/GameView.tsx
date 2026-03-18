@@ -11,11 +11,6 @@ import { FileText, ArrowRight, Eye, AlertTriangle, CheckCircle2 } from 'lucide-r
 import glossaryData from '@/data/glossary.json';
 import { useSaveData } from '@/lib/SaveDataContext';
 
-const PRECOMPILED_GLOSSARY = glossaryData.terms.flatMap((term: any) => {
-  const words = term.trigger_words || (term.trigger_word ? [term.trigger_word] : []);
-  return words.filter(Boolean).map((word: string) => ({ word, term }));
-}).sort((a, b) => b.word.length - a.word.length);
-
 export default function GameView() {
   const ctx = useSaveData();
   const [scenarioData, setScenarioData] = useState<any>(null);
@@ -98,7 +93,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
 
   const rawIntervention = scenarioData.meta?.intervention;
   const interventionType = ['Irene', 'Mycroft', 'Wiggins'].includes(rawIntervention as string) ? (rawIntervention as 'Irene' | 'Mycroft' | 'Wiggins') : null;
-  // ▼ 修正箇所1：I007 -> A013, W040 -> B004
   const isInterventionAvailable = interventionType === 'Irene' ? (ctx.unlockedTerms.includes('A013') && !isIrene && !isMoriarty) : interventionType === 'Mycroft' ? (!isIrene && !isMoriarty) : interventionType === 'Wiggins' ? (ctx.unlockedTerms.includes('B004') && !isIrene && !isMoriarty) : false;
   const [interventionUsed, setInterventionUsed] = useState(false);
 
@@ -163,43 +157,53 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
     }
   }, [collectedEvidence, collectEvidence]);
 
+  // ▼ 大改修： {証拠} と 《用語》 を明示的にパースする超軽量エンジン
   const renderText = useCallback((text: string, skipGlossary: boolean = false) => {
     if (!text) return "";
     let elements: (string | React.JSX.Element)[] = [];
-    const parts = text.split(/(\{.*?\})/g);
+    
+    // {証拠} または 《用語》 でテキストを分割
+    const parts = text.split(/(\{.*?\}|《.*?》)/g);
     
     parts.forEach((part, i) => {
+      // 1. 証拠品の処理 {...}
       if (part.startsWith('{') && part.endsWith('}')) {
         const word = part.slice(1, -1);
         const isCollected = collectedEvidence.includes(word);
         const wigginsStyle = (isWigginsActive && !isCollected) ? 'ring-2 ring-theme-accent-muted ring-offset-1 bg-amber-200 animate-pulse' : '';
         elements.push(
-          <span key={`ev-${word}-${i}`} onClick={(e) => { e.stopPropagation(); handleCollectEvidence(word); }} className={`font-bold cursor-pointer px-1.5 mx-0.5 rounded transition-all shadow-sm inline-flex items-center z-10 relative ${wigginsStyle} ${isCollected ? 'bg-theme-bg-panel text-theme-text-muted cursor-default' : isSanityZero ? 'text-rose-900 bg-rose-500/30 hover:bg-rose-500/50 border border-rose-600/50 active:scale-95 animate-pulse' : 'text-theme-text-base bg-theme-accent-main hover:opacity-80 border border-theme-border-base/50 active:scale-95 text-white'}`}>{word}</span>
+          <span key={`ev-${i}`} onClick={(e) => { e.stopPropagation(); handleCollectEvidence(word); }} className={`font-bold cursor-pointer px-1.5 mx-0.5 rounded transition-all shadow-sm inline-flex items-center z-10 relative ${wigginsStyle} ${isCollected ? 'bg-theme-bg-panel text-theme-text-muted cursor-default' : isSanityZero ? 'text-rose-900 bg-rose-500/30 hover:bg-rose-500/50 border border-rose-600/50 active:scale-95 animate-pulse' : 'text-theme-text-base bg-theme-accent-main hover:opacity-80 border border-theme-border-base/50 active:scale-95 text-white'}`}>
+            {word}
+          </span>
         );
-      } else { 
-        elements.push(part); 
-      }
-    });
-
-    if (skipGlossary) return elements;
-
-    PRECOMPILED_GLOSSARY.forEach(({ word, term }) => {
-      const newElements: (string | React.JSX.Element)[] = [];
-      elements.forEach((el, elIndex) => {
-        if (typeof el !== 'string') { newElements.push(el); return; }
-        const gParts = el.split(word);
-        gParts.forEach((gPart, j) => {
-          newElements.push(gPart);
-          if (j < gParts.length - 1) {
-            newElements.push(
-              <span key={`g-${term.id}-${elIndex}-${j}`} onClick={(e) => { e.stopPropagation(); handleGlossaryClick(term); }} className={`underline decoration-dotted cursor-help transition-colors font-bold z-10 relative ${isSanityZero ? 'text-rose-600 hover:text-rose-400' : 'text-theme-accent-main hover:opacity-80'}`}>
+      } 
+      // 2. 大索引の処理 《...》
+      else if (part.startsWith('《') && part.endsWith('》')) {
+        const word = part.slice(1, -1);
+        if (skipGlossary) {
+          elements.push(word);
+        } else {
+          // glossaryData から対象の用語を検索
+          const term = glossaryData.terms.find((t: any) => 
+            t.ja === word || (t.trigger_words && t.trigger_words.includes(word)) || t.trigger_word === word
+          );
+          
+          if (term) {
+            elements.push(
+              <span key={`g-${i}`} onClick={(e) => { e.stopPropagation(); handleGlossaryClick(term); }} className={`underline decoration-dotted cursor-help transition-colors font-bold z-10 relative ${isSanityZero ? 'text-rose-600 hover:text-rose-400' : 'text-theme-accent-main hover:opacity-80'}`}>
                 {word}
               </span>
             );
+          } else {
+            // 大索引に見つからなかった場合は通常のテキストとして表示
+            elements.push(word);
           }
-        });
-      });
-      elements = newElements;
+        }
+      } 
+      // 3. 通常テキスト
+      else { 
+        elements.push(part); 
+      }
     });
     
     return elements;
@@ -335,7 +339,7 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             let cleanText = (textToShow || "").replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '');
 
             if (isCurrent && isStreaming) {
-              cleanText = cleanText.replace(/\{([^}]*)$/, '$1');
+              cleanText = cleanText.replace(/(\{([^}]*)$|《([^》]*)$)/, '$1');
             }
 
             const isMetaNotice = beat.speaker === 'System' && cleanText.startsWith('【');
@@ -350,7 +354,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
           <div ref={bottomRef} className="h-20" />
         </div>
 
-        {/* ▼ 修正箇所2：W040 -> B004 */}
         {!isStreaming && currentBeat?.text.match(/\{.*?\}/g)?.some((match: string) => !collectedEvidence.includes(match.slice(1, -1))) && !isInterruptMode && !isWigginsActive && ctx.unlockedTerms.includes('B004') && (
           <div className="absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-6 z-20 animate-in fade-in zoom-in duration-300">
              <button onClick={(e) => { e.stopPropagation(); if (ctx.insightPoints >= 1 && !isWigginsActive && ctx.handleSpendPoint(1)) setIsWigginsActive(true); }} disabled={ctx.insightPoints < 1} className="bg-amber-700 hover:bg-amber-600 disabled:bg-[#d8c8b8] disabled:text-[#8c7a6b] disabled:cursor-not-allowed text-white text-[10px] sm:text-xs font-bold px-4 py-3 rounded-full shadow-lg flex items-center gap-1.5 transition-transform active:scale-95"><Eye size={16} /> WIGGINS EYE (1pt)</button>
