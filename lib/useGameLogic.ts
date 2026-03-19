@@ -161,7 +161,6 @@ export function useGameLogic(
     setSelectedEvidence(prev => prev === evidence ? null : evidence);
   };
 
-  // ▼ 大改修：割り込み結果を chatHistory に統合する
   const evaluatePanelInterrupt = useCallback((skill: string, evidence: string | null) => {
     if (isResolved || !currentBeat?.interrupt) return;
     setIsResolved(true);
@@ -201,7 +200,6 @@ export function useGameLogic(
 
       if (newBeats.length > 0) {
         setChatHistory(prev => [...prev, ...newBeats]);
-        // correction_text がある場合はそこからストリーミングを開始する
         setStreamedLength(0);
         setIsStreaming(true);
       }
@@ -291,18 +289,19 @@ export function useGameLogic(
     }
   };
 
+  // ▼ 修正2：streamedLengthを依存配列から除外
   useEffect(() => {
     if (!isCompleted && currentBeatId && chatHistory.length > 0 && !isStreaming) {
       onSaveGame({
         episodeId: scenarioData.meta.episode_id,
         currentBeatId,
         chatHistory,
-        streamedLength,
+        streamedLength, // 外から渡さず、この瞬間の値を使う
         tether,
         collectedEvidence
       });
     }
-  }, [currentBeatId, chatHistory.length, tether, collectedEvidence.length, isCompleted, isStreaming, streamedLength, onSaveGame, scenarioData.meta.episode_id]);
+  }, [currentBeatId, chatHistory.length, tether, collectedEvidence.length, isCompleted, isStreaming, onSaveGame, scenarioData.meta.episode_id]);
 
   const displayedText = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].text.substring(0, streamedLength) : '';
 

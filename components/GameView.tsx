@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import TetherBar from '@/components/TetherBar';
 import Controls from '@/components/Controls';
 import GlossaryToast from '@/components/GlossaryToast';
@@ -157,6 +157,19 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
     }
   }, [collectedEvidence, collectEvidence]);
 
+  // ▼ 修正1：用語データを O(1) で検索できるよう Map化（パフォーマンス激増）
+  const termMap = useMemo(() => {
+    const map = new Map<string, any>();
+    glossaryData.terms.forEach((t: any) => {
+      map.set(t.ja, t);
+      if (t.trigger_word) map.set(t.trigger_word, t);
+      if (t.trigger_words) {
+        t.trigger_words.forEach((w: string) => map.set(w, t));
+      }
+    });
+    return map;
+  }, []);
+
   const renderText = useCallback((text: string, skipGlossary: boolean = false) => {
     if (!text) return "";
     let elements: (string | React.JSX.Element)[] = [];
@@ -179,9 +192,8 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
         if (skipGlossary) {
           elements.push(word);
         } else {
-          const term = glossaryData.terms.find((t: any) => 
-            t.ja === word || (t.trigger_words && t.trigger_words.includes(word)) || t.trigger_word === word
-          );
+          // ▼ 修正1続き：Mapを使用して一瞬で検索
+          const term = termMap.get(word);
           if (term) {
             elements.push(
               <span key={`g-${i}`} onClick={(e) => { e.stopPropagation(); handleGlossaryClick(term); }} className={`underline decoration-dotted cursor-help transition-colors font-bold z-10 relative ${isSanityZero ? 'text-rose-600 hover:text-rose-400' : 'text-theme-accent-main hover:opacity-80'}`}>
@@ -198,7 +210,7 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
       }
     });
     return elements;
-  }, [collectedEvidence, isWigginsActive, isSanityZero, handleCollectEvidence, handleGlossaryClick]);
+  }, [collectedEvidence, isWigginsActive, isSanityZero, handleCollectEvidence, handleGlossaryClick, termMap]);
 
   return (
     <div data-theme={isMoriarty ? 'moriarty' : 'holmes'} className={`w-full max-w-2xl mx-auto relative flex flex-col h-[100dvh] supports-[height:100svh]:h-[100svh] touch-manipulation overscroll-none transition-transform duration-75 select-none ${screenEffect === 'shake' ? '-translate-x-2' : ''} bg-theme-bg-base`}>
