@@ -85,9 +85,9 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   const isReplay = Boolean(ctx.clearedData[episodeId]);
 
   const {
-    currentBeat, isStreaming, streamedLength, tether, feedback, handleInterrupt, evaluatePanelInterrupt,
+    currentBeat, isStreaming, streamedLength, tether, feedback, evaluatePanelInterrupt,
     nextBeat, handleChoice, skipStream, chatHistory, collectedEvidence, selectedEvidence,
-    collectEvidence, handleSelectEvidence, selectedSkill, isCompleted, endResult,
+    collectEvidence, handleSelectEvidence, isCompleted, endResult,
     uiLabels, isMoriarty, isIrene
   } = useGameLogic(scenarioData as ScenarioData, isReplay, ctx.textSpeed, initialSaveData, ctx.setActiveGameData);
 
@@ -157,16 +157,13 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
     }
   }, [collectedEvidence, collectEvidence]);
 
-  // ▼ 大改修： {証拠} と 《用語》 を明示的にパースする超軽量エンジン
   const renderText = useCallback((text: string, skipGlossary: boolean = false) => {
     if (!text) return "";
     let elements: (string | React.JSX.Element)[] = [];
     
-    // {証拠} または 《用語》 でテキストを分割
     const parts = text.split(/(\{.*?\}|《.*?》)/g);
     
     parts.forEach((part, i) => {
-      // 1. 証拠品の処理 {...}
       if (part.startsWith('{') && part.endsWith('}')) {
         const word = part.slice(1, -1);
         const isCollected = collectedEvidence.includes(word);
@@ -177,17 +174,14 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
           </span>
         );
       } 
-      // 2. 大索引の処理 《...》
       else if (part.startsWith('《') && part.endsWith('》')) {
         const word = part.slice(1, -1);
         if (skipGlossary) {
           elements.push(word);
         } else {
-          // glossaryData から対象の用語を検索
           const term = glossaryData.terms.find((t: any) => 
             t.ja === word || (t.trigger_words && t.trigger_words.includes(word)) || t.trigger_word === word
           );
-          
           if (term) {
             elements.push(
               <span key={`g-${i}`} onClick={(e) => { e.stopPropagation(); handleGlossaryClick(term); }} className={`underline decoration-dotted cursor-help transition-colors font-bold z-10 relative ${isSanityZero ? 'text-rose-600 hover:text-rose-400' : 'text-theme-accent-main hover:opacity-80'}`}>
@@ -195,17 +189,14 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
               </span>
             );
           } else {
-            // 大索引に見つからなかった場合は通常のテキストとして表示
             elements.push(word);
           }
         }
       } 
-      // 3. 通常テキスト
       else { 
         elements.push(part); 
       }
     });
-    
     return elements;
   }, [collectedEvidence, isWigginsActive, isSanityZero, handleCollectEvidence, handleGlossaryClick]);
 
@@ -398,9 +389,9 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             ))}
           </div>
         ) : isInterruptMode ? (
-          <InterruptPanel collectedEvidences={collectedEvidence} hintText={currentBeat?.interrupt?.hint} interventionType={interventionType} isInterventionAvailable={isInterventionAvailable} interventionUsed={interventionUsed} onUseIntervention={() => setInterventionUsed(true)} onSubmit={(skill, evidence) => { evaluatePanelInterrupt(skill, evidence); setIsInterruptMode(false); }} onTimeUp={() => { handleInterrupt('TIMEOUT'); setIsInterruptMode(false); }} protagonist={protagonist} isMoriarty={isMoriarty} uiLabels={uiLabels} isEvidenceRequired={!!currentBeat?.interrupt?.required_evidence} />
+          <InterruptPanel collectedEvidences={collectedEvidence} hintText={currentBeat?.interrupt?.hint} interventionType={interventionType} isInterventionAvailable={isInterventionAvailable} interventionUsed={interventionUsed} onUseIntervention={() => setInterventionUsed(true)} onSubmit={(skill, evidence) => { evaluatePanelInterrupt(skill, evidence); setIsInterruptMode(false); }} onTimeUp={() => { evaluatePanelInterrupt('TIMEOUT', null); setIsInterruptMode(false); }} protagonist={protagonist} isMoriarty={isMoriarty} uiLabels={uiLabels} isEvidenceRequired={!!currentBeat?.interrupt?.required_evidence} />
         ) : (
-          <Controls isStreaming={isStreaming && chatHistory[chatHistory.length-1]?.speaker !== 'System'} selectedSkill={selectedSkill} onNext={() => { const now = Date.now(); if (now - lastActionTimeRef.current > 500) { nextBeat(); lastActionTimeRef.current = now; } }} onInterrupt={handleInterrupt} />
+          <Controls isStreaming={isStreaming && chatHistory[chatHistory.length-1]?.speaker !== 'System'} onNext={() => { const now = Date.now(); if (now - lastActionTimeRef.current > 500) { nextBeat(); lastActionTimeRef.current = now; } }} />
         )}
       </div>
 
