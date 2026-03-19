@@ -13,7 +13,7 @@ type SaveDataContextType = {
   currentEpisodeId: string;
   setCurrentEpisodeId: React.Dispatch<React.SetStateAction<string>>;
   unlockedTerms: string[];
-  setUnlockedTerms: (terms: string[]) => void;
+  setUnlockedTerms: React.Dispatch<React.SetStateAction<string[]>>;
   readTerms: string[];
   insightPoints: number;
   clearedData: ClearedData;
@@ -46,7 +46,8 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<'title' | 'game' | 'archive' | 'endroll'>('title');
   const [currentEpisodeId, setCurrentEpisodeId] = useState<string>('#00');
 
-  const [unlockedTerms, setUnlockedTerms] = useState<string[]>([]);
+  // 内部ステート
+  const [unlockedTerms, _setUnlockedTerms] = useState<string[]>([]);
   const [readTerms, setReadTerms] = useState<string[]>([]);
   const [insightPoints, setInsightPoints] = useState(0);
   const [clearedData, setClearedData] = useState<ClearedData>({});
@@ -61,6 +62,15 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
     clearedData['#13'] ? 2 : 1;
 
   const [mycroftIntel, setMycroftIntel] = useState<string[]>([]);
+
+  // ★重複防止用のラッパー関数
+  const setUnlockedTerms: React.Dispatch<React.SetStateAction<string[]>> = (value) => {
+    if (typeof value === 'function') {
+      _setUnlockedTerms(prev => Array.from(new Set(value(prev))));
+    } else {
+      _setUnlockedTerms(Array.from(new Set(value)));
+    }
+  };
   
   useEffect(() => {
     try {
@@ -68,7 +78,8 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
       if (savedStr) {
         const data = JSON.parse(savedStr);
         if (data && typeof data === 'object') {
-            if (data.unlockedTerms) setUnlockedTerms(data.unlockedTerms);
+            // ★ロード時も重複を排除して安全にセット
+            if (data.unlockedTerms) _setUnlockedTerms(Array.from(new Set(data.unlockedTerms)));
             if (data.readTerms) setReadTerms(data.readTerms);
             if (data.insightPoints !== undefined) setInsightPoints(data.insightPoints);
             if (data.clearedData) setClearedData(data.clearedData);
@@ -97,7 +108,7 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
   const handleStartConnection = () => {
     if (!hasSaveData) {
       const initialTerm = glossaryData.terms.find(t => t.id === 'H001');
-      if (initialTerm) setUnlockedTerms([initialTerm.id]);
+      if (initialTerm) _setUnlockedTerms([initialTerm.id]);
       setInsightPoints(0);
       setClearedData({});
       setCurrentEpisodeId('#00');
@@ -106,7 +117,7 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
   };
 
   const handleResetData = () => {
-    setUnlockedTerms([]);
+    _setUnlockedTerms([]);
     setReadTerms([]);
     setInsightPoints(0);
     setClearedData({});
@@ -121,7 +132,7 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
     try {
       const data = JSON.parse(atob(dataStr));
       if (data && typeof data === 'object') {
-        if (data.unlockedTerms) setUnlockedTerms(data.unlockedTerms);
+        if (data.unlockedTerms) _setUnlockedTerms(Array.from(new Set(data.unlockedTerms)));
         if (data.readTerms) setReadTerms(data.readTerms);
         if (data.insightPoints !== undefined) setInsightPoints(data.insightPoints);
         if (data.clearedData) setClearedData(data.clearedData);
