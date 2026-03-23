@@ -24,9 +24,15 @@ export default function GameView() {
     const fetchScenario = async () => {
       try {
         let fileName = '';
-        if (ctx.currentEpisodeId.startsWith('Interlude')) fileName = `interlude_${ctx.currentEpisodeId.split('-')[1].toLowerCase()}`;
-        else if (ctx.currentEpisodeId.startsWith('SP-')) fileName = `episode_sp${ctx.currentEpisodeId.split('-')[1]}`;
-        else fileName = `episode_${ctx.currentEpisodeId.replace('#', '')}`;
+        if (ctx.currentEpisodeId.startsWith('Interlude')) {
+          fileName = `interlude_${ctx.currentEpisodeId.split('-')[1].toLowerCase()}`;
+        } else if (ctx.currentEpisodeId.startsWith('SP-')) {
+          fileName = `episode_sp${ctx.currentEpisodeId.split('-')[1]}`;
+        } else if (ctx.currentEpisodeId.startsWith('M-')) {
+          fileName = `episode_m${ctx.currentEpisodeId.split('-')[1]}`;
+        } else {
+          fileName = `episode_${ctx.currentEpisodeId.replace('#', '')}`;
+        }
         
         const scenarioModule = await import(`@/data/${fileName}.json`);
         if (isMounted) setScenarioData(scenarioModule.default || scenarioModule);
