@@ -41,7 +41,6 @@ export type ScenarioData = {
 const TETHER_REWARD_SUCCESS = 15;
 const TETHER_PENALTY_FAIL = -15;
 const TETHER_PENALTY_MISS = -15;
-const TETHER_PENALTY_WASTE = -5;
 
 export function useGameLogic(
   scenarioData: ScenarioData, 
@@ -77,9 +76,13 @@ export function useGameLogic(
   const [isCompleted, setIsCompleted] = useState(false);
   const [endResult, setEndResult] = useState<{ rank: string; points: number; consequenceData: any; } | null>(null);
 
+  // --- 状態ロックとアニメーション管理用のRef ---
   const tetherRef = useRef(tether);
-  const isProcessingChoiceRef = useRef(false);
   const hasLoadedRef = useRef(false);
+  const isProcessingActionRef = useRef(false); // 連打防止用の鉄壁ロック
+  const requestRef = useRef<number>();
+  const lastCharTimeRef = useRef<number>(0);
+  const waitTimeRef = useRef<number>(0);
 
   const currentBeat = beats.find(b => b.id === currentBeatId) || beats[0];
 
@@ -95,7 +98,7 @@ export function useGameLogic(
     const current = tetherRef.current;
     if (current >= 80) return userTextSpeed;
     if (current >= 40) return userTextSpeed * 1.5;
-    return userTextSpeed * 0.5;
+    return userTextSpeed * 0.5; // ピンチ時は文字送りが少し遅くなる（または早くする）
   }, [userTextSpeed]);
 
   const pushBeatToHistory = useCallback((beat: ScenarioBeat, isInstant: boolean = false) => {
@@ -106,9 +109,12 @@ export function useGameLogic(
     } else {
       setStreamedLength(0);
       setIsStreaming(true);
+      lastCharTimeRef.current = performance.now();
+      waitTimeRef.current = 0;
     }
   }, []);
 
+  // --- 初期化処理 ---
   useEffect(() => {
     if (initialSaveData && !hasLoadedRef.current) {
       hasLoadedRef.current = true;
@@ -120,40 +126,70 @@ export function useGameLogic(
       }
     }
     hasLoadedRef.current = true;
-
     if (chatHistory.length === 0 && beats.length > 0) {
       pushBeatToHistory(beats[0]);
     }
   }, []);
 
-  useEffect(() => {
+  // --- 高精度・滑らかな文字送りエンジン (requestAnimationFrame) ---
+  const streamText = useCallback((time: number) => {
     if (!isStreaming || chatHistory.length === 0) return;
     
     const lastBeat = chatHistory[chatHistory.length - 1];
-    if (streamedLength >= lastBeat.text.length) {
-      setIsStreaming(false);
-      return;
-    }
-    
-    const timer = setTimeout(() => {
-      setStreamedLength(prev => prev + 1);
-    }, getTextSpeed());
-    
-    return () => clearTimeout(timer);
-  }, [isStreaming, streamedLength, chatHistory, getTextSpeed]);
+    const fullText = lastBeat.text;
 
+    setStreamedLength((prev) => {
+      if (prev >= fullText.length) {
+        setIsStreaming(false);
+        return fullText.length;
+      }
+
+      const timePassed = time - lastCharTimeRef.current;
+      
+      // 句読点などでの「タメ（マイクロウェイト）」の処理
+      if (waitTimeRef.current > 0) {
+        if (timePassed < waitTimeRef.current) return prev;
+        waitTimeRef.current = 0; // ウェイト解除
+        lastCharTimeRef.current = time;
+      } else if (timePassed > getTextSpeed()) {
+        const nextLength = prev + 1;
+        const charAdded = fullText.substring(prev, nextLength);
+        
+        // 人間らしい息継ぎを設定
+        if (['、', '。', '…', '！', '？'].includes(charAdded)) {
+          waitTimeRef.current = 150; // 約0.15秒のタメ
+        }
+        
+        lastCharTimeRef.current = time;
+        return nextLength;
+      }
+      return prev;
+    });
+
+    requestRef.current = requestAnimationFrame(streamText);
+  }, [isStreaming, chatHistory, getTextSpeed]);
+
+  useEffect(() => {
+    if (isStreaming) {
+      requestRef.current = requestAnimationFrame(streamText);
+    }
+    return () => {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    };
+  }, [isStreaming, streamText]);
+
+  // --- 連打耐性のある確実なスキップ ---
   const skipStream = useCallback(() => {
     if (!isStreaming || chatHistory.length === 0) return;
     const lastBeat = chatHistory[chatHistory.length - 1];
+    if (requestRef.current) cancelAnimationFrame(requestRef.current);
     setStreamedLength(lastBeat.text.length);
     setIsStreaming(false);
+    isProcessingActionRef.current = false; // ロック解除
   }, [isStreaming, chatHistory]);
 
   const collectEvidence = (evidence: string) => {
-    setCollectedEvidence(prev => {
-      if (prev.includes(evidence)) return prev;
-      return [...prev, evidence];
-    });
+    setCollectedEvidence(prev => prev.includes(evidence) ? prev : [...prev, evidence]);
   };
 
   const handleSelectEvidence = (evidence: string) => {
@@ -161,6 +197,7 @@ export function useGameLogic(
     setSelectedEvidence(prev => prev === evidence ? null : evidence);
   };
 
+  // --- 割り込み評価 ---
   const evaluatePanelInterrupt = useCallback((skill: string, evidence: string | null) => {
     if (isResolved || !currentBeat?.interrupt) return;
     setIsResolved(true);
@@ -173,13 +210,7 @@ export function useGameLogic(
       const failMsg = currentBeat.interrupt.fail_msg || "（時間切れだ。動くことができなかった……）";
       setFeedback({ type: 'fail', msg: `TIME OUT\n（${uiLabels.gaugeName} -15）` });
       updateTether(TETHER_PENALTY_MISS);
-      
-      const newBeats: ScenarioBeat[] = [
-        { id: `fail-${Date.now()}`, speaker: speakerName, text: failMsg, type: 'normal' }
-      ];
-      setChatHistory(prev => [...prev, ...newBeats]);
-      setStreamedLength(failMsg.length);
-      setIsStreaming(false);
+      pushBeatToHistory({ id: `fail-${Date.now()}`, speaker: speakerName, text: failMsg, type: 'normal' }, true);
       return;
     }
 
@@ -197,7 +228,6 @@ export function useGameLogic(
       if (currentBeat.interrupt.correction_text) {
         newBeats.push({ id: `corr-${Date.now()}`, speaker: currentBeat.speaker, text: currentBeat.interrupt.correction_text, type: 'normal' });
       }
-
       if (newBeats.length > 0) {
         setChatHistory(prev => [...prev, ...newBeats]);
         setStreamedLength(0);
@@ -206,20 +236,15 @@ export function useGameLogic(
     } else {
       setFeedback({ type: 'penalty', msg: `INTERRUPT FAILED\n（${uiLabels.gaugeName} -15）` });
       updateTether(TETHER_PENALTY_FAIL);
-      
       const failMsg = currentBeat.interrupt.fail_msg || `（選択したアプローチ [${skill}] は間違っていたようだ……）`;
-      const newBeats: ScenarioBeat[] = [
-        { id: `fail-${Date.now()}`, speaker: speakerName, text: failMsg, type: 'normal' }
-      ];
-      setChatHistory(prev => [...prev, ...newBeats]);
-      setStreamedLength(failMsg.length);
-      setIsStreaming(false);
+      pushBeatToHistory({ id: `fail-${Date.now()}`, speaker: speakerName, text: failMsg, type: 'normal' }, true);
     }
-  }, [currentBeat, isResolved, updateTether, uiLabels.gaugeName, protagonist]);
+  }, [currentBeat, isResolved, updateTether, uiLabels.gaugeName, protagonist, pushBeatToHistory]);
 
+  // --- 確実な進行処理（連打対策済み） ---
   const handleChoice = (nextId: string) => {
-    if (isStreaming || isProcessingChoiceRef.current) return;
-    isProcessingChoiceRef.current = true;
+    if (isStreaming || isProcessingActionRef.current) return;
+    isProcessingActionRef.current = true;
     
     setCurrentBeatId(nextId);
     const nextB = beats.find(b => b.id === nextId);
@@ -229,17 +254,27 @@ export function useGameLogic(
       setSelectedEvidence(null);
       pushBeatToHistory(nextB);
     }
-    setTimeout(() => { isProcessingChoiceRef.current = false; }, 300);
+    setTimeout(() => { isProcessingActionRef.current = false; }, 200);
   };
 
   const nextBeat = () => {
-    if (isStreaming) { skipStream(); return; }
+    if (isProcessingActionRef.current) return;
+
+    if (isStreaming) {
+      isProcessingActionRef.current = true; // スキップ中は他の操作をロック
+      skipStream(); 
+      setTimeout(() => { isProcessingActionRef.current = false; }, 100);
+      return; 
+    }
+    
     if (currentBeat?.choices) return;
 
     if (!isResolved && !isInterlude && currentBeat?.interrupt) {
       evaluatePanelInterrupt('TIMEOUT', null);
       return;
     }
+
+    isProcessingActionRef.current = true; // 進行ロック開始
 
     let nextId: string | null = currentBeat?.next_beat_id || null;
     if (!nextId) {
@@ -259,44 +294,44 @@ export function useGameLogic(
         pushBeatToHistory(nextB);
       }
     } else {
+      // 終了処理
       if (scenarioData.meta.type === 'cutscene') {
         setEndResult(null); 
         setIsCompleted(true);
-        return;
-      }
-      if (isInterlude) {
+      } else if (isInterlude) {
         setEndResult({ rank: 'CLEARED', points: isReplay ? 0 : 1, consequenceData: scenarioData.consequence || {} });
         setIsCompleted(true);
-        return;
-      }
-
-      let rank = 'ABYSS';
-      let journalText = '';
-      let basePoints = 1;
-
-      if (isMoriarty) {
-        if (tether >= 80) { rank = 'MASTERPIECE'; basePoints = 5; } 
-        else if (tether >= 40) { rank = 'COMPROMISED'; basePoints = 3; } 
-        else { rank = 'FAILED'; }
       } else {
-        if (tether >= 80) { rank = 'SYMPATHETIC'; journalText = scenarioData.consequence?.watson_journal?.sympathetic || ''; basePoints = 5; } 
-        else if (tether >= 40) { rank = 'LUCID'; journalText = scenarioData.consequence?.watson_journal?.lucid || ''; basePoints = 3; } 
-        else { journalText = scenarioData.consequence?.watson_journal?.abyss || ''; }
-      }
+        let rank = 'ABYSS';
+        let journalText = '';
+        let basePoints = 1;
 
-      setEndResult({ rank, points: isReplay ? 1 : basePoints, consequenceData: { ...scenarioData.consequence, watson_journal: journalText } });
-      setIsCompleted(true);
+        if (isMoriarty) {
+          if (tether >= 80) { rank = 'MASTERPIECE'; basePoints = 5; } 
+          else if (tether >= 40) { rank = 'COMPROMISED'; basePoints = 3; } 
+          else { rank = 'FAILED'; }
+        } else {
+          if (tether >= 80) { rank = 'SYMPATHETIC'; journalText = scenarioData.consequence?.watson_journal?.sympathetic || ''; basePoints = 5; } 
+          else if (tether >= 40) { rank = 'LUCID'; journalText = scenarioData.consequence?.watson_journal?.lucid || ''; basePoints = 3; } 
+          else { journalText = scenarioData.consequence?.watson_journal?.abyss || ''; }
+        }
+        setEndResult({ rank, points: isReplay ? 1 : basePoints, consequenceData: { ...scenarioData.consequence, watson_journal: journalText } });
+        setIsCompleted(true);
+      }
     }
+    
+    // ごく短いロック解除（もたつきを感じさせない150ms）
+    setTimeout(() => { isProcessingActionRef.current = false; }, 150);
   };
 
-  // ▼ 修正2：streamedLengthを依存配列から除外
+  // --- オートセーブ ---
   useEffect(() => {
     if (!isCompleted && currentBeatId && chatHistory.length > 0 && !isStreaming) {
       onSaveGame({
         episodeId: scenarioData.meta.episode_id,
         currentBeatId,
         chatHistory,
-        streamedLength, // 外から渡さず、この瞬間の値を使う
+        streamedLength,
         tether,
         collectedEvidence
       });
@@ -306,25 +341,9 @@ export function useGameLogic(
   const displayedText = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].text.substring(0, streamedLength) : '';
 
   return {
-    currentBeat,
-    displayedText,
-    isStreaming,
-    streamedLength,
-    tether,
-    feedback,
-    evaluatePanelInterrupt,
-    nextBeat,
-    handleChoice,
-    skipStream,
-    chatHistory,
-    collectedEvidence,
-    selectedEvidence,
-    collectEvidence,
-    handleSelectEvidence,
-    isCompleted,
-    endResult,
-    isMoriarty,
-    isIrene,
-    uiLabels, 
+    currentBeat, displayedText, isStreaming, streamedLength, tether, feedback,
+    evaluatePanelInterrupt, nextBeat, handleChoice, skipStream, chatHistory,
+    collectedEvidence, selectedEvidence, collectEvidence, handleSelectEvidence,
+    isCompleted, endResult, isMoriarty, isIrene, uiLabels, 
   };
 }

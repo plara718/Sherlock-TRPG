@@ -24,15 +24,10 @@ export default function GameView() {
     const fetchScenario = async () => {
       try {
         let fileName = '';
-        if (ctx.currentEpisodeId.startsWith('Interlude')) {
-          fileName = `interlude_${ctx.currentEpisodeId.split('-')[1].toLowerCase()}`;
-        } else if (ctx.currentEpisodeId.startsWith('SP-')) {
-          fileName = `episode_sp${ctx.currentEpisodeId.split('-')[1]}`;
-        } else if (ctx.currentEpisodeId.startsWith('M-')) {
-          fileName = `episode_m${ctx.currentEpisodeId.split('-')[1]}`;
-        } else {
-          fileName = `episode_${ctx.currentEpisodeId.replace('#', '')}`;
-        }
+        if (ctx.currentEpisodeId.startsWith('Interlude')) fileName = `interlude_${ctx.currentEpisodeId.split('-')[1].toLowerCase()}`;
+        else if (ctx.currentEpisodeId.startsWith('SP-')) fileName = `episode_sp${ctx.currentEpisodeId.split('-')[1]}`;
+        else if (ctx.currentEpisodeId.startsWith('M-')) fileName = `episode_m${ctx.currentEpisodeId.split('-')[1]}`;
+        else fileName = `episode_${ctx.currentEpisodeId.replace('#', '')}`;
         
         const scenarioModule = await import(`@/data/${fileName}.json`);
         if (isMounted) setScenarioData(scenarioModule.default || scenarioModule);
@@ -69,9 +64,7 @@ export default function GameView() {
 function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, initialSaveData: any }) {
   const ctx = useSaveData(); 
   const episodeId = ctx.currentEpisodeId;
-  const onBack = () => {
-    ctx.setView('archive');
-  };
+  const onBack = () => ctx.setView('archive');
 
   const protagonist = scenarioData.meta?.protagonist || 'watson';
   const [activeGlossary, setActiveGlossary] = useState<{ word: string; desc: string; } | null>(null);
@@ -82,12 +75,9 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   const popupIdCounter = useRef(0);
 
   const [cutin, setCutin] = useState<{type: 'success' | 'fail' | 'penalty', msg: string, isCritical?: boolean} | null>(null);
-
   const [isWigginsActive, setIsWigginsActive] = useState(false);
   const [isSanityZero, setIsSanityZero] = useState(false);
   const [showBacklog, setShowBacklog] = useState(false);
-  
-  const [interactionCooldown, setInteractionCooldown] = useState(false);
   const isReplay = Boolean(ctx.clearedData[episodeId]);
 
   const {
@@ -102,58 +92,72 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   const isInterventionAvailable = interventionType === 'Irene' ? (ctx.unlockedTerms.includes('A013') && !isIrene && !isMoriarty) : interventionType === 'Mycroft' ? (!isIrene && !isMoriarty) : interventionType === 'Wiggins' ? (ctx.unlockedTerms.includes('B004') && !isIrene && !isMoriarty) : false;
   const [interventionUsed, setInterventionUsed] = useState(false);
 
-  useEffect(() => { setInterventionUsed(false); setIsSanityZero(false); }, [episodeId]);
-  useEffect(() => { setIsSanityZero(tether <= 0 && !isCompleted && !(scenarioData.meta?.type === 'interlude' || scenarioData.meta?.episode_id?.includes('Interlude'))); }, [tether, isCompleted, scenarioData]);
-
-  useEffect(() => {
-    if (!isStreaming) {
-      setInteractionCooldown(true);
-      const timer = setTimeout(() => setInteractionCooldown(false), 600);
-      return () => clearTimeout(timer);
-    }
-  }, [isStreaming]);
-
-  const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const lastActionTimeRef = useRef<number>(Date.now());
+
+  const triggerVibration = useCallback((type: 'light' | 'heavy' | 'success' | 'error') => {
+    if (typeof window === 'undefined' || !navigator.vibrate) return;
+    try {
+      switch(type) {
+        case 'light': navigator.vibrate(15); break;
+        case 'heavy': navigator.vibrate(40); break;
+        case 'success': navigator.vibrate([30, 50, 30]); break;
+        case 'error': navigator.vibrate([50, 100, 50]); break;
+      }
+    } catch(e) {}
+  }, []);
+
+  useEffect(() => { setInterventionUsed(false); setIsSanityZero(false); }, [episodeId]);
+  useEffect(() => { setIsSanityZero(tether <= 0 && !isCompleted && !(scenarioData.meta?.type === 'interlude' || scenarioData.meta?.episode_id?.includes('Interlude'))); }, [tether, isCompleted, scenarioData]);
 
   useEffect(() => {
     if (feedback) {
       setCutin({ type: feedback.type, msg: feedback.msg, isCritical: feedback.isCriticalSuccess });
       if (!ctx.reduceEffects) setScreenEffect(feedback.isCriticalSuccess ? 'glass-shatter' : feedback.type === 'success' ? 'flash' : 'shake');
+      triggerVibration(feedback.type === 'success' ? 'success' : 'error');
+      
       const timer = setTimeout(() => {
         setScreenEffect('none');
         setCutin(null);
       }, 1800);
       return () => clearTimeout(timer);
     }
-  }, [feedback, ctx.reduceEffects]);
+  }, [feedback, ctx.reduceEffects, triggerVibration]);
 
   useEffect(() => {
     const hasTrigger = currentBeat?.text.includes('[<NOISE>]') || currentBeat?.text.includes('[<FLAW>]');
-    setIsInterruptMode(hasTrigger && !isStreaming);
+    if (hasTrigger && !isStreaming && !isInterruptMode) {
+      setIsInterruptMode(true);
+      triggerVibration('heavy');
+    }
+    if (!hasTrigger || isStreaming) {
+      setIsInterruptMode(false);
+    }
     setIsWigginsActive(false);
-  }, [currentBeat, isStreaming]);
+  }, [currentBeat, isStreaming, isInterruptMode, triggerVibration]);
 
   useEffect(() => { 
-    if (!isScrollingRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: isStreaming ? 'auto' : 'smooth' }); 
+    if (!isScrollingRef.current && scrollContainerRef.current) {
+      const { scrollHeight, clientHeight, scrollTop } = scrollContainerRef.current;
+      if (scrollHeight - clientHeight - scrollTop < 150) {
+        scrollContainerRef.current.scrollTo({ top: scrollHeight, behavior: 'auto' });
+      }
     }
-  }, [streamedLength, chatHistory.length, collectedEvidence, isInterruptMode, isStreaming]);
+  }, [streamedLength, chatHistory.length, isInterruptMode]);
 
   const handleGlossaryClick = useCallback((term: any) => {
+    triggerVibration('light');
     if (ctx.unlockedTerms.includes(term.id)) {
       setActiveGlossary({ word: term.ja, desc: "このデータは既に大索引に登録されています。詳細はアーカイブで確認してください。" });
     } else {
       ctx.setUnlockedTerms([...ctx.unlockedTerms, term.id]);
       setActiveGlossary({ word: term.ja, desc: "【NEW】大索引に新規データが登録されました！ 事件解決後、アーカイブから詳細を解読できます。" });
     }
-  }, [ctx]);
+  }, [ctx, triggerVibration]);
 
   const handleCollectEvidence = useCallback((word: string) => {
     if (!collectedEvidence.includes(word)) {
+      triggerVibration('light');
       collectEvidence(word);
       const newId = popupIdCounter.current++;
       setEvidencePopups(prev => [...prev, { id: newId, word }]);
@@ -161,52 +165,57 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
         setEvidencePopups(prev => prev.filter(p => p.id !== newId));
       }, 2500);
     }
-  }, [collectedEvidence, collectEvidence]);
+  }, [collectedEvidence, collectEvidence, triggerVibration]);
 
   const termMap = useMemo(() => {
     const map = new Map<string, any>();
     glossaryData.terms.forEach((t: any) => {
       map.set(t.ja, t);
       if (t.trigger_word) map.set(t.trigger_word, t);
-      if (t.trigger_words) {
-        t.trigger_words.forEach((w: string) => map.set(w, t));
-      }
+      if (t.trigger_words) t.trigger_words.forEach((w: string) => map.set(w, t));
     });
     return map;
   }, []);
 
-  const renderText = useCallback((text: string, skipGlossary: boolean = false) => {
+  const renderText = useCallback((text: string, isStreamingNow: boolean = false) => {
     if (!text) return "";
     let elements: (string | React.JSX.Element)[] = [];
-    
     const parts = text.split(/(\{.*?\}|《.*?》)/g);
     
     parts.forEach((part, i) => {
       if (part.startsWith('{') && part.endsWith('}')) {
         const word = part.slice(1, -1);
         const isCollected = collectedEvidence.includes(word);
+        
+        if (isStreamingNow) {
+          elements.push(<span key={`raw-ev-${i}`} className="font-bold">{word}</span>);
+          return;
+        }
+
         const wigginsStyle = (isWigginsActive && !isCollected) ? 'ring-2 ring-theme-accent-muted ring-offset-1 bg-amber-200 animate-pulse' : '';
         elements.push(
-          <span key={`ev-${i}`} onClick={(e) => { e.stopPropagation(); handleCollectEvidence(word); }} className={`font-bold cursor-pointer px-1.5 mx-0.5 rounded transition-all shadow-sm inline-flex items-center z-10 relative ${wigginsStyle} ${isCollected ? 'bg-theme-bg-panel text-theme-text-muted cursor-default' : isSanityZero ? 'text-rose-900 bg-rose-500/30 hover:bg-rose-500/50 border border-rose-600/50 active:scale-95 animate-pulse' : 'text-theme-text-base bg-theme-accent-main hover:opacity-80 border border-theme-border-base/50 active:scale-95 text-white'}`}>
+          <span key={`ev-${i}`} onClick={(e) => { e.stopPropagation(); handleCollectEvidence(word); }} className={`font-bold cursor-pointer px-1.5 mx-0.5 rounded transition-all shadow-sm inline-flex items-center z-10 relative animate-in zoom-in-75 duration-300 ${wigginsStyle} ${isCollected ? 'bg-theme-bg-panel text-theme-text-muted cursor-default' : isSanityZero ? 'text-rose-900 bg-rose-500/30 hover:bg-rose-500/50 border border-rose-600/50 active:scale-95 animate-pulse' : 'text-theme-text-base bg-theme-accent-main hover:opacity-80 border border-theme-border-base/50 active:scale-95'}`}>
             {word}
           </span>
         );
       } 
       else if (part.startsWith('《') && part.endsWith('》')) {
         const word = part.slice(1, -1);
-        if (skipGlossary) {
-          elements.push(word);
+        
+        if (isStreamingNow) {
+          elements.push(<span key={`raw-g-${i}`}>{word}</span>);
+          return;
+        }
+
+        const term = termMap.get(word);
+        if (term) {
+          elements.push(
+            <span key={`g-${i}`} onClick={(e) => { e.stopPropagation(); handleGlossaryClick(term); }} className={`underline decoration-dotted cursor-help transition-colors font-bold z-10 relative animate-in fade-in duration-300 ${isSanityZero ? 'text-rose-600 hover:text-rose-400' : 'text-theme-accent-main hover:opacity-80'}`}>
+              {word}
+            </span>
+          );
         } else {
-          const term = termMap.get(word);
-          if (term) {
-            elements.push(
-              <span key={`g-${i}`} onClick={(e) => { e.stopPropagation(); handleGlossaryClick(term); }} className={`underline decoration-dotted cursor-help transition-colors font-bold z-10 relative ${isSanityZero ? 'text-rose-600 hover:text-rose-400' : 'text-theme-accent-main hover:opacity-80'}`}>
-                {word}
-              </span>
-            );
-          } else {
-            elements.push(word);
-          }
+          elements.push(word);
         }
       } 
       else { 
@@ -234,7 +243,7 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
         <div className="absolute top-[20%] left-1/2 -translate-x-1/2 z-[70] pointer-events-none flex flex-col items-center gap-2">
           {evidencePopups.map((popup) => (
             <div key={popup.id} className="animate-in slide-in-from-bottom-5 fade-in duration-300 flex flex-col items-center">
-              <div className="bg-theme-accent-main text-white font-black px-6 py-2 rounded-full shadow-lg border-2 border-theme-border-base flex items-center gap-2 text-sm sm:text-base tracking-widest">
+              <div className="bg-theme-accent-main text-theme-text-base font-black px-6 py-2 rounded-full shadow-lg border-2 border-theme-border-base flex items-center gap-2 text-sm sm:text-base tracking-widest">
                 <FileText size={18} /> {isMoriarty ? 'VARIABLE ACQUIRED' : 'EVIDENCE ACQUIRED'}
               </div>
               <div className="mt-1 bg-theme-bg-dark text-theme-text-light px-4 py-1.5 rounded-lg border border-theme-accent-main shadow-lg text-sm sm:text-base font-bold font-serif max-w-[80vw] truncate">
@@ -257,7 +266,7 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             <h2 className="text-3xl sm:text-4xl font-black tracking-[0.1em] font-mono mt-2 mb-2 uppercase drop-shadow-md">{cutin.type === 'success' ? 'SUCCESS' : 'FAILED'}</h2>
             <div className={`w-full h-px mb-3 ${cutin.type === 'success' ? 'bg-emerald-500/30' : 'bg-rose-600/30'}`} />
             <p className="text-sm sm:text-base font-bold font-serif opacity-90 break-words whitespace-pre-wrap leading-relaxed">{cutin.msg.replace(/（.+?）/g, '')}</p>
-            {cutin.isCritical && <div className="absolute -bottom-4 bg-theme-accent-main text-white text-[10px] font-black px-4 py-1 rounded-full uppercase tracking-widest border-2 border-theme-border-base animate-pulse whitespace-nowrap shadow-lg">CRITICAL HIT</div>}
+            {cutin.isCritical && <div className="absolute -bottom-4 bg-theme-accent-main text-theme-text-base text-[10px] font-black px-4 py-1 rounded-full uppercase tracking-widest border-2 border-theme-border-base animate-pulse whitespace-nowrap shadow-lg">CRITICAL HIT</div>}
             <div className={`absolute top-0 left-0 w-full h-full bg-gradient-to-r ${cutin.type === 'success' ? 'from-emerald-400/0 via-emerald-400/10 to-emerald-400/0' : 'from-rose-500/0 via-rose-500/10 to-rose-500/0'} transform -skew-x-12 animate-[pulse_1s_infinite] pointer-events-none rounded-xl`} />
           </div>
         </div>
@@ -284,11 +293,10 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
           </div>
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar bg-theme-bg-base pb-[env(safe-area-inset-bottom)]">
             {chatHistory.map((beat: any, idx: number) => {
-              let textToShow = beat.text;
-              let cleanText = (textToShow || "").replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '');
+              let cleanText = (beat.text || "").replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '');
               const isMetaNotice = beat.speaker === 'System' && cleanText.startsWith('【');
               return (
-                <ChatLog key={`log-${beat.id || idx}`} speaker={beat.speaker} text={renderText(cleanText)} feedback={null} isMetaNotice={isMetaNotice} />
+                <ChatLog key={`log-${beat.id || idx}`} speaker={beat.speaker} text={renderText(cleanText, false)} feedback={null} isMetaNotice={isMetaNotice} />
               );
             })}
           </div>
@@ -319,14 +327,11 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
         className="flex-1 flex flex-col relative overflow-hidden cursor-pointer transition-colors duration-1000 bg-theme-bg-base" 
         onClick={() => { 
           if (isInterruptMode) return; 
-          if (!isScrollingRef.current && (Date.now() - lastActionTimeRef.current > 500)) { 
-            lastActionTimeRef.current = Date.now(); 
-            isStreaming ? skipStream() : nextBeat(); 
-          } 
+          isStreaming ? skipStream() : nextBeat(); 
           isScrollingRef.current = false;
         }} 
-        onTouchStart={(e) => { touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }} 
-        onTouchMove={(e) => { if (touchStartRef.current && (Math.abs(e.touches[0].clientX - touchStartRef.current.x) > 10 || Math.abs(e.touches[0].clientY - touchStartRef.current.y) > 10)) isScrollingRef.current = true; }}
+        onTouchStart={() => { isScrollingRef.current = false; }} 
+        onTouchMove={() => { isScrollingRef.current = true; }}
       >
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-theme-text-base opacity-[0.03] to-transparent" />
         
@@ -336,7 +341,7 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
           onScroll={(e) => {
             const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
             const isAtBottom = scrollHeight - scrollTop - clientHeight <= 50;
-            isScrollingRef.current = !isAtBottom;
+            if (!isAtBottom) isScrollingRef.current = true;
           }}
         >
           {chatHistory.map((beat: any, idx: number) => {
@@ -350,7 +355,8 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             let cleanText = (textToShow || "").replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '');
 
             if (isCurrent && isStreaming) {
-              cleanText = cleanText.replace(/(\{([^}]*)$|《([^》]*)$)/, '$1');
+              cleanText = cleanText.replace(/[\{《]([^}》]*)$/, '$1');
+              cleanText = cleanText.replace(/[{}]/g, '').replace(/[《》]/g, '');
             }
 
             const isMetaNotice = beat.speaker === 'System' && cleanText.startsWith('【');
@@ -362,12 +368,12 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             );
           })}
           {isStreaming && chatHistory[chatHistory.length-1]?.speaker !== 'System' && <div className="inline-block w-2.5 h-5 ml-1 animate-pulse align-middle bg-theme-text-base" />}
-          <div ref={bottomRef} className="h-20" />
+          <div className="h-32" /> 
         </div>
 
         {!isStreaming && currentBeat?.text.match(/\{.*?\}/g)?.some((match: string) => !collectedEvidence.includes(match.slice(1, -1))) && !isInterruptMode && !isWigginsActive && ctx.unlockedTerms.includes('B004') && !isMoriarty && (
           <div className="absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-6 z-20 animate-in fade-in zoom-in duration-300">
-             <button onClick={(e) => { e.stopPropagation(); if (ctx.insightPoints >= 1 && !isWigginsActive && ctx.handleSpendPoint(1)) setIsWigginsActive(true); }} disabled={ctx.insightPoints < 1} className="bg-amber-700 hover:bg-amber-600 disabled:bg-[#d8c8b8] disabled:text-[#8c7a6b] disabled:cursor-not-allowed text-white text-[10px] sm:text-xs font-bold px-4 py-3 rounded-full shadow-lg flex items-center gap-1.5 transition-transform active:scale-95"><Eye size={16} /> WIGGINS EYE (1pt)</button>
+             <button onClick={(e) => { e.stopPropagation(); if (ctx.insightPoints >= 1 && !isWigginsActive && ctx.handleSpendPoint(1)) setIsWigginsActive(true); }} disabled={ctx.insightPoints < 1} className="bg-amber-700 hover:bg-amber-600 disabled:bg-[#d8c8b8] disabled:text-[#8c7a6b] disabled:cursor-not-allowed text-theme-text-base text-[10px] sm:text-xs font-bold px-4 py-3 rounded-full shadow-lg flex items-center gap-1.5 transition-transform active:scale-95"><Eye size={16} /> WIGGINS EYE (1pt)</button>
           </div>
         )}
       </div>
@@ -378,10 +384,10 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             {isMoriarty ? 'VARIABLES:' : 'EVIDENCE:'}
           </span>
           {collectedEvidence.map((ev) => (
-            <button key={ev} onClick={(e) => { e.stopPropagation(); handleSelectEvidence(ev); }} disabled={isStreaming || interactionCooldown} 
-              className={`whitespace-nowrap text-[10px] sm:text-xs px-2.5 py-1.5 rounded-full font-bold transition-all z-20 relative 
-              ${evidencePopups.some(p => p.word === ev) ? 'ring-4 ring-theme-accent-main ring-offset-2 ring-offset-theme-bg-dark bg-theme-accent-main text-white scale-110 shadow-lg z-30 duration-300' : ''} 
-              ${selectedEvidence === ev ? 'bg-theme-accent-main text-white shadow-md' : 'bg-theme-bg-panel text-theme-text-muted hover:bg-theme-border-base hover:text-theme-text-light'} ${interactionCooldown ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
+            <button key={ev} onClick={(e) => { e.stopPropagation(); triggerVibration('light'); handleSelectEvidence(ev); }} disabled={isStreaming} 
+              className={`whitespace-nowrap text-[10px] sm:text-xs px-2.5 py-1.5 rounded-full font-bold transition-all z-20 relative active:scale-95
+              ${evidencePopups.some(p => p.word === ev) ? 'ring-4 ring-theme-accent-main ring-offset-2 ring-offset-theme-bg-dark bg-theme-accent-main text-theme-text-base scale-110 shadow-lg z-30 duration-300' : ''} 
+              ${selectedEvidence === ev ? 'bg-theme-accent-main text-theme-text-base shadow-md' : 'bg-theme-bg-panel text-theme-text-muted hover:bg-theme-border-base hover:text-theme-text-light'}`}
             >
               {ev}
             </button>
@@ -402,18 +408,17 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             {currentBeat.choices.map((choice: any, idx: number) => (
               <button 
                 key={idx} 
-                disabled={interactionCooldown}
-                onClick={() => handleChoice(choice.next_beat_id)} 
-                className={`w-full py-3.5 sm:py-4 bg-theme-bg-dark-panel border border-theme-border-base/50 text-theme-text-light font-bold font-serif tracking-widest rounded-lg shadow-md transition-all text-sm ${interactionCooldown ? 'opacity-50 cursor-not-allowed' : 'hover:bg-theme-bg-panel active:scale-95'}`}
+                onClick={() => { triggerVibration('light'); handleChoice(choice.next_beat_id); }} 
+                className={`w-full py-3.5 sm:py-4 bg-theme-bg-dark-panel border border-theme-border-base/50 text-theme-text-light font-bold font-serif tracking-widest rounded-lg shadow-md transition-all text-sm hover:bg-theme-bg-panel active:scale-95`}
               >
                 {choice.label}
               </button>
             ))}
           </div>
         ) : isInterruptMode ? (
-          <InterruptPanel collectedEvidences={collectedEvidence} hintText={currentBeat?.interrupt?.hint} interventionType={interventionType} isInterventionAvailable={isInterventionAvailable} interventionUsed={interventionUsed} onUseIntervention={() => setInterventionUsed(true)} onSubmit={(skill, evidence) => { evaluatePanelInterrupt(skill, evidence); setIsInterruptMode(false); }} onTimeUp={() => { evaluatePanelInterrupt('TIMEOUT', null); setIsInterruptMode(false); }} protagonist={protagonist} isMoriarty={isMoriarty} uiLabels={uiLabels} isEvidenceRequired={!!currentBeat?.interrupt?.required_evidence} />
+          <InterruptPanel collectedEvidences={collectedEvidence} hintText={currentBeat?.interrupt?.hint} interventionType={interventionType} isInterventionAvailable={isInterventionAvailable} interventionUsed={interventionUsed} onUseIntervention={() => { triggerVibration('light'); setInterventionUsed(true); }} onSubmit={(skill, evidence) => { triggerVibration('heavy'); evaluatePanelInterrupt(skill, evidence); setIsInterruptMode(false); }} onTimeUp={() => { evaluatePanelInterrupt('TIMEOUT', null); setIsInterruptMode(false); }} protagonist={protagonist} isMoriarty={isMoriarty} uiLabels={uiLabels} isEvidenceRequired={!!currentBeat?.interrupt?.required_evidence} />
         ) : (
-          <Controls isStreaming={isStreaming && chatHistory[chatHistory.length-1]?.speaker !== 'System'} onNext={() => { const now = Date.now(); if (now - lastActionTimeRef.current > 500) { nextBeat(); lastActionTimeRef.current = now; } }} />
+          <Controls isStreaming={isStreaming && chatHistory[chatHistory.length-1]?.speaker !== 'System'} onNext={() => { isStreaming ? skipStream() : nextBeat(); }} />
         )}
       </div>
 
@@ -434,10 +439,10 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
               <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-2 custom-scrollbar">
                 {endResult.consequenceData?.official_record && <div className="bg-theme-bg-panel/50 p-3 sm:p-4 rounded-lg border border-theme-border-base/20 font-mono text-xs shadow-inner"><p className="text-theme-text-base leading-relaxed">{endResult.consequenceData.official_record}</p></div>}
                 {endResult.consequenceData?.watson_journal && <div className="p-4 rounded-lg border border-theme-border-base/30 bg-theme-bg-dark shadow-sm"><h3 className="font-bold text-theme-text-base mb-2 border-b border-theme-border-base/20 pb-1 text-xs uppercase tracking-widest">{isIrene ? "Irene's Journal" : isMoriarty ? "Organization Record" : "Watson's Journal"}</h3><p className="text-sm leading-relaxed text-theme-text-muted">{endResult.consequenceData.watson_journal}</p></div>}
-                {endResult.consequenceData?.holmes_note && <div className="p-4 rounded-lg bg-theme-accent-main opacity-90 border border-theme-accent-muted shadow-sm"><h3 className="font-bold text-white mb-1.5 italic text-xs uppercase tracking-widest">{isMoriarty ? "The Professor's Note :" : "Holmes's Note :"}</h3><p className="text-sm leading-relaxed italic text-white/90">{endResult.consequenceData.holmes_note}</p></div>}
+                {endResult.consequenceData?.holmes_note && <div className="p-4 rounded-lg bg-theme-accent-main opacity-90 border border-theme-accent-muted shadow-sm"><h3 className="font-bold text-theme-text-base mb-1.5 italic text-xs uppercase tracking-widest">{isMoriarty ? "The Professor's Note :" : "Holmes's Note :"}</h3><p className="text-sm leading-relaxed italic text-theme-text-base/90">{endResult.consequenceData.holmes_note}</p></div>}
               </div>
               <div className="mt-6 text-center pt-4"><p className="text-[10px] text-theme-text-muted tracking-widest uppercase mb-1 font-mono">Insight Points Acquired</p><p className="text-4xl font-bold text-theme-accent-main font-mono drop-shadow-sm">+{endResult.points} pt</p>{isReplay && <p className="text-[9px] text-theme-text-muted mt-1 font-mono tracking-tighter">*再プレイ報酬適用</p>}</div>
-              <button onClick={() => ctx.handleEpisodeComplete(episodeId, endResult.rank, tether, endResult.points)} className="w-full mt-6 bg-theme-bg-dark hover:bg-theme-bg-dark-panel text-theme-text-light font-bold py-3.5 rounded-full tracking-widest transition-transform active:scale-95 shadow-md text-sm">
+              <button onClick={() => { triggerVibration('success'); ctx.handleEpisodeComplete(episodeId, endResult.rank, tether, endResult.points); }} className="w-full mt-6 bg-theme-bg-dark hover:bg-theme-bg-dark-panel text-theme-text-light font-bold py-3.5 rounded-full tracking-widest transition-transform active:scale-95 shadow-md text-sm">
                 {isMoriarty ? 'CLOSE EQUATION (証明完了)' : 'FILE ARCHIVE (記録完了)'}
               </button>
             </div>
@@ -448,7 +453,7 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
       {isCompleted && !endResult && (
         <div className="absolute inset-0 z-50 bg-theme-bg-dark opacity-95 flex flex-col items-center justify-center p-4 animate-in fade-in duration-1000 backdrop-blur-md">
           <p className="text-theme-text-light text-lg font-serif tracking-widest mb-10 animate-pulse text-center">―― そして、記録は次へ繋がる。</p>
-          <button onClick={() => ctx.handleEpisodeComplete(episodeId, "INTERLUDE", tether, 0)} className="bg-transparent border border-theme-border-base text-theme-text-light hover:bg-theme-text-light hover:text-theme-bg-dark font-bold py-3 px-8 rounded-full tracking-widest transition-all duration-300 flex items-center gap-2 active:scale-95">次へ進む <ArrowRight size={20} /></button>
+          <button onClick={() => { triggerVibration('light'); ctx.handleEpisodeComplete(episodeId, "INTERLUDE", tether, 0); }} className="bg-transparent border border-theme-border-base text-theme-text-light hover:bg-theme-text-light hover:text-theme-bg-dark font-bold py-3 px-8 rounded-full tracking-widest transition-all duration-300 flex items-center gap-2 active:scale-95">次へ進む <ArrowRight size={20} /></button>
         </div>
       )}
     </div>
