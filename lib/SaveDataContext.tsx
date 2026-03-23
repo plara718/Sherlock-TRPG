@@ -37,6 +37,9 @@ type SaveDataContextType = {
   setTextSpeed: (speed: number) => void;
   reduceEffects: boolean;
   setReduceEffects: (reduce: boolean) => void;
+  // ▼ 新規追加：プレイモードの管理
+  playMode: 'holmes' | 'moriarty';
+  setPlayMode: React.Dispatch<React.SetStateAction<'holmes' | 'moriarty'>>;
 };
 
 const SaveDataContext = createContext<SaveDataContextType | undefined>(undefined);
@@ -46,7 +49,6 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<'title' | 'game' | 'archive' | 'endroll'>('title');
   const [currentEpisodeId, setCurrentEpisodeId] = useState<string>('#00');
 
-  // 内部ステート
   const [unlockedTerms, _setUnlockedTerms] = useState<string[]>([]);
   const [readTerms, setReadTerms] = useState<string[]>([]);
   const [insightPoints, setInsightPoints] = useState(0);
@@ -55,6 +57,9 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
   const [textSpeed, setTextSpeed] = useState<number>(30);
   const [reduceEffects, setReduceEffects] = useState<boolean>(false);
   const [activeGameData, setActiveGameData] = useState<any>(null);
+  
+  // ▼ 新規追加：プレイモードステート
+  const [playMode, setPlayMode] = useState<'holmes' | 'moriarty'>('holmes');
 
   const currentSeason = 
     clearedData['#39'] ? 4 : 
@@ -63,7 +68,6 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
 
   const [mycroftIntel, setMycroftIntel] = useState<string[]>([]);
 
-  // ★重複防止用のラッパー関数
   const setUnlockedTerms: React.Dispatch<React.SetStateAction<string[]>> = (value) => {
     if (typeof value === 'function') {
       _setUnlockedTerms(prev => Array.from(new Set(value(prev))));
@@ -78,7 +82,6 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
       if (savedStr) {
         const data = JSON.parse(savedStr);
         if (data && typeof data === 'object') {
-            // ★ロード時も重複を排除して安全にセット
             if (data.unlockedTerms) _setUnlockedTerms(Array.from(new Set(data.unlockedTerms)));
             if (data.readTerms) setReadTerms(data.readTerms);
             if (data.insightPoints !== undefined) setInsightPoints(data.insightPoints);
@@ -88,6 +91,8 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
             if (data.textSpeed !== undefined) setTextSpeed(data.textSpeed);
             if (data.reduceEffects !== undefined) setReduceEffects(data.reduceEffects);
             if (data.activeGameData !== undefined) setActiveGameData(data.activeGameData);
+            // ▼ 新規追加：プレイモードの復元
+            if (data.playMode) setPlayMode(data.playMode);
         }
       }
     } catch (e) {
@@ -99,9 +104,12 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isInitialized) {
-      localStorage.setItem('sherlock_save_v1', JSON.stringify({ unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths, mycroftIntel, textSpeed, reduceEffects, activeGameData }));
+      // ▼ 新規追加：プレイモードの保存
+      localStorage.setItem('sherlock_save_v1', JSON.stringify({ 
+        unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths, mycroftIntel, textSpeed, reduceEffects, activeGameData, playMode 
+      }));
     }
-  }, [unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths, mycroftIntel, isInitialized, textSpeed, reduceEffects, activeGameData]);
+  }, [unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths, mycroftIntel, isInitialized, textSpeed, reduceEffects, activeGameData, playMode]);
 
   const hasSaveData = unlockedTerms.length > 0 || Object.keys(clearedData).length > 0;
 
@@ -112,6 +120,7 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
       setInsightPoints(0);
       setClearedData({});
       setCurrentEpisodeId('#00');
+      setPlayMode('holmes'); // 新規プレイ時はホームズモードに戻す
     }
     setView('archive');
   };
@@ -125,6 +134,7 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
     setMycroftIntel([]);
     setCurrentEpisodeId('#00');
     setActiveGameData(null);
+    setPlayMode('holmes'); // リセット時はホームズモードに戻す
     setView('title');
   };
 
@@ -138,6 +148,7 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
         if (data.clearedData) setClearedData(data.clearedData);
         if (data.unlockedTruths) setUnlockedTruths(data.unlockedTruths);
         if (data.mycroftIntel) setMycroftIntel(data.mycroftIntel);
+        if (data.playMode) setPlayMode(data.playMode);
         return true;
       }
     } catch (e) {
@@ -163,7 +174,7 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
 
   const handleEpisodeComplete = (epId: string, rank: string, tether: number, points: number) => {
     setActiveGameData(null);
-    if (epId !== 'INTERLUDE' && !epId.includes('Interlude')) {
+    if (epId !== 'INTERLUDE' && !epId.includes('Interlude') && !epId.startsWith('interlude')) {
       setClearedData(prev => ({ ...prev, [epId]: { rank, tether } }));
       setInsightPoints(prev => prev + points);
     }
@@ -198,7 +209,8 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
       handleSpendPoint, handleEpisodeComplete, handleResearch, handleReadTerm,
       handleUnlockTruth, handleLinkFail,
       textSpeed, setTextSpeed, reduceEffects, setReduceEffects,
-      activeGameData, setActiveGameData, clearActiveGameData
+      activeGameData, setActiveGameData, clearActiveGameData,
+      playMode, setPlayMode // ▼ 新規追加
     }}>
       {children}
     </SaveDataContext.Provider>

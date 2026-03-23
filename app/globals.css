@@ -2,51 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  /* Holmes Mode (Default) */
-  --bg-base: #f4ebd8;
-  --bg-panel: #e6d5c3;
-  --bg-dark: #1a1512;
-  --bg-dark-panel: #2a2420;
-  
-  --text-base: #3a2f29;
-  --text-muted: #8c7a6b;
-  --text-light: #f4ebd8;
-  --text-light-muted: #d8c8b8;
+@layer base {
+  :root {
+    /* =========================================
+       Holmes Theme (Default / Sepia & Amber)
+       ========================================= */
+    --color-bg-base: 243 234 216;         /* 羊皮紙色 */
+    --color-bg-dark: 228 213 183;
+    --color-bg-panel: 250 245 235;
+    --color-bg-dark-panel: 235 222 195;
+    
+    --color-text-base: 42 36 32;          /* 暗茶色 */
+    --color-text-light: 20 15 10;
+    --color-text-muted: 115 100 85;
+    
+    --color-accent-main: 217 119 6;       /* 琥珀色 (#d97706) */
+    --color-accent-main-hover: 180 83 9;
+    --color-accent-muted: 217 119 6;
+    
+    --color-border-base: 210 190 160;
+    --color-border-dark: 180 160 130;
+  }
 
-  --border-base: #8c7a6b;
-  --border-dark: #3a2f29;
+  [data-theme='moriarty'] {
+    /* =========================================
+       Moriarty Theme (Inverted / Black & Crimson)
+       ========================================= */
+    --color-bg-base: 10 10 10;            /* 漆黒 (#0a0a0a) */
+    --color-bg-dark: 0 0 0;               /* 完全な黒 (#000000) */
+    --color-bg-panel: 24 24 24;
+    --color-bg-dark-panel: 15 15 15;
+    
+    --color-text-base: 224 224 224;       /* 冷徹な白銀 (#e0e0e0) */
+    --color-text-light: 255 255 255;
+    --color-text-muted: 120 120 120;
+    
+    --color-accent-main: 139 0 0;         /* 血の真紅 (#8b0000) */
+    --color-accent-main-hover: 180 0 0;
+    --color-accent-muted: 139 0 0;
+    
+    --color-border-base: 50 50 50;
+    --color-border-dark: 30 30 30;
+  }
 
-  --accent-main: #d97706; /* amber-600 */
-  --accent-muted: #f59e0b; /* amber-500 */
+  body {
+    /* 全画面でのスムーズなテーマ切り替えアニメーション */
+    @apply bg-theme-bg-base text-theme-text-base transition-colors duration-1000;
+  }
 }
 
-[data-theme='moriarty'] {
-  /* Moriarty Mode - アンチ・極限スマホUI */
-  --bg-base: #0a0a0a;
-  --bg-panel: #141414;
-  --bg-dark: #000000;
-  --bg-dark-panel: #1a1a1a;
-
-  --text-base: #e0e0e0;
-  --text-muted: #888888;
-  --text-light: #ffffff;
-  --text-light-muted: #aaaaaa;
-
-  --border-base: #444444;
-  --border-dark: #222222;
-
-  --accent-main: #8b0000; /* 血のような深い真紅 */
-  --accent-muted: #b91c1c; /* red-700 */
-}
-
-body {
-  background-color: var(--bg-base);
-  color: var(--text-base);
-  transition: background-color 0.5s ease, color 0.5s ease;
-  
-  /* ▼ 追加: スマホ長押しメニュー・テキスト選択の完全無効化 */
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
+/* カスタムスクロールバー等の既存設定があればこの下に維持 */
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-theme-bg-dark rounded-full;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-theme-border-base rounded-full hover:bg-theme-border-dark transition-colors;
+  }
 }

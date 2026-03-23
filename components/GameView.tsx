@@ -157,7 +157,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
     }
   }, [collectedEvidence, collectEvidence]);
 
-  // ▼ 修正1：用語データを O(1) で検索できるよう Map化（パフォーマンス激増）
   const termMap = useMemo(() => {
     const map = new Map<string, any>();
     glossaryData.terms.forEach((t: any) => {
@@ -192,7 +191,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
         if (skipGlossary) {
           elements.push(word);
         } else {
-          // ▼ 修正1続き：Mapを使用して一瞬で検索
           const term = termMap.get(word);
           if (term) {
             elements.push(
@@ -220,7 +218,9 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
       {screenEffect === 'glass-shatter' && (
         <div className="absolute inset-0 z-[60] pointer-events-none flex items-center justify-center overflow-hidden">
           <div className="absolute inset-0 bg-white/80 animate-out fade-out duration-700 mix-blend-overlay" />
-          <div className="text-4xl font-black text-rose-600 tracking-[0.5em] animate-out zoom-out-150 fade-out duration-700 rotate-12 drop-shadow-2xl">NOISE CLEARED</div>
+          <div className="text-4xl font-black text-rose-600 tracking-[0.5em] animate-out zoom-out-150 fade-out duration-700 rotate-12 drop-shadow-2xl">
+            {isMoriarty ? 'FLAW EXPOSED' : 'NOISE CLEARED'}
+          </div>
         </div>
       )}
 
@@ -229,7 +229,7 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
           {evidencePopups.map((popup) => (
             <div key={popup.id} className="animate-in slide-in-from-bottom-5 fade-in duration-300 flex flex-col items-center">
               <div className="bg-theme-accent-main text-white font-black px-6 py-2 rounded-full shadow-lg border-2 border-theme-border-base flex items-center gap-2 text-sm sm:text-base tracking-widest">
-                <FileText size={18} /> EVIDENCE ACQUIRED
+                <FileText size={18} /> {isMoriarty ? 'VARIABLE ACQUIRED' : 'EVIDENCE ACQUIRED'}
               </div>
               <div className="mt-1 bg-theme-bg-dark text-theme-text-light px-4 py-1.5 rounded-lg border border-theme-accent-main shadow-lg text-sm sm:text-base font-bold font-serif max-w-[80vw] truncate">
                 {popup.word}
@@ -261,7 +261,9 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
         <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden mix-blend-multiply opacity-50 flex flex-col">
            <div className={`absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(225,29,72,0.1)_2px,rgba(225,29,72,0.1)_4px)] ${ctx.reduceEffects ? '' : 'animate-[pulse_0.1s_infinite]'}`} />
            <div className={`absolute top-[20%] w-full bg-rose-600/20 border-y-2 border-rose-600 text-rose-500 font-mono font-bold text-center py-2 tracking-[0.3em] shadow-[0_0_20px_rgba(225,29,72,0.5)] ${ctx.reduceEffects ? '' : 'animate-[pulse_1.5s_infinite]'}`}>
-             <AlertTriangle className="inline-block mr-2 w-5 h-5 mb-1" /> WARNING: SANITY COMPROMISED <AlertTriangle className="inline-block ml-2 w-5 h-5 mb-1" />
+             <AlertTriangle className="inline-block mr-2 w-5 h-5 mb-1" /> 
+             {isMoriarty ? 'WARNING: DOMINATION COMPROMISED' : 'WARNING: SANITY COMPROMISED'} 
+             <AlertTriangle className="inline-block ml-2 w-5 h-5 mb-1" />
            </div>
         </div>
       )}
@@ -357,7 +359,7 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
           <div ref={bottomRef} className="h-20" />
         </div>
 
-        {!isStreaming && currentBeat?.text.match(/\{.*?\}/g)?.some((match: string) => !collectedEvidence.includes(match.slice(1, -1))) && !isInterruptMode && !isWigginsActive && ctx.unlockedTerms.includes('B004') && (
+        {!isStreaming && currentBeat?.text.match(/\{.*?\}/g)?.some((match: string) => !collectedEvidence.includes(match.slice(1, -1))) && !isInterruptMode && !isWigginsActive && ctx.unlockedTerms.includes('B004') && !isMoriarty && (
           <div className="absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-6 z-20 animate-in fade-in zoom-in duration-300">
              <button onClick={(e) => { e.stopPropagation(); if (ctx.insightPoints >= 1 && !isWigginsActive && ctx.handleSpendPoint(1)) setIsWigginsActive(true); }} disabled={ctx.insightPoints < 1} className="bg-amber-700 hover:bg-amber-600 disabled:bg-[#d8c8b8] disabled:text-[#8c7a6b] disabled:cursor-not-allowed text-white text-[10px] sm:text-xs font-bold px-4 py-3 rounded-full shadow-lg flex items-center gap-1.5 transition-transform active:scale-95"><Eye size={16} /> WIGGINS EYE (1pt)</button>
           </div>
@@ -366,7 +368,9 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
 
       {!isInterruptMode && collectedEvidence.length > 0 && (
         <div className="p-3 flex flex-wrap gap-2 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.1)] overflow-x-auto custom-scrollbar border-t z-20 relative bg-theme-bg-dark-panel border-theme-border-dark">
-          <span className="text-[10px] font-mono flex items-center mr-1 tracking-widest uppercase text-theme-text-muted">EVIDENCE:</span>
+          <span className="text-[10px] font-mono flex items-center mr-1 tracking-widest uppercase text-theme-text-muted">
+            {isMoriarty ? 'VARIABLES:' : 'EVIDENCE:'}
+          </span>
           {collectedEvidence.map((ev) => (
             <button key={ev} onClick={(e) => { e.stopPropagation(); handleSelectEvidence(ev); }} disabled={isStreaming || interactionCooldown} 
               className={`whitespace-nowrap text-[10px] sm:text-xs px-2.5 py-1.5 rounded-full font-bold transition-all z-20 relative 
@@ -387,7 +391,7 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
         {currentBeat?.choices && !isStreaming ? (
           <div className="p-4 flex flex-col gap-3 border-t-2 border-theme-border-base/30 bg-theme-bg-dark shadow-[0_-20px_40px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom-full duration-500 relative z-10">
             <p className="text-[10px] font-mono text-theme-accent-main mb-1 text-center tracking-[0.3em] uppercase animate-pulse flex items-center justify-center gap-2">
-              <span className="w-10 h-px bg-theme-accent-main opacity-50" /> LOGIC BRANCH <span className="w-10 h-px bg-theme-accent-main opacity-50" />
+              <span className="w-10 h-px bg-theme-accent-main opacity-50" /> {isMoriarty ? 'EQUATION BRANCH' : 'LOGIC BRANCH'} <span className="w-10 h-px bg-theme-accent-main opacity-50" />
             </p>
             {currentBeat.choices.map((choice: any, idx: number) => (
               <button 
@@ -414,18 +418,22 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
           <div className="bg-theme-bg-base max-w-md w-full rounded-xl shadow-2xl border-2 border-theme-border-base relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent to-theme-border-dark" />
             <div className="p-6 sm:p-8 relative z-10 font-serif text-theme-text-base">
-              <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-widest border-b border-theme-border-base/30 pb-3 mb-5 flex items-center gap-2"><FileText className="text-theme-text-muted" /> Investigation Report</h2>
+              <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-widest border-b border-theme-border-base/30 pb-3 mb-5 flex items-center gap-2">
+                <FileText className="text-theme-text-muted" /> {isMoriarty ? 'Equation Proof Report' : 'Investigation Report'}
+              </h2>
               <div className="flex justify-between items-end border-b border-theme-border-base/30 border-dotted pb-3 mb-5 font-mono text-sm">
                 <div><span className="text-theme-text-muted">CASE ID:</span> <span className="font-bold">{episodeId}</span><br /><span className="text-theme-text-muted">FINAL {uiLabels.gaugeName}:</span> <span className="text-lg font-bold text-theme-accent-main">{tether}%</span></div>
-                <div className={`border-2 px-3 py-1 font-bold text-lg uppercase tracking-widest rotate-6 opacity-90 rounded-sm bg-theme-bg-base shadow-sm ${endResult.rank === 'LUCID' || endResult.rank === 'CLEARED' ? 'border-emerald-700 text-emerald-800' : endResult.rank === 'SYMPATHETIC' ? 'border-blue-700 text-blue-800' : 'border-rose-800 text-rose-800'}`}>{endResult.rank}</div>
+                <div className={`border-2 px-3 py-1 font-bold text-lg uppercase tracking-widest rotate-6 opacity-90 rounded-sm bg-theme-bg-base shadow-sm ${endResult.rank === 'LUCID' || endResult.rank === 'CLEARED' || endResult.rank === 'MASTERPIECE' ? 'border-emerald-700 text-emerald-800' : endResult.rank === 'SYMPATHETIC' || endResult.rank === 'COMPROMISED' ? 'border-blue-700 text-blue-800' : 'border-rose-800 text-rose-800'}`}>{endResult.rank}</div>
               </div>
               <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-2 custom-scrollbar">
                 {endResult.consequenceData?.official_record && <div className="bg-theme-bg-panel/50 p-3 sm:p-4 rounded-lg border border-theme-border-base/20 font-mono text-xs shadow-inner"><p className="text-theme-text-base leading-relaxed">{endResult.consequenceData.official_record}</p></div>}
-                {endResult.consequenceData?.watson_journal && <div className="p-4 rounded-lg border border-theme-border-base/30 bg-theme-bg-light shadow-sm"><h3 className="font-bold text-theme-text-base mb-2 border-b border-theme-border-base/20 pb-1 text-xs uppercase tracking-widest">{isIrene ? "Irene's Journal" : "Watson's Journal"}</h3><p className="text-sm leading-relaxed text-theme-text-muted">{endResult.consequenceData.watson_journal}</p></div>}
-                {endResult.consequenceData?.holmes_note && <div className="p-4 rounded-lg bg-theme-accent-main opacity-90 border border-theme-accent-muted shadow-sm"><h3 className="font-bold text-white mb-1.5 italic text-xs uppercase tracking-widest">{isMoriarty ? "M.C. Report :" : "Holmes's Note :"}</h3><p className="text-sm leading-relaxed italic text-white/90">{endResult.consequenceData.holmes_note}</p></div>}
+                {endResult.consequenceData?.watson_journal && <div className="p-4 rounded-lg border border-theme-border-base/30 bg-theme-bg-dark shadow-sm"><h3 className="font-bold text-theme-text-base mb-2 border-b border-theme-border-base/20 pb-1 text-xs uppercase tracking-widest">{isIrene ? "Irene's Journal" : isMoriarty ? "Organization Record" : "Watson's Journal"}</h3><p className="text-sm leading-relaxed text-theme-text-muted">{endResult.consequenceData.watson_journal}</p></div>}
+                {endResult.consequenceData?.holmes_note && <div className="p-4 rounded-lg bg-theme-accent-main opacity-90 border border-theme-accent-muted shadow-sm"><h3 className="font-bold text-white mb-1.5 italic text-xs uppercase tracking-widest">{isMoriarty ? "The Professor's Note :" : "Holmes's Note :"}</h3><p className="text-sm leading-relaxed italic text-white/90">{endResult.consequenceData.holmes_note}</p></div>}
               </div>
               <div className="mt-6 text-center pt-4"><p className="text-[10px] text-theme-text-muted tracking-widest uppercase mb-1 font-mono">Insight Points Acquired</p><p className="text-4xl font-bold text-theme-accent-main font-mono drop-shadow-sm">+{endResult.points} pt</p>{isReplay && <p className="text-[9px] text-theme-text-muted mt-1 font-mono tracking-tighter">*再プレイ報酬適用</p>}</div>
-              <button onClick={() => ctx.handleEpisodeComplete(episodeId, endResult.rank, tether, endResult.points)} className="w-full mt-6 bg-theme-bg-dark hover:bg-theme-bg-dark-panel text-theme-text-light font-bold py-3.5 rounded-full tracking-widest transition-transform active:scale-95 shadow-md text-sm">FILE ARCHIVE (記録完了)</button>
+              <button onClick={() => ctx.handleEpisodeComplete(episodeId, endResult.rank, tether, endResult.points)} className="w-full mt-6 bg-theme-bg-dark hover:bg-theme-bg-dark-panel text-theme-text-light font-bold py-3.5 rounded-full tracking-widest transition-transform active:scale-95 shadow-md text-sm">
+                {isMoriarty ? 'CLOSE EQUATION (証明完了)' : 'FILE ARCHIVE (記録完了)'}
+              </button>
             </div>
           </div>
         </div>

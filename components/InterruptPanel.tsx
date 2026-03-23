@@ -39,7 +39,6 @@ export default function InterruptPanel({
   const isIrene = protagonist === 'irene';
   const isMetaHint = hintText?.startsWith('【');
 
-  // ▼ 修正1：親の再描画によるタイマーの不具合を防ぐため、最新のonTimeUpをRefで保持
   const savedOnTimeUp = useRef(onTimeUp);
   useEffect(() => {
     savedOnTimeUp.current = onTimeUp;
@@ -70,7 +69,7 @@ export default function InterruptPanel({
         ];
 
   const renderInterventionButton = () => {
-    if (!interventionType || !isInterventionAvailable || interventionUsed) return null;
+    if (!interventionType || !isInterventionAvailable || interventionUsed || isMoriarty) return null;
     let icon, label, colorClass, borderClass;
     switch (interventionType) {
       case 'Irene': icon = <Sparkles size={14} />; label = "Irene's Whisper"; colorClass = "bg-rose-900 hover:bg-rose-800 text-rose-100"; borderClass = "border-rose-500/50"; break;
@@ -93,8 +92,12 @@ export default function InterruptPanel({
           <div className="flex items-center gap-2">
             <ShieldAlert className="text-theme-accent-main animate-pulse" />
             <div>
-              <p className="text-[10px] font-mono tracking-widest uppercase text-theme-accent-muted">System Warning</p>
-              <h3 className="text-theme-text-light font-bold text-sm sm:text-base tracking-widest">LOGIC INTERRUPT REQUIRED</h3>
+              <p className="text-[10px] font-mono tracking-widest uppercase text-theme-accent-muted">
+                {isMoriarty ? 'Equation Error' : 'System Warning'}
+              </p>
+              <h3 className="text-theme-text-light font-bold text-sm sm:text-base tracking-widest">
+                {isMoriarty ? 'REWRITE EQUATION REQUIRED' : 'LOGIC INTERRUPT REQUIRED'}
+              </h3>
             </div>
           </div>
           <div className={`text-3xl font-black font-mono tabular-nums tracking-tighter ${timeLeft <= 5 ? 'text-theme-accent-main animate-[shake_0.5s_infinite]' : 'text-theme-text-light'}`}>
@@ -106,7 +109,7 @@ export default function InterruptPanel({
           <div className="mb-4">
             {renderInterventionButton() || (
               <button onClick={() => setShowHint(true)} className="w-full bg-theme-bg-dark-panel hover:bg-theme-bg-panel text-theme-text-muted hover:text-theme-text-light border border-theme-border-base/30 py-2.5 rounded-lg text-xs font-bold tracking-widest transition-colors flex items-center justify-center gap-2">
-                <HelpCircle size={14} /> HINT (推論の補助を要求)
+                <HelpCircle size={14} /> {isMoriarty ? 'OBSERVATION (状況の再確認)' : 'HINT (推論の補助を要求)'}
               </button>
             )}
           </div>
@@ -131,7 +134,7 @@ export default function InterruptPanel({
 
         <div className="mb-5">
           <p className="text-[10px] font-mono mb-2 uppercase tracking-widest flex items-center gap-2 text-theme-text-muted">
-            Evidence Link 
+            {isMoriarty ? 'Variable Selection' : 'Evidence Link'}
             {isEvidenceRequired ? (
               <span className="text-theme-accent-main font-bold border border-theme-accent-main/30 px-1.5 py-0.5 rounded shadow-sm animate-pulse">Required (必須)</span>
             ) : (
@@ -149,9 +152,7 @@ export default function InterruptPanel({
           {skillOptions.map((skill) => (
             <button 
               key={skill.id} 
-              onClick={() => {
-                onSubmit(skill.id, selectedEvidence);
-              }} 
+              onClick={() => onSubmit(skill.id, selectedEvidence)} 
               className="py-4 rounded-xl flex flex-col items-center gap-2 transition-all border-2 active:scale-95 shadow-lg bg-theme-bg-panel/20 border-theme-border-base/50 hover:bg-theme-bg-panel hover:border-theme-accent-main text-theme-text-light"
             >
               {skill.icon}
