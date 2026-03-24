@@ -78,7 +78,6 @@ export function useGameLogic(
   const [isCompleted, setIsCompleted] = useState(false);
   const [endResult, setEndResult] = useState<{ rank: string; points: number; consequenceData: any; } | null>(null);
 
-  // --- 状態ロックとアニメーション管理用のRef ---
   const tetherRef = useRef(tether);
   const hasLoadedRef = useRef(false);
   const isProcessingActionRef = useRef(false);
@@ -86,7 +85,7 @@ export function useGameLogic(
   const lastCharTimeRef = useRef<number>(0);
   const waitTimeRef = useRef<number>(0);
 
-  // ▼ 修正箇所：割り込みが解決済（isResolved）の場合、GameView側の自動判定ループを防ぐためにトリガー文字を動的に消去する
+  // ▼ 修正箇所：割り込み判定が終了したビートからはトリガー文字を動的に消去し、UIの無限ループを防ぐ
   const currentBeatRaw = beats.find(b => b.id === currentBeatId) || beats[0];
   const currentBeat = isResolved && currentBeatRaw 
     ? { ...currentBeatRaw, text: currentBeatRaw.text.replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '') } 
@@ -120,7 +119,6 @@ export function useGameLogic(
     }
   }, []);
 
-  // --- 初期化処理 ---
   useEffect(() => {
     if (initialSaveData && !hasLoadedRef.current) {
       hasLoadedRef.current = true;
@@ -137,7 +135,6 @@ export function useGameLogic(
     }
   }, []);
 
-  // --- 高精度・滑らかな文字送りエンジン ---
   const streamText = useCallback((time: number) => {
     if (!isStreaming || chatHistory.length === 0) return;
     
@@ -200,10 +197,9 @@ export function useGameLogic(
     setSelectedEvidence(prev => prev === evidence ? null : evidence);
   };
 
-  // --- 割り込み評価 ---
   const evaluatePanelInterrupt = useCallback((skill: string, evidence: string | null) => {
     if (isResolved || !currentBeat?.interrupt) return;
-    setIsResolved(true);
+    setIsResolved(true); // ▼ ここで判定済みにフラグが立つ
     setSelectedSkill(skill);
     setSelectedEvidence(evidence);
 

@@ -28,7 +28,7 @@ export default function ArchiveView() {
     handleResetData,
     textSpeed, setTextSpeed,
     reduceEffects, setReduceEffects,
-    playMode // ▼ 追加
+    playMode
   } = useSaveData();
 
   const clearedEpisodes = Object.keys(clearedData);
@@ -38,7 +38,7 @@ export default function ArchiveView() {
   const [showCopySuccess, setShowCopySuccess] = useState(false);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
 
-  const isMoriarty = playMode === 'moriarty'; // ▼ モード判定
+  const isMoriarty = playMode === 'moriarty';
 
   useEffect(() => {
     const handleSwitchTab = (e: any) => {

@@ -37,6 +37,9 @@ export default function InterruptPanel({
   const [showHint, setShowHint] = useState(false);
 
   const isIrene = protagonist === 'irene';
+  // ▼ 修正箇所：ワトスンとホームズを明確に切り分ける
+  const isWatson = protagonist === 'watson';
+  const isHolmes = protagonist === 'holmes' || (!isIrene && !isWatson && !isMoriarty);
   const isMetaHint = hintText?.startsWith('【');
 
   const savedOnTimeUp = useRef(onTimeUp);
@@ -50,7 +53,7 @@ export default function InterruptPanel({
     return () => clearInterval(timer);
   }, [timeLeft]);
 
-  // ▼ 修正箇所：モリアーティ用に REWRITE (書換) を追加
+  // ▼ 修正箇所：主人公に応じた適切なスキル群を定義
   const skillOptions = isMoriarty
     ? [
         { id: 'CALCULUS', label: 'CALCULUS (計算)', icon: <Calculator size={16} /> },
@@ -64,11 +67,17 @@ export default function InterruptPanel({
           { id: 'SCOPE', label: 'SCOPE (俯瞰)', icon: <BrainCircuit size={16} /> },
           { id: 'EMPATHY', label: 'EMPATHY (共感)', icon: <HeartHandshake size={16} /> }
         ]
-      : [
-          { id: 'LINK', label: 'LINK (結合)', icon: <Network size={16} /> },
-          { id: 'SCOPE', label: 'SCOPE (俯瞰)', icon: <BrainCircuit size={16} /> },
-          { id: 'MEDICAL', label: 'MEDICAL (医学)', icon: <HeartHandshake size={16} /> }
-        ];
+      : isHolmes
+        ? [
+            { id: 'LINK', label: 'LINK (結合)', icon: <Network size={16} /> },
+            { id: 'SCOPE', label: 'SCOPE (俯瞰)', icon: <BrainCircuit size={16} /> },
+            { id: 'INSPECT', label: 'INSPECT (観察)', icon: <Fingerprint size={16} /> }
+          ]
+        : [ // Watson default
+            { id: 'LINK', label: 'LINK (結合)', icon: <Network size={16} /> },
+            { id: 'SCOPE', label: 'SCOPE (俯瞰)', icon: <BrainCircuit size={16} /> },
+            { id: 'MEDICAL', label: 'MEDICAL (医学)', icon: <HeartHandshake size={16} /> }
+          ];
 
   const renderInterventionButton = () => {
     if (!interventionType || !isInterventionAvailable || interventionUsed || isMoriarty) return null;
@@ -150,7 +159,6 @@ export default function InterruptPanel({
           </div>
         </div>
 
-        {/* ▼ 修正箇所：モリアーティモードで4つのボタンが綺麗に収まるようにgridを調整 */}
         <div className={`grid gap-2 sm:gap-3 mb-2 ${isMoriarty ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
           {skillOptions.map((skill) => (
             <button 
