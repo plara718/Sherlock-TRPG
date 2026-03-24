@@ -50,11 +50,13 @@ export default function InterruptPanel({
     return () => clearInterval(timer);
   }, [timeLeft]);
 
+  // ▼ 修正箇所：モリアーティ用に REWRITE (書換) を追加
   const skillOptions = isMoriarty
     ? [
         { id: 'CALCULUS', label: 'CALCULUS (計算)', icon: <Calculator size={16} /> },
         { id: 'AESTHETIC', label: 'AESTHETIC (美学)', icon: <Eye size={16} /> },
-        { id: 'SHADOW', label: 'SHADOW (暗躍)', icon: <EyeOff size={16} /> }
+        { id: 'SHADOW', label: 'SHADOW (暗躍)', icon: <EyeOff size={16} /> },
+        { id: 'REWRITE', label: 'REWRITE (書換)', icon: <BrainCircuit size={16} /> }
       ]
     : isIrene
       ? [
@@ -148,7 +150,8 @@ export default function InterruptPanel({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-2">
+        {/* ▼ 修正箇所：モリアーティモードで4つのボタンが綺麗に収まるようにgridを調整 */}
+        <div className={`grid gap-2 sm:gap-3 mb-2 ${isMoriarty ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
           {skillOptions.map((skill) => (
             <button 
               key={skill.id} 

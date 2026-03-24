@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 export type ScenarioBeat = {
@@ -79,12 +81,16 @@ export function useGameLogic(
   // --- 状態ロックとアニメーション管理用のRef ---
   const tetherRef = useRef(tether);
   const hasLoadedRef = useRef(false);
-  const isProcessingActionRef = useRef(false); // 連打防止用の鉄壁ロック
+  const isProcessingActionRef = useRef(false);
   const requestRef = useRef<number>();
   const lastCharTimeRef = useRef<number>(0);
   const waitTimeRef = useRef<number>(0);
 
-  const currentBeat = beats.find(b => b.id === currentBeatId) || beats[0];
+  // ▼ 修正箇所：割り込みが解決済（isResolved）の場合、GameView側の自動判定ループを防ぐためにトリガー文字を動的に消去する
+  const currentBeatRaw = beats.find(b => b.id === currentBeatId) || beats[0];
+  const currentBeat = isResolved && currentBeatRaw 
+    ? { ...currentBeatRaw, text: currentBeatRaw.text.replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '') } 
+    : currentBeatRaw;
 
   const updateTether = useCallback((amount: number) => {
     setTether(prev => {
@@ -98,7 +104,7 @@ export function useGameLogic(
     const current = tetherRef.current;
     if (current >= 80) return userTextSpeed;
     if (current >= 40) return userTextSpeed * 1.5;
-    return userTextSpeed * 0.5; // ピンチ時は文字送りが少し遅くなる（または早くする）
+    return userTextSpeed * 0.5;
   }, [userTextSpeed]);
 
   const pushBeatToHistory = useCallback((beat: ScenarioBeat, isInstant: boolean = false) => {
@@ -131,7 +137,7 @@ export function useGameLogic(
     }
   }, []);
 
-  // --- 高精度・滑らかな文字送りエンジン (requestAnimationFrame) ---
+  // --- 高精度・滑らかな文字送りエンジン ---
   const streamText = useCallback((time: number) => {
     if (!isStreaming || chatHistory.length === 0) return;
     
@@ -146,18 +152,16 @@ export function useGameLogic(
 
       const timePassed = time - lastCharTimeRef.current;
       
-      // 句読点などでの「タメ（マイクロウェイト）」の処理
       if (waitTimeRef.current > 0) {
         if (timePassed < waitTimeRef.current) return prev;
-        waitTimeRef.current = 0; // ウェイト解除
+        waitTimeRef.current = 0;
         lastCharTimeRef.current = time;
       } else if (timePassed > getTextSpeed()) {
         const nextLength = prev + 1;
         const charAdded = fullText.substring(prev, nextLength);
         
-        // 人間らしい息継ぎを設定
         if (['、', '。', '…', '！', '？'].includes(charAdded)) {
-          waitTimeRef.current = 150; // 約0.15秒のタメ
+          waitTimeRef.current = 150;
         }
         
         lastCharTimeRef.current = time;
@@ -178,14 +182,13 @@ export function useGameLogic(
     };
   }, [isStreaming, streamText]);
 
-  // --- 連打耐性のある確実なスキップ ---
   const skipStream = useCallback(() => {
     if (!isStreaming || chatHistory.length === 0) return;
     const lastBeat = chatHistory[chatHistory.length - 1];
     if (requestRef.current) cancelAnimationFrame(requestRef.current);
     setStreamedLength(lastBeat.text.length);
     setIsStreaming(false);
-    isProcessingActionRef.current = false; // ロック解除
+    isProcessingActionRef.current = false;
   }, [isStreaming, chatHistory]);
 
   const collectEvidence = (evidence: string) => {
@@ -241,7 +244,6 @@ export function useGameLogic(
     }
   }, [currentBeat, isResolved, updateTether, uiLabels.gaugeName, protagonist, pushBeatToHistory]);
 
-  // --- 確実な進行処理（連打対策済み） ---
   const handleChoice = (nextId: string) => {
     if (isStreaming || isProcessingActionRef.current) return;
     isProcessingActionRef.current = true;
@@ -261,7 +263,7 @@ export function useGameLogic(
     if (isProcessingActionRef.current) return;
 
     if (isStreaming) {
-      isProcessingActionRef.current = true; // スキップ中は他の操作をロック
+      isProcessingActionRef.current = true;
       skipStream(); 
       setTimeout(() => { isProcessingActionRef.current = false; }, 100);
       return; 
@@ -274,7 +276,7 @@ export function useGameLogic(
       return;
     }
 
-    isProcessingActionRef.current = true; // 進行ロック開始
+    isProcessingActionRef.current = true;
 
     let nextId: string | null = currentBeat?.next_beat_id || null;
     if (!nextId) {
@@ -294,7 +296,6 @@ export function useGameLogic(
         pushBeatToHistory(nextB);
       }
     } else {
-      // 終了処理
       if (scenarioData.meta.type === 'cutscene') {
         setEndResult(null); 
         setIsCompleted(true);
@@ -320,11 +321,9 @@ export function useGameLogic(
       }
     }
     
-    // ごく短いロック解除（もたつきを感じさせない150ms）
     setTimeout(() => { isProcessingActionRef.current = false; }, 150);
   };
 
-  // --- オートセーブ ---
   useEffect(() => {
     if (!isCompleted && currentBeatId && chatHistory.length > 0 && !isStreaming) {
       onSaveGame({
