@@ -37,7 +37,6 @@ type SaveDataContextType = {
   setTextSpeed: (speed: number) => void;
   reduceEffects: boolean;
   setReduceEffects: (reduce: boolean) => void;
-  // ▼ 新規追加：プレイモードの管理
   playMode: 'holmes' | 'moriarty';
   setPlayMode: React.Dispatch<React.SetStateAction<'holmes' | 'moriarty'>>;
 };
@@ -58,7 +57,6 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
   const [reduceEffects, setReduceEffects] = useState<boolean>(false);
   const [activeGameData, setActiveGameData] = useState<any>(null);
   
-  // ▼ 新規追加：プレイモードステート
   const [playMode, setPlayMode] = useState<'holmes' | 'moriarty'>('holmes');
 
   const currentSeason = 
@@ -91,7 +89,6 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
             if (data.textSpeed !== undefined) setTextSpeed(data.textSpeed);
             if (data.reduceEffects !== undefined) setReduceEffects(data.reduceEffects);
             if (data.activeGameData !== undefined) setActiveGameData(data.activeGameData);
-            // ▼ 新規追加：プレイモードの復元
             if (data.playMode) setPlayMode(data.playMode);
         }
       }
@@ -104,7 +101,6 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isInitialized) {
-      // ▼ 新規追加：プレイモードの保存
       localStorage.setItem('sherlock_save_v1', JSON.stringify({ 
         unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths, mycroftIntel, textSpeed, reduceEffects, activeGameData, playMode 
       }));
@@ -120,7 +116,7 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
       setInsightPoints(0);
       setClearedData({});
       setCurrentEpisodeId('#00');
-      setPlayMode('holmes'); // 新規プレイ時はホームズモードに戻す
+      setPlayMode('holmes');
     }
     setView('archive');
   };
@@ -134,7 +130,7 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
     setMycroftIntel([]);
     setCurrentEpisodeId('#00');
     setActiveGameData(null);
-    setPlayMode('holmes'); // リセット時はホームズモードに戻す
+    setPlayMode('holmes');
     setView('title');
   };
 
@@ -175,7 +171,15 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
   const handleEpisodeComplete = (epId: string, rank: string, tether: number, points: number) => {
     setActiveGameData(null);
     if (epId !== 'INTERLUDE' && !epId.includes('Interlude') && !epId.startsWith('interlude')) {
-      setClearedData(prev => ({ ...prev, [epId]: { rank, tether } }));
+      // ▼ 修正箇所：既存のスコア（tether）と比較し、初クリアまたはハイスコア時のみランクとスコアを更新
+      setClearedData(prev => {
+        const existingData = prev[epId];
+        if (!existingData || existingData.tether < tether) {
+          return { ...prev, [epId]: { rank, tether } };
+        }
+        return prev; // スコアが低い場合は更新せず保護
+      });
+      // ポイントは再プレイでも常に加算
       setInsightPoints(prev => prev + points);
     }
     setView('archive');
@@ -210,7 +214,7 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
       handleUnlockTruth, handleLinkFail,
       textSpeed, setTextSpeed, reduceEffects, setReduceEffects,
       activeGameData, setActiveGameData, clearActiveGameData,
-      playMode, setPlayMode // ▼ 新規追加
+      playMode, setPlayMode
     }}>
       {children}
     </SaveDataContext.Provider>

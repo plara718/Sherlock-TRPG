@@ -74,6 +74,13 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   const [evidencePopups, setEvidencePopups] = useState<{id: number, word: string}[]>([]);
   const popupIdCounter = useRef(0);
 
+  const collectingWordsRef = useRef<Set<string>>(new Set());
+  
+  // ▼ 新規追加：誤爆タップ防止のためのタッチ座標記録用Ref
+  const touchStartCoords = useRef<{x: number, y: number} | null>(null);
+  // ▼ 新規追加：バックログの自動スクロール用Ref
+  const backlogRef = useRef<HTMLDivElement>(null);
+
   const [cutin, setCutin] = useState<{type: 'success' | 'fail' | 'penalty', msg: string, isCritical?: boolean} | null>(null);
   const [isWigginsActive, setIsWigginsActive] = useState(false);
   const [isSanityZero, setIsSanityZero] = useState(false);
@@ -107,7 +114,12 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
     } catch(e) {}
   }, []);
 
-  useEffect(() => { setInterventionUsed(false); setIsSanityZero(false); }, [episodeId]);
+  useEffect(() => { 
+    setInterventionUsed(false); 
+    setIsSanityZero(false); 
+    collectingWordsRef.current.clear();
+  }, [episodeId]);
+  
   useEffect(() => { setIsSanityZero(tether <= 0 && !isCompleted && !(scenarioData.meta?.type === 'interlude' || scenarioData.meta?.episode_id?.includes('Interlude'))); }, [tether, isCompleted, scenarioData]);
 
   useEffect(() => {
@@ -145,6 +157,13 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
     }
   }, [streamedLength, chatHistory.length, isInterruptMode]);
 
+  // ▼ 新規追加：LOGを開いた際に自動で最新（一番下）へスクロールさせる処理
+  useEffect(() => {
+    if (showBacklog && backlogRef.current) {
+      backlogRef.current.scrollTop = backlogRef.current.scrollHeight;
+    }
+  }, [showBacklog]);
+
   const handleGlossaryClick = useCallback((term: any) => {
     triggerVibration('light');
     if (ctx.unlockedTerms.includes(term.id)) {
@@ -156,7 +175,8 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   }, [ctx, triggerVibration]);
 
   const handleCollectEvidence = useCallback((word: string) => {
-    if (!collectedEvidence.includes(word)) {
+    if (!collectedEvidence.includes(word) && !collectingWordsRef.current.has(word)) {
+      collectingWordsRef.current.add(word);
       triggerVibration('light');
       collectEvidence(word);
       const newId = popupIdCounter.current++;
@@ -185,7 +205,7 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
     parts.forEach((part, i) => {
       if (part.startsWith('{') && part.endsWith('}')) {
         const word = part.slice(1, -1);
-        const isCollected = collectedEvidence.includes(word);
+        const isCollected = collectedEvidence.includes(word) || collectingWordsRef.current.has(word);
         
         if (isStreamingNow) {
           elements.push(<span key={`raw-ev-${i}`} className="font-bold">{word}</span>);
@@ -291,7 +311,8 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
               <AlertTriangle className="rotate-180" size={18} />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar bg-theme-bg-base pb-[env(safe-area-inset-bottom)]">
+          {/* ▼ 自動スクロール用の ref={backlogRef} を追加 */}
+          <div ref={backlogRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar bg-theme-bg-base pb-[env(safe-area-inset-bottom)]">
             {chatHistory.map((beat: any, idx: number) => {
               let cleanText = (beat.text || "").replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '');
               const isMetaNotice = beat.speaker === 'System' && cleanText.startsWith('【');
@@ -326,12 +347,27 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
       <div 
         className="flex-1 flex flex-col relative overflow-hidden cursor-pointer transition-colors duration-1000 bg-theme-bg-base" 
         onClick={() => { 
-          if (isInterruptMode) return; 
+          // ▼ 修正箇所：スクロール中と判定されている場合はクリック（次へ進む）を無効化
+          if (isInterruptMode || isScrollingRef.current) return; 
           isStreaming ? skipStream() : nextBeat(); 
           isScrollingRef.current = false;
         }} 
-        onTouchStart={() => { isScrollingRef.current = false; }} 
-        onTouchMove={() => { isScrollingRef.current = true; }}
+        onTouchStart={(e) => { 
+          // ▼ 修正箇所：指の初期位置を記録
+          if (e.touches && e.touches.length > 0) {
+            touchStartCoords.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+          }
+          isScrollingRef.current = false; 
+        }} 
+        onTouchMove={(e) => { 
+          // ▼ 修正箇所：10px以上の移動距離がある場合のみ「スクロール」と判定
+          if (!touchStartCoords.current || !e.touches || e.touches.length === 0) return;
+          const dx = Math.abs(e.touches[0].clientX - touchStartCoords.current.x);
+          const dy = Math.abs(e.touches[0].clientY - touchStartCoords.current.y);
+          if (dx > 10 || dy > 10) {
+            isScrollingRef.current = true;
+          }
+        }}
       >
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-theme-text-base opacity-[0.03] to-transparent" />
         

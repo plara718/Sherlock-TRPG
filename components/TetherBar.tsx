@@ -16,6 +16,7 @@ export default function TetherBar({ tether, onArchiveClick, protagonist = 'watso
   
   const isIrene = protagonist === 'irene';
   const isMoriarty = gaugeName === 'DOMINATION';
+  const isDanger = tether <= 30;
 
   useEffect(() => {
     if (tether > prevTether.current) {
@@ -34,6 +35,16 @@ export default function TetherBar({ tether, onArchiveClick, protagonist = 'watso
 
   const IconComponent = isMoriarty ? Skull : (isIrene ? Sparkles : BrainCircuit);
   const defaultColor = 'text-theme-accent-main';
+
+  // モードとピンチ状態に応じたゲージカラーの動的生成
+  let barColor = '';
+  if (isMoriarty) {
+    barColor = isDanger ? 'bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(225,29,72,0.8)]' : 'bg-gradient-to-r from-rose-900 to-rose-600';
+  } else if (isIrene) {
+    barColor = isDanger ? 'bg-rose-500 animate-pulse' : 'bg-fuchsia-700';
+  } else {
+    barColor = isDanger ? 'bg-rose-600 animate-pulse' : tether >= 80 ? 'bg-theme-accent-main' : tether >= 40 ? 'bg-theme-accent-muted' : 'bg-theme-border-dark';
+  }
 
   return (
     <div
@@ -79,13 +90,7 @@ export default function TetherBar({ tether, onArchiveClick, protagonist = 'watso
               />
             )}
             <div
-              className={`h-full transition-all duration-700 ease-out relative z-0 ${
-                tether >= 80
-                  ? 'bg-theme-accent-main'
-                  : tether >= 40
-                  ? 'bg-theme-accent-muted'
-                  : 'bg-theme-border-dark'
-              }`}
+              className={`h-full transition-all duration-700 ease-out relative z-0 ${barColor}`}
               style={{ width: `${tether}%` }}
             />
           </div>
