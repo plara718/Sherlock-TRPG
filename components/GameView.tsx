@@ -75,10 +75,7 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   const popupIdCounter = useRef(0);
 
   const collectingWordsRef = useRef<Set<string>>(new Set());
-  
-  // ▼ 新規追加：誤爆タップ防止のためのタッチ座標記録用Ref
   const touchStartCoords = useRef<{x: number, y: number} | null>(null);
-  // ▼ 新規追加：バックログの自動スクロール用Ref
   const backlogRef = useRef<HTMLDivElement>(null);
 
   const [cutin, setCutin] = useState<{type: 'success' | 'fail' | 'penalty', msg: string, isCritical?: boolean} | null>(null);
@@ -157,7 +154,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
     }
   }, [streamedLength, chatHistory.length, isInterruptMode]);
 
-  // ▼ 新規追加：LOGを開いた際に自動で最新（一番下）へスクロールさせる処理
   useEffect(() => {
     if (showBacklog && backlogRef.current) {
       backlogRef.current.scrollTop = backlogRef.current.scrollHeight;
@@ -311,7 +307,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
               <AlertTriangle className="rotate-180" size={18} />
             </button>
           </div>
-          {/* ▼ 自動スクロール用の ref={backlogRef} を追加 */}
           <div ref={backlogRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar bg-theme-bg-base pb-[env(safe-area-inset-bottom)]">
             {chatHistory.map((beat: any, idx: number) => {
               let cleanText = (beat.text || "").replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '');
@@ -347,20 +342,28 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
       <div 
         className="flex-1 flex flex-col relative overflow-hidden cursor-pointer transition-colors duration-1000 bg-theme-bg-base" 
         onClick={() => { 
-          // ▼ 修正箇所：スクロール中と判定されている場合はクリック（次へ進む）を無効化
-          if (isInterruptMode || isScrollingRef.current) return; 
-          isStreaming ? skipStream() : nextBeat(); 
+          if (isScrollingRef.current) return;
+          
+          // ▼ 修正箇所：ストリーミング中なら「トリガーの有無に関わらず」必ずスキップさせる（スキップ不可バグの解消）
+          if (isStreaming) {
+            skipStream();
+            isScrollingRef.current = false;
+            return;
+          }
+
+          const hasTrigger = currentBeat?.text.includes('[<NOISE>]') || currentBeat?.text.includes('[<FLAW>]');
+          if (isInterruptMode || hasTrigger) return; 
+
+          nextBeat(); 
           isScrollingRef.current = false;
         }} 
         onTouchStart={(e) => { 
-          // ▼ 修正箇所：指の初期位置を記録
           if (e.touches && e.touches.length > 0) {
             touchStartCoords.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
           }
           isScrollingRef.current = false; 
         }} 
         onTouchMove={(e) => { 
-          // ▼ 修正箇所：10px以上の移動距離がある場合のみ「スクロール」と判定
           if (!touchStartCoords.current || !e.touches || e.touches.length === 0) return;
           const dx = Math.abs(e.touches[0].clientX - touchStartCoords.current.x);
           const dy = Math.abs(e.touches[0].clientY - touchStartCoords.current.y);
@@ -473,13 +476,16 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
                 <div className={`border-2 px-3 py-1 font-bold text-lg uppercase tracking-widest rotate-6 opacity-90 rounded-sm bg-theme-bg-base shadow-sm ${endResult.rank === 'LUCID' || endResult.rank === 'CLEARED' || endResult.rank === 'MASTERPIECE' ? 'border-emerald-700 text-emerald-800' : endResult.rank === 'SYMPATHETIC' || endResult.rank === 'COMPROMISED' ? 'border-blue-700 text-blue-800' : 'border-rose-800 text-rose-800'}`}>{endResult.rank}</div>
               </div>
               <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-2 custom-scrollbar">
-                {endResult.consequenceData?.official_record && <div className="bg-theme-bg-panel/50 p-3 sm:p-4 rounded-lg border border-theme-border-base/20 font-mono text-xs shadow-inner"><p className="text-theme-text-base leading-relaxed">{endResult.consequenceData.official_record}</p></div>}
+                {endResult.rank !== 'FAILED' && endResult.rank !== 'ABYSS' && endResult.consequenceData?.official_record && <div className="bg-theme-bg-panel/50 p-3 sm:p-4 rounded-lg border border-theme-border-base/20 font-mono text-xs shadow-inner"><p className="text-theme-text-base leading-relaxed">{endResult.consequenceData.official_record}</p></div>}
+                
                 {endResult.consequenceData?.watson_journal && <div className="p-4 rounded-lg border border-theme-border-base/30 bg-theme-bg-dark shadow-sm"><h3 className="font-bold text-theme-text-base mb-2 border-b border-theme-border-base/20 pb-1 text-xs uppercase tracking-widest">{isIrene ? "Irene's Journal" : isMoriarty ? "Organization Record" : "Watson's Journal"}</h3><p className="text-sm leading-relaxed text-theme-text-muted">{endResult.consequenceData.watson_journal}</p></div>}
-                {endResult.consequenceData?.holmes_note && <div className="p-4 rounded-lg bg-theme-accent-main opacity-90 border border-theme-accent-muted shadow-sm"><h3 className="font-bold text-theme-text-base mb-1.5 italic text-xs uppercase tracking-widest">{isMoriarty ? "The Professor's Note :" : "Holmes's Note :"}</h3><p className="text-sm leading-relaxed italic text-theme-text-base/90">{endResult.consequenceData.holmes_note}</p></div>}
+                
+                {endResult.rank !== 'FAILED' && endResult.rank !== 'ABYSS' && endResult.consequenceData?.holmes_note && <div className="p-4 rounded-lg bg-theme-accent-main opacity-90 border border-theme-accent-muted shadow-sm"><h3 className="font-bold text-theme-text-base mb-1.5 italic text-xs uppercase tracking-widest">{isMoriarty ? "The Professor's Note :" : "Holmes's Note :"}</h3><p className="text-sm leading-relaxed italic text-theme-text-base/90">{endResult.consequenceData.holmes_note}</p></div>}
               </div>
-              <div className="mt-6 text-center pt-4"><p className="text-[10px] text-theme-text-muted tracking-widest uppercase mb-1 font-mono">Insight Points Acquired</p><p className="text-4xl font-bold text-theme-accent-main font-mono drop-shadow-sm">+{endResult.points} pt</p>{isReplay && <p className="text-[9px] text-theme-text-muted mt-1 font-mono tracking-tighter">*再プレイ報酬適用</p>}</div>
+              <div className="mt-6 text-center pt-4"><p className="text-[10px] text-theme-text-muted tracking-widest uppercase mb-1 font-mono">Insight Points Acquired</p><p className="text-4xl font-bold text-theme-accent-main font-mono drop-shadow-sm">+{endResult.points} pt</p>{isReplay && endResult.points > 0 && <p className="text-[9px] text-theme-text-muted mt-1 font-mono tracking-tighter">*再プレイ報酬適用</p>}</div>
+              
               <button onClick={() => { triggerVibration('success'); ctx.handleEpisodeComplete(episodeId, endResult.rank, tether, endResult.points); }} className="w-full mt-6 bg-theme-bg-dark hover:bg-theme-bg-dark-panel text-theme-text-light font-bold py-3.5 rounded-full tracking-widest transition-transform active:scale-95 shadow-md text-sm">
-                {isMoriarty ? 'CLOSE EQUATION (証明完了)' : 'FILE ARCHIVE (記録完了)'}
+                {endResult.rank === 'FAILED' ? 'DISCARD EQUATION (記録破棄)' : endResult.rank === 'ABYSS' ? 'DISCARD REPORT (調査失敗)' : isMoriarty ? 'CLOSE EQUATION (証明完了)' : 'FILE ARCHIVE (記録完了)'}
               </button>
             </div>
           </div>

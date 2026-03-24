@@ -33,7 +33,7 @@ export type ScenarioData = {
   };
   consequence?: { 
     official_record?: string;
-    watson_journal?: { sympathetic?: string; lucid?: string; abyss?: string; };
+    watson_journal?: { sympathetic?: string; lucid?: string; abyss?: string; } | string;
     holmes_note?: string;
     [key: string]: any; 
   };
@@ -85,7 +85,6 @@ export function useGameLogic(
   const lastCharTimeRef = useRef<number>(0);
   const waitTimeRef = useRef<number>(0);
 
-  // ▼ 修正箇所：割り込み判定が終了したビートからはトリガー文字を動的に消去し、UIの無限ループを防ぐ
   const currentBeatRaw = beats.find(b => b.id === currentBeatId) || beats[0];
   const currentBeat = isResolved && currentBeatRaw 
     ? { ...currentBeatRaw, text: currentBeatRaw.text.replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '') } 
@@ -198,10 +197,8 @@ export function useGameLogic(
   };
 
   const evaluatePanelInterrupt = useCallback((skill: string, evidence: string | null) => {
-    if (isResolved || !currentBeat?.interrupt) return;
-    setIsResolved(true); // ▼ ここで判定済みにフラグが立つ
-    setSelectedSkill(skill);
-    setSelectedEvidence(evidence);
+    // ▼ 追加：HP0の時の進行ロック
+    if (tether <= 0 || isResolved || !currentBeat?.interrupt) return;
 
     const speakerName = protagonist === 'watson' ? 'Watson' : protagonist === 'irene' ? 'Irene' : 'Holmes';
 
@@ -209,7 +206,7 @@ export function useGameLogic(
       const failMsg = currentBeat.interrupt.fail_msg || "（時間切れだ。動くことができなかった……）";
       setFeedback({ type: 'fail', msg: `TIME OUT\n（${uiLabels.gaugeName} -15）` });
       updateTether(TETHER_PENALTY_MISS);
-      pushBeatToHistory({ id: `fail-${Date.now()}`, speaker: speakerName, text: failMsg, type: 'normal' }, true);
+      pushBeatToHistory({ id: `fail-${Date.now()}`, speaker: speakerName, text: failMsg, type: 'normal' });
       return;
     }
 
@@ -217,6 +214,7 @@ export function useGameLogic(
     const isEvidenceMatch = currentBeat.interrupt.required_evidence ? evidence === currentBeat.interrupt.required_evidence : true;
 
     if (isSkillMatch && isEvidenceMatch) {
+      setIsResolved(true);
       setFeedback({ type: 'success', msg: `INTERRUPT SUCCESS\n（${uiLabels.gaugeName} +15）`, isCriticalSuccess: true });
       updateTether(TETHER_REWARD_SUCCESS);
       
@@ -236,12 +234,13 @@ export function useGameLogic(
       setFeedback({ type: 'penalty', msg: `INTERRUPT FAILED\n（${uiLabels.gaugeName} -15）` });
       updateTether(TETHER_PENALTY_FAIL);
       const failMsg = currentBeat.interrupt.fail_msg || `（選択したアプローチ [${skill}] は間違っていたようだ……）`;
-      pushBeatToHistory({ id: `fail-${Date.now()}`, speaker: speakerName, text: failMsg, type: 'normal' }, true);
+      pushBeatToHistory({ id: `fail-${Date.now()}`, speaker: speakerName, text: failMsg, type: 'normal' });
     }
-  }, [currentBeat, isResolved, updateTether, uiLabels.gaugeName, protagonist, pushBeatToHistory]);
+  }, [currentBeat, isResolved, tether, updateTether, uiLabels.gaugeName, protagonist, pushBeatToHistory]);
 
   const handleChoice = (nextId: string) => {
-    if (isStreaming || isProcessingActionRef.current) return;
+    // ▼ 追加：HP0の時の進行ロック
+    if (tether <= 0 || isStreaming || isProcessingActionRef.current) return;
     isProcessingActionRef.current = true;
     
     setCurrentBeatId(nextId);
@@ -256,7 +255,8 @@ export function useGameLogic(
   };
 
   const nextBeat = () => {
-    if (isProcessingActionRef.current) return;
+    // ▼ 追加：HP0の時の進行ロック
+    if (tether <= 0 || isProcessingActionRef.current) return;
 
     if (isStreaming) {
       isProcessingActionRef.current = true;
@@ -266,11 +266,6 @@ export function useGameLogic(
     }
     
     if (currentBeat?.choices) return;
-
-    if (!isResolved && !isInterlude && currentBeat?.interrupt) {
-      evaluatePanelInterrupt('TIMEOUT', null);
-      return;
-    }
 
     isProcessingActionRef.current = true;
 
@@ -304,21 +299,37 @@ export function useGameLogic(
         let basePoints = 1;
 
         if (isMoriarty) {
-          if (tether >= 80) { rank = 'MASTERPIECE'; basePoints = 5; } 
-          else if (tether >= 40) { rank = 'COMPROMISED'; basePoints = 3; } 
-          else { rank = 'FAILED'; }
+          if (tether >= 80) { rank = 'MASTERPIECE'; basePoints = 5; journalText = typeof scenarioData.consequence?.watson_journal === 'string' ? scenarioData.consequence.watson_journal : ''; } 
+          else if (tether >= 40) { rank = 'COMPROMISED'; basePoints = 3; journalText = typeof scenarioData.consequence?.watson_journal === 'string' ? scenarioData.consequence.watson_journal : ''; } 
+          else { rank = 'FAILED'; basePoints = 0; journalText = "【SYSTEM ERROR】\n数式の構築に失敗しました。不確定要素（ノイズ）によって因果律が崩壊したため、このシミュレーション記録は破棄されます。"; }
         } else {
-          if (tether >= 80) { rank = 'SYMPATHETIC'; journalText = scenarioData.consequence?.watson_journal?.sympathetic || ''; basePoints = 5; } 
-          else if (tether >= 40) { rank = 'LUCID'; journalText = scenarioData.consequence?.watson_journal?.lucid || ''; basePoints = 3; } 
-          else { journalText = scenarioData.consequence?.watson_journal?.abyss || ''; }
+          if (tether >= 80) { rank = 'SYMPATHETIC'; journalText = (scenarioData.consequence?.watson_journal as any)?.sympathetic || ''; basePoints = 5; } 
+          else if (tether >= 40) { rank = 'LUCID'; journalText = (scenarioData.consequence?.watson_journal as any)?.lucid || ''; basePoints = 3; } 
+          else { rank = 'ABYSS'; basePoints = 0; journalText = (scenarioData.consequence?.watson_journal as any)?.abyss || "真相は闇の中へ消えた。我々は決定的な過ちを犯してしまったようだ……。"; }
         }
-        setEndResult({ rank, points: isReplay ? 1 : basePoints, consequenceData: { ...scenarioData.consequence, watson_journal: journalText } });
+        
+        const finalPoints = (rank === 'FAILED' || rank === 'ABYSS') ? 0 : (isReplay ? 1 : basePoints);
+        setEndResult({ rank, points: finalPoints, consequenceData: { ...scenarioData.consequence, watson_journal: journalText } });
         setIsCompleted(true);
       }
     }
     
     setTimeout(() => { isProcessingActionRef.current = false; }, 150);
   };
+
+  useEffect(() => {
+    if (tether <= 0 && !isCompleted && !isInterlude && scenarioData.meta.type !== 'cutscene') {
+      const timer = setTimeout(() => {
+        let rank = isMoriarty ? 'FAILED' : 'ABYSS';
+        let journalText = isMoriarty
+          ? "【SYSTEM ERROR】\n数式の構築に致命的な矛盾が生じました。不確定要素（ノイズ）により盤面が崩壊したため、シミュレーションを強制終了します。"
+          : ((scenarioData.consequence?.watson_journal as any)?.abyss || "調査は行き詰まった。致命的なミスにより、これ以上真相に近づくことはできない……。");
+        setEndResult({ rank, points: 0, consequenceData: { ...scenarioData.consequence, watson_journal: journalText } });
+        setIsCompleted(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [tether, isCompleted, isInterlude, isMoriarty, scenarioData]);
 
   useEffect(() => {
     if (!isCompleted && currentBeatId && chatHistory.length > 0 && !isStreaming) {
