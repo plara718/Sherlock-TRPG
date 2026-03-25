@@ -90,7 +90,6 @@ export function useGameLogic(
 
   const currentBeatRaw = beats.find(b => b.id === currentBeatId) || beats[0];
 
-  // ▼ 修正箇所：Warning解消（useMemoで再計算を防止）
   const currentBeat = useMemo(() => {
     return isResolved && currentBeatRaw 
       ? { ...currentBeatRaw, text: currentBeatRaw.text.replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '') } 
@@ -125,23 +124,22 @@ export function useGameLogic(
     }
   }, []);
 
-  // ▼ 修正箇所：Warning解消（マウント時の1回のみ実行されるべき処理のため静的除外）
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // ▼ 修正箇所：依存配列を追加しつつ、Refを用いて安全に1回だけ実行する
   useEffect(() => {
-    if (initialSaveData && !hasLoadedRef.current) {
-      hasLoadedRef.current = true;
-      if (initialSaveData.chatHistory && initialSaveData.chatHistory.length > 0) {
-        setChatHistory(initialSaveData.chatHistory);
-        setStreamedLength(initialSaveData.streamedLength ?? initialSaveData.chatHistory[initialSaveData.chatHistory.length - 1].text.length);
-        setIsStreaming(false);
-        return;
-      }
-    }
+    if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
-    if (chatHistory.length === 0 && beats.length > 0) {
+    
+    if (initialSaveData && initialSaveData.chatHistory && initialSaveData.chatHistory.length > 0) {
+      setChatHistory(initialSaveData.chatHistory);
+      setStreamedLength(initialSaveData.streamedLength ?? initialSaveData.chatHistory[initialSaveData.chatHistory.length - 1].text.length);
+      setIsStreaming(false);
+      return;
+    }
+    
+    if (beats.length > 0) {
       pushBeatToHistory(beats[0]);
     }
-  }, []);
+  }, [initialSaveData, beats, pushBeatToHistory]);
 
   const streamText = useCallback((time: number) => {
     if (!isStreaming || chatHistory.length === 0) return;
@@ -355,8 +353,7 @@ export function useGameLogic(
     }
   }, [tether, isCompleted, isInterlude, isMoriarty, scenarioData]);
 
-  // ▼ 修正箇所：Warning解消（オートセーブの過剰実行を防ぐための静的除外）
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // ▼ 修正箇所：Warning解消（必要な依存配列を全て追加）
   useEffect(() => {
     if (!isCompleted && currentBeatId && chatHistory.length > 0 && !isStreaming) {
       onSaveGame({
@@ -368,7 +365,7 @@ export function useGameLogic(
         collectedEvidence
       });
     }
-  }, [currentBeatId, chatHistory.length, tether, collectedEvidence.length, isCompleted, isStreaming, onSaveGame, scenarioData.meta.episode_id]);
+  }, [currentBeatId, chatHistory, streamedLength, tether, collectedEvidence, isCompleted, isStreaming, onSaveGame, scenarioData.meta.episode_id]);
 
   const displayedText = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].text.substring(0, streamedLength) : '';
 

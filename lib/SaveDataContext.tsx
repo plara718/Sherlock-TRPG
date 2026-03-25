@@ -9,7 +9,7 @@ type ClearedData = {
 };
 
 type SaveDataContextType = {
-  isInitialized: boolean; // ← ▼追加：ビルドエラーの原因だった型定義
+  isInitialized: boolean;
   currentSeason: number;
   unlockedTerms: string[];
   readTerms: string[];
@@ -31,6 +31,7 @@ type SaveDataContextType = {
   setTextSpeed: (speed: number) => void;
   setReduceEffects: (reduce: boolean) => void;
   setPlayMode: (mode: 'holmes' | 'moriarty') => void;
+  handleStartConnection: () => void; // ▼追加：タイトルから開始する処理
   handlePlayEpisode: (epId: string) => void;
   handleEpisodeComplete: (epId: string, rank: string, tether: number, points: number) => void;
   handleResearch: (termId: string, cost: number) => boolean;
@@ -93,6 +94,11 @@ export function SaveDataProvider({ children }: { children: React.ReactNode }) {
     const dataToSave = { currentSeason, unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths, activeGameData, textSpeed, reduceEffects, playMode };
     localStorage.setItem('sherlock_save_v1', JSON.stringify(dataToSave));
   }, [currentSeason, unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths, activeGameData, textSpeed, reduceEffects, playMode, isLoaded]);
+
+  // ▼追加：タイトル画面からアーカイブ画面へ移行する処理
+  const handleStartConnection = () => {
+    setView('archive');
+  };
 
   const handlePlayEpisode = (epId: string) => {
     setCurrentEpisodeId(epId);
@@ -197,11 +203,12 @@ export function SaveDataProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <SaveDataContext.Provider value={{
-      isInitialized: isLoaded, // ← ▼追加：Providerへの値渡し
+      isInitialized: isLoaded,
       currentSeason, unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths,
       currentEpisodeId, activeGameData, view, textSpeed, reduceEffects, playMode,
       setUnlockedTerms, setReadTerms, setInsightPoints, setCurrentEpisodeId, setActiveGameData,
       setView, setTextSpeed, setReduceEffects, setPlayMode,
+      handleStartConnection, // ▼追加：Providerへの登録
       handlePlayEpisode, handleEpisodeComplete, handleResearch, handleReadTerm,
       handleUnlockTruth, handleLinkFail, handleLoadData, handleResetData, handleSpendPoint
     }}>
