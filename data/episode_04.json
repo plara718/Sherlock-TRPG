@@ -7,7 +7,8 @@
       "location": "ベイカー街 ～ ゴドルフィン・ストリート",
       "weather": "重苦しいロンドンの秋霧"
     },
-    "protagonist": "watson"
+    "protagonist": "watson",
+    "intervention": "Mycroft"
   },
   "consequence": {
     "official_record": "【スコットランド・ヤード公式記録】外務省の機密文書紛失事件は、無事書類が発見され解決。容疑者と目されていたエドアルド・ルーカスは、パリから追ってきた妻による痴情のもつれで刺殺されたと判明し、事件は終結した。",
