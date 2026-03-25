@@ -10,6 +10,7 @@ type ClearedData = {
 
 type SaveDataContextType = {
   isInitialized: boolean;
+  hasSaveData: boolean; // ▼ 追加：セーブデータの有無を判定するプロパティ
   currentSeason: number;
   unlockedTerms: string[];
   readTerms: string[];
@@ -30,7 +31,6 @@ type SaveDataContextType = {
   setView: React.Dispatch<React.SetStateAction<'title' | 'game' | 'archive' | 'endroll'>>;
   setTextSpeed: React.Dispatch<React.SetStateAction<number>>;
   setReduceEffects: React.Dispatch<React.SetStateAction<boolean>>;
-  // ▼ 修正箇所：コールバック関数（prev => ...）も受け取れるように型を変更
   setPlayMode: React.Dispatch<React.SetStateAction<'holmes' | 'moriarty'>>;
   handleStartConnection: () => void;
   handlePlayEpisode: (epId: string) => void;
@@ -201,9 +201,13 @@ export function SaveDataProvider({ children }: { children: React.ReactNode }) {
     return false;
   };
 
+  // ▼ 追加：クリアデータや解放済み用語が1つでもあれば「続きから」扱いとする
+  const hasSaveData = Object.keys(clearedData).length > 0 || unlockedTerms.length > 0 || currentSeason > 1;
+
   return (
     <SaveDataContext.Provider value={{
       isInitialized: isLoaded,
+      hasSaveData, // ▼ 追加：Providerへの登録
       currentSeason, unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths,
       currentEpisodeId, activeGameData, view, textSpeed, reduceEffects, playMode,
       setUnlockedTerms, setReadTerms, setInsightPoints, setCurrentEpisodeId, setActiveGameData,
