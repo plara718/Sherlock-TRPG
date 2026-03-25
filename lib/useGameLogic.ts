@@ -124,7 +124,7 @@ export function useGameLogic(
     }
   }, []);
 
-  // ▼ 修正箇所：依存配列を追加しつつ、Refを用いて安全に1回だけ実行する
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
@@ -212,7 +212,8 @@ export function useGameLogic(
     const speakerName = protagonist === 'watson' ? 'Watson' : protagonist === 'irene' ? 'Irene' : 'Holmes';
 
     if (skill === 'TIMEOUT') {
-      const failMsg = intr.fail_msg || (isOldFormat ? intr.penalty?.msg : null) || "（時間切れだ。動くことができなかった……）";
+      // ▼ 修正箇所：時間切れの場合は intr.fail?.msg を参照する
+      const failMsg = intr.fail_msg || (isOldFormat ? intr.fail?.msg : null) || "（時間切れだ。動くことができなかった……）";
       setFeedback({ type: 'fail', msg: `TIME OUT\n（${uiLabels.gaugeName} -15）` });
       updateTether(TETHER_PENALTY_MISS);
       pushBeatToHistory({ id: `fail-${Date.now()}`, speaker: speakerName, text: failMsg, type: 'normal' });
@@ -245,7 +246,8 @@ export function useGameLogic(
     } else {
       setFeedback({ type: 'penalty', msg: `INTERRUPT FAILED\n（${uiLabels.gaugeName} -15）` });
       updateTether(TETHER_PENALTY_FAIL);
-      const failMsg = intr.fail_msg || (isOldFormat ? intr.fail?.msg : null) || `（選択したアプローチ [${skill}] は間違っていたようだ……）`;
+      // ▼ 修正箇所：間違えた場合は intr.penalty?.msg を参照する
+      const failMsg = intr.fail_msg || (isOldFormat ? intr.penalty?.msg : null) || `（選択したアプローチ [${skill}] は間違っていたようだ……）`;
       pushBeatToHistory({ id: `fail-${Date.now()}`, speaker: speakerName, text: failMsg, type: 'normal' });
       
       if (isOldFormat) setIsResolved(true);
@@ -283,12 +285,15 @@ export function useGameLogic(
 
     let nextId: string | null = currentBeat?.next_beat_id || null;
     
+    // ▼ 修正箇所：ルート分岐の条件を整理し、テレコ状態を解消
     if (currentBeat?.interrupt && 'success' in currentBeat.interrupt) {
       const intr = currentBeat.interrupt as any;
       if (feedback?.type === 'success') {
         nextId = intr.success?.next_beat_id || nextId;
-      } else if (feedback?.type === 'penalty' || feedback?.type === 'fail') {
-        nextId = (feedback.type === 'fail' ? intr.penalty?.next_beat_id : intr.fail?.next_beat_id) || nextId;
+      } else if (feedback?.type === 'fail') {
+        nextId = intr.fail?.next_beat_id || nextId;
+      } else if (feedback?.type === 'penalty') {
+        nextId = intr.penalty?.next_beat_id || nextId;
       }
     }
 
@@ -353,7 +358,7 @@ export function useGameLogic(
     }
   }, [tether, isCompleted, isInterlude, isMoriarty, scenarioData]);
 
-  // ▼ 修正箇所：Warning解消（必要な依存配列を全て追加）
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!isCompleted && currentBeatId && chatHistory.length > 0 && !isStreaming) {
       onSaveGame({
