@@ -9,6 +9,7 @@ type ClearedData = {
 };
 
 type SaveDataContextType = {
+  isInitialized: boolean; // ← ▼追加：ビルドエラーの原因だった型定義
   currentSeason: number;
   unlockedTerms: string[];
   readTerms: string[];
@@ -111,7 +112,6 @@ export function SaveDataProvider({ children }: { children: React.ReactNode }) {
       const prevWeight = prevData ? (RANK_WEIGHT[prevData.rank] || 0) : 0;
       const newWeight = RANK_WEIGHT[rank] || 0;
 
-      // ▼ 修正箇所：以前より良いランク（または同等）の場合のみランクを更新し、過去の栄光を保護する
       const bestRank = newWeight >= prevWeight ? rank : prevData.rank;
       const bestScore = Math.max(tether, prevData?.score || 0);
 
@@ -195,10 +195,9 @@ export function SaveDataProvider({ children }: { children: React.ReactNode }) {
     return false;
   };
 
-  if (!isLoaded) return <div className="h-screen bg-[#1a1412]" />;
-
   return (
     <SaveDataContext.Provider value={{
+      isInitialized: isLoaded, // ← ▼追加：Providerへの値渡し
       currentSeason, unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths,
       currentEpisodeId, activeGameData, view, textSpeed, reduceEffects, playMode,
       setUnlockedTerms, setReadTerms, setInsightPoints, setCurrentEpisodeId, setActiveGameData,

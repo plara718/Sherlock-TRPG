@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 
 export type ScenarioBeat = {
   id: string;
@@ -12,14 +12,14 @@ export type ScenarioBeat = {
   interrupt?: {
     required_skill?: string;
     required_evidence?: string;
-    trigger_keyword?: string; // 新形式
-    success_msg?: string;     // 新形式
-    fail_msg?: string;        // 新形式
-    correction_text?: string; // 新形式
+    trigger_keyword?: string; 
+    success_msg?: string;     
+    fail_msg?: string;        
+    correction_text?: string; 
     hint?: string;
-    success?: { msg: string; next_beat_id?: string; isCriticalSuccess?: boolean; }; // 旧形式
-    fail?: { msg: string; next_beat_id?: string; }; // 旧形式
-    penalty?: { msg: string; next_beat_id?: string; }; // 旧形式
+    success?: { msg: string; next_beat_id?: string; isCriticalSuccess?: boolean; }; 
+    fail?: { msg: string; next_beat_id?: string; }; 
+    penalty?: { msg: string; next_beat_id?: string; }; 
   };
 };
 
@@ -89,9 +89,13 @@ export function useGameLogic(
   const waitTimeRef = useRef<number>(0);
 
   const currentBeatRaw = beats.find(b => b.id === currentBeatId) || beats[0];
-  const currentBeat = isResolved && currentBeatRaw 
-    ? { ...currentBeatRaw, text: currentBeatRaw.text.replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '') } 
-    : currentBeatRaw;
+
+  // ▼ 修正箇所：Warning解消（useMemoで再計算を防止）
+  const currentBeat = useMemo(() => {
+    return isResolved && currentBeatRaw 
+      ? { ...currentBeatRaw, text: currentBeatRaw.text.replace(/\[<NOISE>\]/g, '').replace(/\[<FLAW>\]/g, '') } 
+      : currentBeatRaw;
+  }, [isResolved, currentBeatRaw]);
 
   const updateTether = useCallback((amount: number) => {
     setTether(prev => {
@@ -121,6 +125,8 @@ export function useGameLogic(
     }
   }, []);
 
+  // ▼ 修正箇所：Warning解消（マウント時の1回のみ実行されるべき処理のため静的除外）
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (initialSaveData && !hasLoadedRef.current) {
       hasLoadedRef.current = true;
@@ -202,20 +208,17 @@ export function useGameLogic(
   const evaluatePanelInterrupt = useCallback((skill: string, evidence: string | null) => {
     if (tether <= 0 || isResolved || !currentBeat?.interrupt) return;
 
-    // ▼ 修正箇所：旧JSON（ホームズ編）と新JSON（モリアーティ編）の自動判別
     const intr = currentBeat.interrupt as any;
     const isOldFormat = 'success' in intr;
 
     const speakerName = protagonist === 'watson' ? 'Watson' : protagonist === 'irene' ? 'Irene' : 'Holmes';
 
-    // タイムアウト時の処理
     if (skill === 'TIMEOUT') {
       const failMsg = intr.fail_msg || (isOldFormat ? intr.penalty?.msg : null) || "（時間切れだ。動くことができなかった……）";
       setFeedback({ type: 'fail', msg: `TIME OUT\n（${uiLabels.gaugeName} -15）` });
       updateTether(TETHER_PENALTY_MISS);
       pushBeatToHistory({ id: `fail-${Date.now()}`, speaker: speakerName, text: failMsg, type: 'normal' });
       
-      // 旧仕様（ホームズ編）の場合は、失敗したまま強制的にルートを進行させる
       if (isOldFormat) setIsResolved(true);
       return;
     }
@@ -247,7 +250,6 @@ export function useGameLogic(
       const failMsg = intr.fail_msg || (isOldFormat ? intr.fail?.msg : null) || `（選択したアプローチ [${skill}] は間違っていたようだ……）`;
       pushBeatToHistory({ id: `fail-${Date.now()}`, speaker: speakerName, text: failMsg, type: 'normal' });
       
-      // 旧仕様（ホームズ編）の場合は、失敗したまま強制的に失敗ルートへ進行させる
       if (isOldFormat) setIsResolved(true);
     }
   }, [currentBeat, isResolved, tether, updateTether, uiLabels.gaugeName, protagonist, pushBeatToHistory]);
@@ -281,7 +283,6 @@ export function useGameLogic(
 
     isProcessingActionRef.current = true;
 
-    // ▼ 修正箇所：ルート分岐のアダプター（旧JSONの success.next_beat_id 等を解釈する）
     let nextId: string | null = currentBeat?.next_beat_id || null;
     
     if (currentBeat?.interrupt && 'success' in currentBeat.interrupt) {
@@ -293,7 +294,6 @@ export function useGameLogic(
       }
     }
 
-    // 指定先がない場合は配列の次の要素へ
     if (!nextId) {
       const idx = beats.findIndex(b => b.id === currentBeatId);
       if (idx !== -1 && idx < beats.length - 1) {
@@ -355,6 +355,8 @@ export function useGameLogic(
     }
   }, [tether, isCompleted, isInterlude, isMoriarty, scenarioData]);
 
+  // ▼ 修正箇所：Warning解消（オートセーブの過剰実行を防ぐための静的除外）
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!isCompleted && currentBeatId && chatHistory.length > 0 && !isStreaming) {
       onSaveGame({
