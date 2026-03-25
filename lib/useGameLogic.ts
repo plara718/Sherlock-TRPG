@@ -12,11 +12,14 @@ export type ScenarioBeat = {
   interrupt?: {
     required_skill?: string;
     required_evidence?: string;
-    trigger_keyword: string;
-    success_msg: string;
-    fail_msg: string;
-    correction_text?: string;
+    trigger_keyword?: string; // 新形式
+    success_msg?: string;     // 新形式
+    fail_msg?: string;        // 新形式
+    correction_text?: string; // 新形式
     hint?: string;
+    success?: { msg: string; next_beat_id?: string; isCriticalSuccess?: boolean; }; // 旧形式
+    fail?: { msg: string; next_beat_id?: string; }; // 旧形式
+    penalty?: { msg: string; next_beat_id?: string; }; // 旧形式
   };
 };
 
@@ -197,33 +200,41 @@ export function useGameLogic(
   };
 
   const evaluatePanelInterrupt = useCallback((skill: string, evidence: string | null) => {
-    // ▼ 追加：HP0の時の進行ロック
     if (tether <= 0 || isResolved || !currentBeat?.interrupt) return;
+
+    // ▼ 修正箇所：旧JSON（ホームズ編）と新JSON（モリアーティ編）の自動判別
+    const intr = currentBeat.interrupt as any;
+    const isOldFormat = 'success' in intr;
 
     const speakerName = protagonist === 'watson' ? 'Watson' : protagonist === 'irene' ? 'Irene' : 'Holmes';
 
+    // タイムアウト時の処理
     if (skill === 'TIMEOUT') {
-      const failMsg = currentBeat.interrupt.fail_msg || "（時間切れだ。動くことができなかった……）";
+      const failMsg = intr.fail_msg || (isOldFormat ? intr.penalty?.msg : null) || "（時間切れだ。動くことができなかった……）";
       setFeedback({ type: 'fail', msg: `TIME OUT\n（${uiLabels.gaugeName} -15）` });
       updateTether(TETHER_PENALTY_MISS);
       pushBeatToHistory({ id: `fail-${Date.now()}`, speaker: speakerName, text: failMsg, type: 'normal' });
+      
+      // 旧仕様（ホームズ編）の場合は、失敗したまま強制的にルートを進行させる
+      if (isOldFormat) setIsResolved(true);
       return;
     }
 
-    const isSkillMatch = skill === currentBeat.interrupt.required_skill;
-    const isEvidenceMatch = currentBeat.interrupt.required_evidence ? evidence === currentBeat.interrupt.required_evidence : true;
+    const isSkillMatch = skill === intr.required_skill;
+    const isEvidenceMatch = intr.required_evidence ? evidence === intr.required_evidence : true;
 
     if (isSkillMatch && isEvidenceMatch) {
       setIsResolved(true);
-      setFeedback({ type: 'success', msg: `INTERRUPT SUCCESS\n（${uiLabels.gaugeName} +15）`, isCriticalSuccess: true });
+      setFeedback({ type: 'success', msg: `INTERRUPT SUCCESS\n（${uiLabels.gaugeName} +15）`, isCriticalSuccess: isOldFormat ? intr.success?.isCriticalSuccess : true });
       updateTether(TETHER_REWARD_SUCCESS);
       
       const newBeats: ScenarioBeat[] = [];
-      if (currentBeat.interrupt.success_msg) {
-        newBeats.push({ id: `succ-${Date.now()}`, speaker: speakerName, text: currentBeat.interrupt.success_msg, type: 'normal' });
+      const successMsg = intr.success_msg || (isOldFormat ? intr.success?.msg : null);
+      if (successMsg) {
+        newBeats.push({ id: `succ-${Date.now()}`, speaker: speakerName, text: successMsg, type: 'normal' });
       }
-      if (currentBeat.interrupt.correction_text) {
-        newBeats.push({ id: `corr-${Date.now()}`, speaker: currentBeat.speaker, text: currentBeat.interrupt.correction_text, type: 'normal' });
+      if (intr.correction_text) {
+        newBeats.push({ id: `corr-${Date.now()}`, speaker: currentBeat.speaker, text: intr.correction_text, type: 'normal' });
       }
       if (newBeats.length > 0) {
         setChatHistory(prev => [...prev, ...newBeats]);
@@ -233,13 +244,15 @@ export function useGameLogic(
     } else {
       setFeedback({ type: 'penalty', msg: `INTERRUPT FAILED\n（${uiLabels.gaugeName} -15）` });
       updateTether(TETHER_PENALTY_FAIL);
-      const failMsg = currentBeat.interrupt.fail_msg || `（選択したアプローチ [${skill}] は間違っていたようだ……）`;
+      const failMsg = intr.fail_msg || (isOldFormat ? intr.fail?.msg : null) || `（選択したアプローチ [${skill}] は間違っていたようだ……）`;
       pushBeatToHistory({ id: `fail-${Date.now()}`, speaker: speakerName, text: failMsg, type: 'normal' });
+      
+      // 旧仕様（ホームズ編）の場合は、失敗したまま強制的に失敗ルートへ進行させる
+      if (isOldFormat) setIsResolved(true);
     }
   }, [currentBeat, isResolved, tether, updateTether, uiLabels.gaugeName, protagonist, pushBeatToHistory]);
 
   const handleChoice = (nextId: string) => {
-    // ▼ 追加：HP0の時の進行ロック
     if (tether <= 0 || isStreaming || isProcessingActionRef.current) return;
     isProcessingActionRef.current = true;
     
@@ -255,7 +268,6 @@ export function useGameLogic(
   };
 
   const nextBeat = () => {
-    // ▼ 追加：HP0の時の進行ロック
     if (tether <= 0 || isProcessingActionRef.current) return;
 
     if (isStreaming) {
@@ -269,7 +281,19 @@ export function useGameLogic(
 
     isProcessingActionRef.current = true;
 
+    // ▼ 修正箇所：ルート分岐のアダプター（旧JSONの success.next_beat_id 等を解釈する）
     let nextId: string | null = currentBeat?.next_beat_id || null;
+    
+    if (currentBeat?.interrupt && 'success' in currentBeat.interrupt) {
+      const intr = currentBeat.interrupt as any;
+      if (feedback?.type === 'success') {
+        nextId = intr.success?.next_beat_id || nextId;
+      } else if (feedback?.type === 'penalty' || feedback?.type === 'fail') {
+        nextId = (feedback.type === 'fail' ? intr.penalty?.next_beat_id : intr.fail?.next_beat_id) || nextId;
+      }
+    }
+
+    // 指定先がない場合は配列の次の要素へ
     if (!nextId) {
       const idx = beats.findIndex(b => b.id === currentBeatId);
       if (idx !== -1 && idx < beats.length - 1) {
