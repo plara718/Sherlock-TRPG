@@ -1,220 +1,210 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import glossaryData from '@/data/glossary.json';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
-type ClearedData = { [epId: string]: { rank: string; tether: number } };
+type ClearedData = {
+  rank: string;
+  score: number;
+  date: string;
+};
 
 type SaveDataContextType = {
-  view: 'title' | 'game' | 'archive' | 'endroll';
-  setView: React.Dispatch<React.SetStateAction<'title' | 'game' | 'archive' | 'endroll'>>;
-  hasSaveData: boolean;
-  isInitialized: boolean;
-  currentEpisodeId: string;
-  setCurrentEpisodeId: React.Dispatch<React.SetStateAction<string>>;
+  currentSeason: number;
   unlockedTerms: string[];
-  setUnlockedTerms: React.Dispatch<React.SetStateAction<string[]>>;
   readTerms: string[];
   insightPoints: number;
-  clearedData: ClearedData;
-  unlockedTruths: Record<string, any>;
-  currentSeason: number;
+  clearedData: Record<string, ClearedData>;
+  unlockedTruths: string[];
+  currentEpisodeId: string;
   activeGameData: any;
-  setActiveGameData: React.Dispatch<React.SetStateAction<any>>;
-  clearActiveGameData: () => void;
-  mycroftIntel: string[];
-  handleStartConnection: () => void;
-  handleResetData: () => void;
-  handleLoadData: (dataStr: string) => boolean;
-  handlePlayEpisode: (epId: string) => void;
-  handleSpendPoint: (amount: number) => boolean;
-  handleEpisodeComplete: (epId: string, rank: string, tether: number, points: number) => void;
-  handleResearch: () => void;
-  handleReadTerm: (termId: string) => void;
-  handleUnlockTruth: (pinId: string, truthData: any, linkCost: number) => void;
-  handleLinkFail: (linkCost: number) => void;
+  view: 'title' | 'game' | 'archive' | 'endroll';
   textSpeed: number;
-  setTextSpeed: (speed: number) => void;
   reduceEffects: boolean;
-  setReduceEffects: (reduce: boolean) => void;
   playMode: 'holmes' | 'moriarty';
-  setPlayMode: React.Dispatch<React.SetStateAction<'holmes' | 'moriarty'>>;
+  setUnlockedTerms: (terms: string[]) => void;
+  setReadTerms: (terms: string[]) => void;
+  setInsightPoints: (pts: number | ((prev: number) => number)) => void;
+  setCurrentEpisodeId: (id: string) => void;
+  setActiveGameData: (data: any) => void;
+  setView: (view: 'title' | 'game' | 'archive' | 'endroll') => void;
+  setTextSpeed: (speed: number) => void;
+  setReduceEffects: (reduce: boolean) => void;
+  setPlayMode: (mode: 'holmes' | 'moriarty') => void;
+  handlePlayEpisode: (epId: string) => void;
+  handleEpisodeComplete: (epId: string, rank: string, tether: number, points: number) => void;
+  handleResearch: (termId: string, cost: number) => boolean;
+  handleReadTerm: (termId: string) => void;
+  handleUnlockTruth: (truthId: string) => void;
+  handleLinkFail: () => void;
+  handleLoadData: (base64Str: string) => boolean;
+  handleResetData: () => void;
+  handleSpendPoint: (cost: number) => boolean;
 };
 
 const SaveDataContext = createContext<SaveDataContextType | undefined>(undefined);
 
-export function SaveDataProvider({ children }: { children: ReactNode }) {
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [view, setView] = useState<'title' | 'game' | 'archive' | 'endroll'>('title');
-  const [currentEpisodeId, setCurrentEpisodeId] = useState<string>('#00');
+const RANK_WEIGHT: Record<string, number> = {
+  'MASTERPIECE': 3, 'SYMPATHETIC': 3, 'CLEARED': 3,
+  'COMPROMISED': 2, 'LUCID': 2,
+  'FAILED': 1, 'ABYSS': 1
+};
 
-  const [unlockedTerms, _setUnlockedTerms] = useState<string[]>([]);
+export function SaveDataProvider({ children }: { children: React.ReactNode }) {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [currentSeason, setCurrentSeason] = useState(1);
+  const [unlockedTerms, setUnlockedTerms] = useState<string[]>([]);
   const [readTerms, setReadTerms] = useState<string[]>([]);
   const [insightPoints, setInsightPoints] = useState(0);
-  const [clearedData, setClearedData] = useState<ClearedData>({});
-  const [unlockedTruths, setUnlockedTruths] = useState<Record<string, any>>({});
-  const [textSpeed, setTextSpeed] = useState<number>(30);
-  const [reduceEffects, setReduceEffects] = useState<boolean>(false);
+  const [clearedData, setClearedData] = useState<Record<string, ClearedData>>({});
+  const [unlockedTruths, setUnlockedTruths] = useState<string[]>([]);
+  const [currentEpisodeId, setCurrentEpisodeId] = useState('');
   const [activeGameData, setActiveGameData] = useState<any>(null);
-  
+  const [view, setView] = useState<'title' | 'game' | 'archive' | 'endroll'>('title');
+  const [textSpeed, setTextSpeed] = useState(30);
+  const [reduceEffects, setReduceEffects] = useState(false);
   const [playMode, setPlayMode] = useState<'holmes' | 'moriarty'>('holmes');
 
-  const currentSeason = 
-    clearedData['#39'] ? 4 : 
-    clearedData['#29'] ? 3 : 
-    clearedData['#13'] ? 2 : 1;
-
-  const [mycroftIntel, setMycroftIntel] = useState<string[]>([]);
-
-  const setUnlockedTerms: React.Dispatch<React.SetStateAction<string[]>> = (value) => {
-    if (typeof value === 'function') {
-      _setUnlockedTerms(prev => Array.from(new Set(value(prev))));
-    } else {
-      _setUnlockedTerms(Array.from(new Set(value)));
-    }
-  };
-  
   useEffect(() => {
     try {
-      const savedStr = localStorage.getItem('sherlock_save_v1');
-      if (savedStr) {
-        const data = JSON.parse(savedStr);
-        if (data && typeof data === 'object') {
-            if (data.unlockedTerms) _setUnlockedTerms(Array.from(new Set(data.unlockedTerms)));
-            if (data.readTerms) setReadTerms(data.readTerms);
-            if (data.insightPoints !== undefined) setInsightPoints(data.insightPoints);
-            if (data.clearedData) setClearedData(data.clearedData);
-            if (data.unlockedTruths) setUnlockedTruths(data.unlockedTruths);
-            if (data.mycroftIntel) setMycroftIntel(data.mycroftIntel);
-            if (data.textSpeed !== undefined) setTextSpeed(data.textSpeed);
-            if (data.reduceEffects !== undefined) setReduceEffects(data.reduceEffects);
-            if (data.activeGameData !== undefined) setActiveGameData(data.activeGameData);
-            if (data.playMode) setPlayMode(data.playMode);
+      const saved = localStorage.getItem('sherlock_save_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setCurrentSeason(parsed.currentSeason || 1);
+        setUnlockedTerms(parsed.unlockedTerms || []);
+        setReadTerms(parsed.readTerms || []);
+        setInsightPoints(parsed.insightPoints || 0);
+        setClearedData(parsed.clearedData || {});
+        setUnlockedTruths(parsed.unlockedTruths || []);
+        if (parsed.activeGameData) {
+          setActiveGameData(parsed.activeGameData);
+          setCurrentEpisodeId(parsed.activeGameData.episodeId);
         }
+        setTextSpeed(parsed.textSpeed || 30);
+        setReduceEffects(parsed.reduceEffects || false);
+        setPlayMode(parsed.playMode || 'holmes');
       }
-    } catch (e) {
-      console.error("Save data load failed", e);
-    } finally {
-      setIsInitialized(true);
-    }
+    } catch (e) {}
+    setIsLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem('sherlock_save_v1', JSON.stringify({ 
-        unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths, mycroftIntel, textSpeed, reduceEffects, activeGameData, playMode 
-      }));
-    }
-  }, [unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths, mycroftIntel, isInitialized, textSpeed, reduceEffects, activeGameData, playMode]);
-
-  const hasSaveData = unlockedTerms.length > 0 || Object.keys(clearedData).length > 0;
-
-  const handleStartConnection = () => {
-    if (!hasSaveData) {
-      const initialTerm = glossaryData.terms.find(t => t.id === 'H001');
-      if (initialTerm) _setUnlockedTerms([initialTerm.id]);
-      setInsightPoints(0);
-      setClearedData({});
-      setCurrentEpisodeId('#00');
-      setPlayMode('holmes');
-    }
-    setView('archive');
-  };
-
-  const handleResetData = () => {
-    _setUnlockedTerms([]);
-    setReadTerms([]);
-    setInsightPoints(0);
-    setClearedData({});
-    setUnlockedTruths({});
-    setMycroftIntel([]);
-    setCurrentEpisodeId('#00');
-    setActiveGameData(null);
-    setPlayMode('holmes');
-    setView('title');
-  };
-
-  const handleLoadData = (dataStr: string) => {
-    try {
-      const data = JSON.parse(atob(dataStr));
-      if (data && typeof data === 'object') {
-        if (data.unlockedTerms) _setUnlockedTerms(Array.from(new Set(data.unlockedTerms)));
-        if (data.readTerms) setReadTerms(data.readTerms);
-        if (data.insightPoints !== undefined) setInsightPoints(data.insightPoints);
-        if (data.clearedData) setClearedData(data.clearedData);
-        if (data.unlockedTruths) setUnlockedTruths(data.unlockedTruths);
-        if (data.mycroftIntel) setMycroftIntel(data.mycroftIntel);
-        if (data.playMode) setPlayMode(data.playMode);
-        return true;
-      }
-    } catch (e) {
-      console.error("Data import failed", e);
-    }
-    return false;
-  };
+    if (!isLoaded) return;
+    const dataToSave = { currentSeason, unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths, activeGameData, textSpeed, reduceEffects, playMode };
+    localStorage.setItem('sherlock_save_v1', JSON.stringify(dataToSave));
+  }, [currentSeason, unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths, activeGameData, textSpeed, reduceEffects, playMode, isLoaded]);
 
   const handlePlayEpisode = (epId: string) => {
     setCurrentEpisodeId(epId);
+    setActiveGameData(null);
     setView('game');
   };
 
-  const handleSpendPoint = (amount: number) => {
-    if (insightPoints >= amount) {
-      setInsightPoints(prev => prev - amount);
+  const handleEpisodeComplete = (epId: string, rank: string, tether: number, points: number) => {
+    if (epId === "INTERLUDE") {
+      setActiveGameData(null);
+      setView('archive');
+      return;
+    }
+
+    setClearedData(prev => {
+      const prevData = prev[epId];
+      const prevWeight = prevData ? (RANK_WEIGHT[prevData.rank] || 0) : 0;
+      const newWeight = RANK_WEIGHT[rank] || 0;
+
+      // ▼ 修正箇所：以前より良いランク（または同等）の場合のみランクを更新し、過去の栄光を保護する
+      const bestRank = newWeight >= prevWeight ? rank : prevData.rank;
+      const bestScore = Math.max(tether, prevData?.score || 0);
+
+      return {
+        ...prev,
+        [epId]: {
+          rank: bestRank,
+          score: bestScore,
+          date: new Date().toISOString()
+        }
+      };
+    });
+
+    if (points > 0) {
+      setInsightPoints(prev => prev + points);
+    }
+    
+    setActiveGameData(null);
+    setView('archive');
+  };
+
+  const handleResearch = (termId: string, cost: number) => {
+    if (insightPoints >= cost && !unlockedTerms.includes(termId)) {
+      setInsightPoints(prev => prev - cost);
+      setUnlockedTerms(prev => [...prev, termId]);
       return true;
     }
     return false;
   };
 
-  const clearActiveGameData = () => { setActiveGameData(null); };
-
-  const handleEpisodeComplete = (epId: string, rank: string, tether: number, points: number) => {
-    setActiveGameData(null);
-    if (epId !== 'INTERLUDE' && !epId.includes('Interlude') && !epId.startsWith('interlude')) {
-      // ▼ 修正箇所：既存のスコア（tether）と比較し、初クリアまたはハイスコア時のみランクとスコアを更新
-      setClearedData(prev => {
-        const existingData = prev[epId];
-        if (!existingData || existingData.tether < tether) {
-          return { ...prev, [epId]: { rank, tether } };
-        }
-        return prev; // スコアが低い場合は更新せず保護
-      });
-      // ポイントは再プレイでも常に加算
-      setInsightPoints(prev => prev + points);
-    }
-    setView('archive');
-  };
-
-  const handleResearch = () => {
-    if (insightPoints <= 0) return;
-    setInsightPoints(prev => prev - 1);
-  };
-
   const handleReadTerm = (termId: string) => {
-    if (!readTerms.includes(termId)) setReadTerms(prev => [...prev, termId]);
-  };
-
-  const handleUnlockTruth = (pinId: string, truthData: any, linkCost: number) => {
-    if (handleSpendPoint(linkCost)) {
-      setUnlockedTruths(prev => ({ ...prev, [pinId]: truthData }));
+    if (!readTerms.includes(termId)) {
+      setReadTerms(prev => [...prev, termId]);
     }
   };
 
-  const handleLinkFail = (linkCost: number) => {
-    handleSpendPoint(linkCost);
+  const handleUnlockTruth = (truthId: string) => {
+    if (!unlockedTruths.includes(truthId)) {
+      setUnlockedTruths(prev => [...prev, truthId]);
+    }
   };
+
+  const handleLinkFail = () => {
+    setInsightPoints(prev => Math.max(0, prev - 1));
+  };
+
+  const handleLoadData = (base64Str: string) => {
+    try {
+      const decoded = atob(base64Str);
+      const parsed = JSON.parse(decoded);
+      if (parsed.clearedData && typeof parsed.insightPoints === 'number') {
+        setCurrentSeason(parsed.currentSeason || 1);
+        setUnlockedTerms(parsed.unlockedTerms || []);
+        setReadTerms(parsed.readTerms || []);
+        setInsightPoints(parsed.insightPoints || 0);
+        setClearedData(parsed.clearedData || {});
+        setUnlockedTruths(parsed.unlockedTruths || []);
+        setPlayMode(parsed.playMode || 'holmes');
+        return true;
+      }
+    } catch(e) {}
+    return false;
+  };
+
+  const handleResetData = () => {
+    setCurrentSeason(1);
+    setUnlockedTerms([]);
+    setReadTerms([]);
+    setInsightPoints(0);
+    setClearedData({});
+    setUnlockedTruths([]);
+    setActiveGameData(null);
+    setPlayMode('holmes');
+  };
+
+  const handleSpendPoint = (cost: number) => {
+    if (insightPoints >= cost) {
+      setInsightPoints(prev => prev - cost);
+      return true;
+    }
+    return false;
+  };
+
+  if (!isLoaded) return <div className="h-screen bg-[#1a1412]" />;
 
   return (
     <SaveDataContext.Provider value={{
-      view, setView, hasSaveData, isInitialized, currentEpisodeId, setCurrentEpisodeId,
-      unlockedTerms, setUnlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths,
-      currentSeason, mycroftIntel,
-      handleStartConnection, handleResetData, handleLoadData, handlePlayEpisode,
-      handleSpendPoint, handleEpisodeComplete, handleResearch, handleReadTerm,
-      handleUnlockTruth, handleLinkFail,
-      textSpeed, setTextSpeed, reduceEffects, setReduceEffects,
-      activeGameData, setActiveGameData, clearActiveGameData,
-      playMode, setPlayMode
+      currentSeason, unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths,
+      currentEpisodeId, activeGameData, view, textSpeed, reduceEffects, playMode,
+      setUnlockedTerms, setReadTerms, setInsightPoints, setCurrentEpisodeId, setActiveGameData,
+      setView, setTextSpeed, setReduceEffects, setPlayMode,
+      handlePlayEpisode, handleEpisodeComplete, handleResearch, handleReadTerm,
+      handleUnlockTruth, handleLinkFail, handleLoadData, handleResetData, handleSpendPoint
     }}>
       {children}
     </SaveDataContext.Provider>
@@ -223,6 +213,6 @@ export function SaveDataProvider({ children }: { children: ReactNode }) {
 
 export function useSaveData() {
   const context = useContext(SaveDataContext);
-  if (context === undefined) throw new Error('useSaveData must be used within a SaveDataProvider');
+  if (!context) throw new Error('useSaveData must be used within SaveDataProvider');
   return context;
 }

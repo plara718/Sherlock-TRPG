@@ -82,7 +82,10 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   const [isWigginsActive, setIsWigginsActive] = useState(false);
   const [isSanityZero, setIsSanityZero] = useState(false);
   const [showBacklog, setShowBacklog] = useState(false);
-  const isReplay = Boolean(ctx.clearedData[episodeId]);
+  
+  // ▼ 修正箇所：FAILEDやABYSSで記録された場合は「再プレイ」扱いとせず、初回報酬の権利を維持する
+  const cData = ctx.clearedData[episodeId];
+  const isReplay = Boolean(cData && cData.rank !== 'FAILED' && cData.rank !== 'ABYSS');
 
   const {
     currentBeat, isStreaming, streamedLength, tether, feedback, evaluatePanelInterrupt,
@@ -343,14 +346,7 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
         className="flex-1 flex flex-col relative overflow-hidden cursor-pointer transition-colors duration-1000 bg-theme-bg-base" 
         onClick={() => { 
           if (isScrollingRef.current) return;
-          
-          // ▼ 修正箇所：ストリーミング中なら「トリガーの有無に関わらず」必ずスキップさせる（スキップ不可バグの解消）
-          if (isStreaming) {
-            skipStream();
-            isScrollingRef.current = false;
-            return;
-          }
-
+          if (isStreaming) { skipStream(); isScrollingRef.current = false; return; }
           const hasTrigger = currentBeat?.text.includes('[<NOISE>]') || currentBeat?.text.includes('[<FLAW>]');
           if (isInterruptMode || hasTrigger) return; 
 

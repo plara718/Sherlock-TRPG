@@ -26,7 +26,6 @@ type Episode = {
   category?: string;
 };
 
-// ▼ 修正箇所：M-12までの全シナリオを網羅
 const MORIARTY_ACTS = [
   {
     title: "第1幕：等式の目覚め",
@@ -62,6 +61,8 @@ const MORIARTY_ACTS = [
   }
 ];
 
+const isSuccessRank = (rank?: string) => rank && rank !== 'FAILED' && rank !== 'ABYSS';
+
 export default function ChronologyTab({
   currentSeason,
   clearedData,
@@ -74,9 +75,6 @@ export default function ChronologyTab({
 
   const isMoriarty = playMode === 'moriarty';
 
-  // ==========================================
-  // Moriarty Mode Render
-  // ==========================================
   if (isMoriarty) {
     return (
       <div className="space-y-12 animate-in fade-in duration-500 pb-10">
@@ -94,14 +92,14 @@ export default function ChronologyTab({
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {act.episodes.map(ep => {
-                const isCleared = clearedEpisodes.includes(ep.id);
                 const cData = clearedData[ep.id];
                 const isExpanded = expandedEp === ep.id;
                 
-                // M-01は常に解放。以降は前のエピソードをクリアしているかチェック
                 const globalIndex = MORIARTY_ACTS.flatMap(a => a.episodes).findIndex(e => e.id === ep.id);
-                const prevEpId = globalIndex > 0 ? MORIARTY_ACTS.flatMap(a => a.episodes)[globalIndex - 1].id : null;
-                const isPlayable = globalIndex === 0 || (prevEpId && clearedEpisodes.includes(prevEpId));
+                const prevEpId = globalIndex > 0 ? MORIARTY_ACTS.flatMap(a => a.episodes)[globalIndex - 1].id : "";
+                
+                // ▼ 修正箇所：Boolean()で明示的にキャストし、TypeScriptの型エラー（赤波線）を解消
+                const isPlayable = globalIndex === 0 || Boolean(prevEpId && clearedData[prevEpId] && isSuccessRank(clearedData[prevEpId].rank));
 
                 return (
                   <div
@@ -124,7 +122,7 @@ export default function ChronologyTab({
                       </div>
                       
                       <div className="flex items-center gap-2 shrink-0">
-                        {cData ? (
+                        {cData && cData.rank !== 'FAILED' && cData.rank !== 'ABYSS' ? (
                           <span className={`text-[10px] text-white px-2 py-1 rounded font-bold tracking-widest shadow-sm ${
                               cData.rank === 'MASTERPIECE' ? 'bg-emerald-700' : cData.rank === 'COMPROMISED' ? 'bg-blue-700' : 'bg-rose-800'
                             }`}>
@@ -143,13 +141,12 @@ export default function ChronologyTab({
                       </div>
                     </div>
 
-                    {/* 詳細展開 */}
                     {isExpanded && isPlayable && (
                       <div className="p-4 border-t border-theme-border-base/20 bg-theme-bg-dark-panel animate-in slide-in-from-top-2">
                         <p className="text-sm text-theme-text-base leading-relaxed font-serif mb-4">
                           {ep.summary}
                         </p>
-                        {cData && (
+                        {cData && isSuccessRank(cData.rank) && (
                           <div className="flex justify-between items-center mt-4">
                             <button
                               onClick={() => onPlayEpisode(ep.id)}
@@ -172,23 +169,20 @@ export default function ChronologyTab({
     );
   }
 
-  // ==========================================
-  // Holmes Mode Render (Default)
-  // ==========================================
   const displaySeason = archiveData.seasons.find((s: any) => s.season_id === activeTab) || archiveData.seasons[0];
   const allEpisodes = archiveData.seasons.flatMap((s: any) => s.episodes);
 
   const checkSpecialPlayable = (epId: string) => {
     switch (epId) {
-      case 'Interlude-S1': return clearedEpisodes.includes('#13');
-      case 'Interlude-S2': return clearedEpisodes.includes('#29');
-      case 'Interlude-S3': return clearedEpisodes.includes('#40');
-      case 'SP-01': return clearedEpisodes.includes('#14');
-      case 'SP-02': return clearedEpisodes.includes('#38');
-      case 'SP-03': return clearedEpisodes.includes('SP-02');
-      case 'SP-04': return clearedEpisodes.includes('#29');
-      case 'SP-05': return clearedEpisodes.includes('SP-04');
-      case 'SP-06': return clearedEpisodes.includes('SP-05');
+      case 'Interlude-S1': return isSuccessRank(clearedData['#13']?.rank);
+      case 'Interlude-S2': return isSuccessRank(clearedData['#29']?.rank);
+      case 'Interlude-S3': return isSuccessRank(clearedData['#40']?.rank);
+      case 'SP-01': return isSuccessRank(clearedData['#14']?.rank);
+      case 'SP-02': return isSuccessRank(clearedData['#38']?.rank);
+      case 'SP-03': return isSuccessRank(clearedData['SP-02']?.rank);
+      case 'SP-04': return isSuccessRank(clearedData['#29']?.rank);
+      case 'SP-05': return isSuccessRank(clearedData['SP-04']?.rank);
+      case 'SP-06': return isSuccessRank(clearedData['SP-05']?.rank);
       default: return false;
     }
   };
@@ -261,15 +255,16 @@ export default function ChronologyTab({
                     const isImplemented = ep.status !== 'locked';
                     let isPlayable = false;
                     
+                    // ▼ 修正箇所：Boolean()で明示的にキャストし、TypeScriptの型エラー（赤波線）を解消
                     if (ep.id.startsWith('SP-') || ep.id.startsWith('Interlude-')) {
-                      isPlayable = isImplemented && checkSpecialPlayable(ep.id);
+                      isPlayable = Boolean(isImplemented && checkSpecialPlayable(ep.id));
                     } else if (ep.id === '#39') {
-                      const is38Cleared = clearedEpisodes.includes('#38');
-                      const areAllSpCleared = ['SP-01', 'SP-02', 'SP-03', 'SP-04', 'SP-05', 'SP-06'].every(spId => clearedEpisodes.includes(spId));
-                      isPlayable = isImplemented && (!!cData || (is38Cleared && areAllSpCleared));
+                      const is38Cleared = isSuccessRank(clearedData['#38']?.rank);
+                      const areAllSpCleared = ['SP-01', 'SP-02', 'SP-03', 'SP-04', 'SP-05', 'SP-06'].every(spId => isSuccessRank(clearedData[spId]?.rank));
+                      isPlayable = Boolean(isImplemented && (isSuccessRank(cData?.rank) || (is38Cleared && areAllSpCleared)));
                     } else {
-                      const isNextPlayable = globalIndex === 0 || (prevEp && clearedData[prevEp.id]);
-                      isPlayable = isImplemented && (!!cData || isNextPlayable);
+                      const isNextPlayable = globalIndex === 0 || Boolean(prevEp && clearedData[prevEp.id] && isSuccessRank(clearedData[prevEp.id].rank));
+                      isPlayable = Boolean(isImplemented && (isSuccessRank(cData?.rank) || isNextPlayable));
                     }
 
                     return (
@@ -307,7 +302,7 @@ export default function ChronologyTab({
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0">
-                            {cData ? (
+                            {cData && isSuccessRank(cData.rank) ? (
                               <span className={`text-[10px] text-white px-2 py-1 rounded font-bold tracking-widest shadow-sm ${
                                   cData.rank === 'LUCID' || cData.rank === 'CLEARED' ? 'bg-emerald-700' : cData.rank === 'SYMPATHETIC' ? 'bg-blue-700' : 'bg-rose-800'
                                 }`}>
@@ -338,7 +333,7 @@ export default function ChronologyTab({
                                   [SYSTEM] 全てのSPシナリオクリアを確認。最終決戦のロックが解除されました。
                                 </p>
                             )}
-                            {cData && (
+                            {cData && isSuccessRank(cData.rank) && (
                               <div className="flex justify-between items-center mt-4">
                                 <button
                                   onClick={() => onPlayEpisode(ep.id)}
