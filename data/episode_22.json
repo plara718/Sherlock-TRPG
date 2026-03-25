@@ -7,7 +7,8 @@
       "location": "ベイカー街 ～ バーミンガム",
       "weather": "どんよりとした曇り空"
     },
-    "protagonist": "watson"
+    "protagonist": "watson",
+    "intervention": "Irene"
   },
   "consequence": {
     "official_record": "【スコットランド・ヤード公式記録】マウソン商会への強盗未遂および警備員殺害事件。実行犯のベディングトン兄弟を逮捕。主犯格の一人はバーミンガムにて偽会社を設立し、職員を隔離する偽装工作を行っていたことが判明。",
