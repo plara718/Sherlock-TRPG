@@ -22,16 +22,17 @@ type SaveDataContextType = {
   textSpeed: number;
   reduceEffects: boolean;
   playMode: 'holmes' | 'moriarty';
-  setUnlockedTerms: (terms: string[]) => void;
-  setReadTerms: (terms: string[]) => void;
-  setInsightPoints: (pts: number | ((prev: number) => number)) => void;
-  setCurrentEpisodeId: (id: string) => void;
-  setActiveGameData: (data: any) => void;
-  setView: (view: 'title' | 'game' | 'archive' | 'endroll') => void;
-  setTextSpeed: (speed: number) => void;
-  setReduceEffects: (reduce: boolean) => void;
-  setPlayMode: (mode: 'holmes' | 'moriarty') => void;
-  handleStartConnection: () => void; // ▼追加：タイトルから開始する処理
+  setUnlockedTerms: React.Dispatch<React.SetStateAction<string[]>>;
+  setReadTerms: React.Dispatch<React.SetStateAction<string[]>>;
+  setInsightPoints: React.Dispatch<React.SetStateAction<number>>;
+  setCurrentEpisodeId: React.Dispatch<React.SetStateAction<string>>;
+  setActiveGameData: React.Dispatch<React.SetStateAction<any>>;
+  setView: React.Dispatch<React.SetStateAction<'title' | 'game' | 'archive' | 'endroll'>>;
+  setTextSpeed: React.Dispatch<React.SetStateAction<number>>;
+  setReduceEffects: React.Dispatch<React.SetStateAction<boolean>>;
+  // ▼ 修正箇所：コールバック関数（prev => ...）も受け取れるように型を変更
+  setPlayMode: React.Dispatch<React.SetStateAction<'holmes' | 'moriarty'>>;
+  handleStartConnection: () => void;
   handlePlayEpisode: (epId: string) => void;
   handleEpisodeComplete: (epId: string, rank: string, tether: number, points: number) => void;
   handleResearch: (termId: string, cost: number) => boolean;
@@ -95,7 +96,6 @@ export function SaveDataProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('sherlock_save_v1', JSON.stringify(dataToSave));
   }, [currentSeason, unlockedTerms, readTerms, insightPoints, clearedData, unlockedTruths, activeGameData, textSpeed, reduceEffects, playMode, isLoaded]);
 
-  // ▼追加：タイトル画面からアーカイブ画面へ移行する処理
   const handleStartConnection = () => {
     setView('archive');
   };
@@ -208,7 +208,7 @@ export function SaveDataProvider({ children }: { children: React.ReactNode }) {
       currentEpisodeId, activeGameData, view, textSpeed, reduceEffects, playMode,
       setUnlockedTerms, setReadTerms, setInsightPoints, setCurrentEpisodeId, setActiveGameData,
       setView, setTextSpeed, setReduceEffects, setPlayMode,
-      handleStartConnection, // ▼追加：Providerへの登録
+      handleStartConnection,
       handlePlayEpisode, handleEpisodeComplete, handleResearch, handleReadTerm,
       handleUnlockTruth, handleLinkFail, handleLoadData, handleResetData, handleSpendPoint
     }}>
