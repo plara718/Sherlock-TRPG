@@ -140,7 +140,8 @@
       "id": "beat_20",
       "speaker": "System",
       "text": "絶望に染まっていたワトスンの胸の奥底で、絶対にあり得ないはずの『希望の心音』が、微かに、だが確かに脈打ち始めていた。\n\n【Season 3 : 決戦 - CLEAR】",
-      "type": "instruction"
+      "type": "instruction",
+      "next_beat_id": "COMPLETE"
     }
   ]
 }
