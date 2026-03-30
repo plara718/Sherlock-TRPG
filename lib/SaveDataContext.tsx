@@ -136,7 +136,13 @@ export function SaveDataProvider({ children }: { children: React.ReactNode }) {
     }
     
     setActiveGameData(null);
-    setView('archive');
+    
+    // ▼ 修正箇所：#50（最後の挨拶）をクリアした場合は、エンドロールへ遷移する
+    if (epId === "#50") {
+      setView('endroll');
+    } else {
+      setView('archive');
+    }
   };
 
   const handleResearch = (termId: string, cost: number) => {
