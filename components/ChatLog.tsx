@@ -42,7 +42,7 @@ const getIconPath = (speakerName: string) => {
 };
 
 // memo() でラップし、プロパティが変化しない過去のログの無駄な再描画を防ぐ（パフォーマンス改善）
-const ChatLog = memo(function ChatLog({ speaker, text, feedback, isMetaNotice }: ChatLogProps) {
+const ChatLog = memo(function ChatLog({ speaker, text, isMetaNotice }: ChatLogProps) {
   const isSystem = speaker === 'System';
   const iconPath = getIconPath(speaker);
 
@@ -95,14 +95,6 @@ const ChatLog = memo(function ChatLog({ speaker, text, feedback, isMetaNotice }:
             <div className="font-bold text-xs font-mono text-[#8c7a6b] mb-1.5 uppercase tracking-widest">{speaker}</div>
             <div className="text-base sm:text-lg leading-relaxed whitespace-pre-wrap font-serif text-[#3a2f29]">{text}</div>
           </div>
-        </div>
-      )}
-
-      {/* フィードバック表示エリア */}
-      {feedback && (
-        <div className={`p-3 sm:p-4 rounded-lg border-l-4 shadow-sm animate-in zoom-in-95 duration-300 ${feedback.type === 'success' ? 'border-emerald-600 bg-emerald-50 text-emerald-900 border-y-emerald-200 border-r-emerald-200' : 'border-rose-600 bg-rose-50 text-rose-900 border-y-rose-200 border-r-rose-200'}`}>
-          <p className="font-bold font-mono text-xs sm:text-sm tracking-widest mb-1">{feedback.type === 'success' ? 'INTERRUPT SUCCESS' : feedback.type === 'penalty' ? 'INVALID INTERRUPT' : 'INTERRUPT MISSED'}</p>
-          <p className="text-sm sm:text-base italic font-serif leading-relaxed">{feedback.msg}</p>
         </div>
       )}
     </div>
