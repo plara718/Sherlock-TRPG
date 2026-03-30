@@ -460,8 +460,8 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
       {activeGlossary && <GlossaryToast term={activeGlossary.word} desc={activeGlossary.desc} onClose={() => setActiveGlossary(null)} />}
 
       {isCompleted && endResult && (
-        <div className="absolute inset-0 z-50 bg-theme-bg-dark opacity-95 flex items-center justify-center p-4 animate-in fade-in duration-500 backdrop-blur-sm">
-          <div className="bg-theme-bg-base max-w-md w-full rounded-xl shadow-2xl border-2 border-theme-border-base relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-4 animate-in fade-in duration-500 backdrop-blur-md">
+          <div className="bg-theme-bg-base max-w-md w-full rounded-xl shadow-2xl border-2 border-theme-border-base relative overflow-hidden backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
             <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent to-theme-border-dark" />
             <div className="p-6 sm:p-8 relative z-10 font-serif text-theme-text-base">
               <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-widest border-b border-theme-border-base/30 pb-3 mb-5 flex items-center gap-2">
@@ -489,7 +489,7 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
       )}
 
       {isCompleted && !endResult && (
-        <div className="absolute inset-0 z-50 bg-theme-bg-dark opacity-95 flex flex-col items-center justify-center p-4 animate-in fade-in duration-1000 backdrop-blur-md">
+        <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 animate-in fade-in duration-1000 backdrop-blur-md">
           <p className="text-theme-text-light text-lg font-serif tracking-widest mb-10 animate-pulse text-center">―― そして、記録は次へ繋がる。</p>
           <button onClick={() => { triggerVibration('light'); ctx.handleEpisodeComplete(episodeId, "INTERLUDE", tether, 0); }} className="bg-transparent border border-theme-border-base text-theme-text-light hover:bg-theme-text-light hover:text-theme-bg-dark font-bold py-3 px-8 rounded-full tracking-widest transition-all duration-300 flex items-center gap-2 active:scale-95">次へ進む <ArrowRight size={20} /></button>
         </div>
