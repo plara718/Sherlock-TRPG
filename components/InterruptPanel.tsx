@@ -36,10 +36,6 @@ export default function InterruptPanel({
   const [selectedEvidence, setSelectedEvidence] = useState<string | null>(null);
   const [showHint, setShowHint] = useState(false);
 
-  const isIrene = protagonist === 'irene';
-  // ▼ 修正箇所：ワトスンとホームズを明確に切り分ける
-  const isWatson = protagonist === 'watson';
-  const isHolmes = protagonist === 'holmes' || (!isIrene && !isWatson && !isMoriarty);
   const isMetaHint = hintText?.startsWith('【');
 
   const savedOnTimeUp = useRef(onTimeUp);
@@ -53,7 +49,7 @@ export default function InterruptPanel({
     return () => clearInterval(timer);
   }, [timeLeft]);
 
-  // ▼ 修正箇所：主人公に応じた適切なスキル群を定義
+  // ▼ 修正箇所：シナリオの全要求に対応できるよう、探偵陣営の基本スキルを4つに統一
   const skillOptions = isMoriarty
     ? [
         { id: 'CALCULUS', label: 'CALCULUS (計算)', icon: <Calculator size={16} /> },
@@ -61,23 +57,12 @@ export default function InterruptPanel({
         { id: 'SHADOW', label: 'SHADOW (暗躍)', icon: <EyeOff size={16} /> },
         { id: 'REWRITE', label: 'REWRITE (書換)', icon: <BrainCircuit size={16} /> }
       ]
-    : isIrene
-      ? [
-          { id: 'LINK', label: 'LINK (結合)', icon: <Network size={16} /> },
-          { id: 'SCOPE', label: 'SCOPE (俯瞰)', icon: <BrainCircuit size={16} /> },
-          { id: 'EMPATHY', label: 'EMPATHY (共感)', icon: <HeartHandshake size={16} /> }
-        ]
-      : isHolmes
-        ? [
-            { id: 'LINK', label: 'LINK (結合)', icon: <Network size={16} /> },
-            { id: 'SCOPE', label: 'SCOPE (俯瞰)', icon: <BrainCircuit size={16} /> },
-            { id: 'INSPECT', label: 'INSPECT (観察)', icon: <Fingerprint size={16} /> }
-          ]
-        : [ // Watson default
-            { id: 'LINK', label: 'LINK (結合)', icon: <Network size={16} /> },
-            { id: 'SCOPE', label: 'SCOPE (俯瞰)', icon: <BrainCircuit size={16} /> },
-            { id: 'MEDICAL', label: 'MEDICAL (医学)', icon: <HeartHandshake size={16} /> }
-          ];
+    : [
+        { id: 'LOGIC', label: 'LOGIC (論理)', icon: <BrainCircuit size={16} /> },
+        { id: 'SCOPE', label: 'SCOPE (観察)', icon: <Eye size={16} /> },
+        { id: 'LINK', label: 'LINK (結合)', icon: <Network size={16} /> },
+        { id: 'HEART', label: 'HEART (心理)', icon: <HeartHandshake size={16} /> }
+      ];
 
   const renderInterventionButton = () => {
     if (!interventionType || !isInterventionAvailable || interventionUsed || isMoriarty) return null;
@@ -159,7 +144,8 @@ export default function InterruptPanel({
           </div>
         </div>
 
-        <div className={`grid gap-2 sm:gap-3 mb-2 ${isMoriarty ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
+        {/* ▼ 修正箇所：全ての陣営で「4つのスキルボタン」が等間隔に並ぶようレイアウトを変更 */}
+        <div className="grid gap-2 sm:gap-3 mb-2 grid-cols-2 sm:grid-cols-4">
           {skillOptions.map((skill) => (
             <button 
               key={skill.id} 
