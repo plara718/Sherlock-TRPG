@@ -75,15 +75,20 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   const popupIdCounter = useRef(0);
 
   const collectingWordsRef = useRef<Set<string>>(new Set());
-  const touchStartCoords = useRef<{x: number, y: number} | null>(null);
   const backlogRef = useRef<HTMLDivElement>(null);
+
+  // ▼ スクロールとドラッグ判定用のRef
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
+  const prevChatLengthRef = useRef(0);
+  const isDraggingRef = useRef(false);
+  const pointerStartCoords = useRef<{x: number, y: number} | null>(null);
 
   const [cutin, setCutin] = useState<{type: 'success' | 'fail' | 'penalty', msg: string, isCritical?: boolean} | null>(null);
   const [isWigginsActive, setIsWigginsActive] = useState(false);
   const [isSanityZero, setIsSanityZero] = useState(false);
   const [showBacklog, setShowBacklog] = useState(false);
   
-  // ▼ 修正箇所：FAILEDやABYSSで記録された場合は「再プレイ」扱いとせず、初回報酬の権利を維持する
   const cData = ctx.clearedData[episodeId];
   const isReplay = Boolean(cData && cData.rank !== 'FAILED' && cData.rank !== 'ABYSS');
 
@@ -98,9 +103,6 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
   const interventionType = ['Irene', 'Mycroft', 'Wiggins'].includes(rawIntervention as string) ? (rawIntervention as 'Irene' | 'Mycroft' | 'Wiggins') : null;
   const isInterventionAvailable = interventionType === 'Irene' ? (ctx.unlockedTerms.includes('A013') && !isIrene && !isMoriarty) : interventionType === 'Mycroft' ? (!isIrene && !isMoriarty) : interventionType === 'Wiggins' ? (ctx.unlockedTerms.includes('B004') && !isIrene && !isMoriarty) : false;
   const [interventionUsed, setInterventionUsed] = useState(false);
-
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const isScrollingRef = useRef(false);
 
   const triggerVibration = useCallback((type: 'light' | 'heavy' | 'success' | 'error') => {
     if (typeof window === 'undefined' || !navigator.vibrate) return;
@@ -148,14 +150,34 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
     setIsWigginsActive(false);
   }, [currentBeat, isStreaming, isInterruptMode, triggerVibration]);
 
+  // ▼ スクロールの最適化
   useEffect(() => { 
-    if (!isScrollingRef.current && scrollContainerRef.current) {
-      const { scrollHeight, clientHeight, scrollTop } = scrollContainerRef.current;
-      if (scrollHeight - clientHeight - scrollTop < 150) {
+    if (!scrollContainerRef.current) return;
+
+    const { scrollHeight, clientHeight, scrollTop } = scrollContainerRef.current;
+    const isNewMessage = chatHistory.length > prevChatLengthRef.current;
+    prevChatLengthRef.current = chatHistory.length;
+
+    // 手動で過去ログを読んでいる最中は自動スクロールしない（ただし割り込み発生時は強制スクロール）
+    if (isScrollingRef.current && !isInterruptMode) return;
+
+    if (isNewMessage || isInterruptMode) {
+      // 新規メッセージ追加時や割り込み発生時は、滑らかに最新位置へ
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTo({ 
+            top: scrollContainerRef.current.scrollHeight, 
+            behavior: 'smooth' 
+          });
+        }
+      }, 50);
+    } else if (isStreaming) {
+      // ストリーミング中は見切れないように即座に追従
+      if (scrollHeight - clientHeight - scrollTop < 300) {
         scrollContainerRef.current.scrollTo({ top: scrollHeight, behavior: 'auto' });
       }
     }
-  }, [streamedLength, chatHistory.length, isInterruptMode]);
+  }, [streamedLength, chatHistory.length, isInterruptMode, isStreaming]);
 
   useEffect(() => {
     if (showBacklog && backlogRef.current) {
@@ -258,10 +280,11 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
         </div>
       )}
 
+      {/* ▼ 証拠ポップアップの位置とアニメーションの最適化 */}
       {evidencePopups.length > 0 && (
-        <div className="absolute top-[20%] left-1/2 -translate-x-1/2 z-[70] pointer-events-none flex flex-col items-center gap-2">
+        <div className="absolute top-[12%] left-1/2 -translate-x-1/2 z-[70] pointer-events-none flex flex-col items-center gap-2">
           {evidencePopups.map((popup) => (
-            <div key={popup.id} className="animate-in slide-in-from-bottom-5 fade-in duration-300 flex flex-col items-center">
+            <div key={popup.id} className="animate-in slide-in-from-top-5 fade-in duration-300 flex flex-col items-center">
               <div className="bg-theme-accent-main text-theme-text-base font-black px-6 py-2 rounded-full shadow-lg border-2 border-theme-border-base flex items-center gap-2 text-sm sm:text-base tracking-widest">
                 <FileText size={18} /> {isMoriarty ? 'VARIABLE ACQUIRED' : 'EVIDENCE ACQUIRED'}
               </div>
@@ -342,30 +365,35 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
 
       <TetherBar tether={tether} onArchiveClick={onBack} protagonist={protagonist} gaugeName={uiLabels.gaugeName} />
 
+      {/* ▼ クリック・ドラッグ判定の最適化（PC操作バグ対応） */}
       <div 
         className="flex-1 flex flex-col relative overflow-hidden cursor-pointer transition-colors duration-1000 bg-theme-bg-base" 
-        onClick={() => { 
-          if (isScrollingRef.current) return;
-          if (isStreaming) { skipStream(); isScrollingRef.current = false; return; }
+        onClick={(e) => { 
+          if (isDraggingRef.current) return;
+          if (isStreaming) { skipStream(); return; }
           const hasTrigger = currentBeat?.text.includes('[<NOISE>]') || currentBeat?.text.includes('[<FLAW>]');
           if (isInterruptMode || hasTrigger) return; 
 
           nextBeat(); 
-          isScrollingRef.current = false;
-        }} 
-        onTouchStart={(e) => { 
-          if (e.touches && e.touches.length > 0) {
-            touchStartCoords.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+          isScrollingRef.current = false; // 次へ進んだら手動スクロールを解除し、自動追従を再開
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' });
           }
-          isScrollingRef.current = false; 
         }} 
-        onTouchMove={(e) => { 
-          if (!touchStartCoords.current || !e.touches || e.touches.length === 0) return;
-          const dx = Math.abs(e.touches[0].clientX - touchStartCoords.current.x);
-          const dy = Math.abs(e.touches[0].clientY - touchStartCoords.current.y);
+        onPointerDown={(e) => { 
+          pointerStartCoords.current = { x: e.clientX, y: e.clientY };
+          isDraggingRef.current = false; 
+        }} 
+        onPointerMove={(e) => { 
+          if (!pointerStartCoords.current) return;
+          const dx = Math.abs(e.clientX - pointerStartCoords.current.x);
+          const dy = Math.abs(e.clientY - pointerStartCoords.current.y);
           if (dx > 10 || dy > 10) {
-            isScrollingRef.current = true;
+            isDraggingRef.current = true;
           }
+        }}
+        onPointerUp={() => {
+          pointerStartCoords.current = null;
         }}
       >
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-theme-text-base opacity-[0.03] to-transparent" />
@@ -375,8 +403,8 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
           className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar relative z-20"
           onScroll={(e) => {
             const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-            const isAtBottom = scrollHeight - scrollTop - clientHeight <= 50;
-            if (!isAtBottom) isScrollingRef.current = true;
+            const isAtBottom = scrollHeight - scrollTop - clientHeight <= 80;
+            isScrollingRef.current = !isAtBottom;
           }}
         >
           {chatHistory.map((beat: any, idx: number) => {
@@ -403,7 +431,9 @@ function GameContent({ scenarioData, initialSaveData }: { scenarioData: any, ini
             );
           })}
           {isStreaming && chatHistory[chatHistory.length-1]?.speaker !== 'System' && <div className="inline-block w-2.5 h-5 ml-1 animate-pulse align-middle bg-theme-text-base" />}
-          <div className="h-32" /> 
+          
+          {/* ▼ ログとパネルのバランス調整：最下部の余白を広げてパネルに隠れないようにする */}
+          <div className="h-40" /> 
         </div>
 
         {!isStreaming && currentBeat?.text.match(/\{.*?\}/g)?.some((match: string) => !collectedEvidence.includes(match.slice(1, -1))) && !isInterruptMode && !isWigginsActive && ctx.unlockedTerms.includes('B004') && !isMoriarty && (
